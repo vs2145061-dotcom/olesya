@@ -1,0 +1,10 @@
+name = "olesya-api"
+main = "worker.js"
+compatibility_date = "2026-06-01"
+
+# База D1 уже создана в вашем аккаунте Cloudflare (регион EU / WEUR).
+# Схема om_users / om_messages / om_bus развёрнута.
+[[d1_databases]]
+binding = "DB"
+database_name = "olesya-messenger-db"
+database_id = "850a02fd-68ce-40be-8cfb-63ce2325f3a1"
