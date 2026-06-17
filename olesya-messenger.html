@@ -640,14 +640,14 @@ let emitSeq=0, seenE=new Set();
 /* ── Firebase config (заполните из Firebase Console → Project Settings → Your apps) ──
    Все поля обязательны. Если apiKey пустой — будет использован Worker OTP или демо-режим. */
 const FIREBASE_CONFIG = {
-  apiKey:            'TODO_AIzaSyDacEhXiP9mUktvdUoVmvkpZzXHCGG_PmI',  // ← из Firebase Console → ⚙️ → Настройки проекта → Ваши приложения → Config
+  apiKey:            'AIzaSyDacEhXiP9mUktvdUoVmvkpZzXHCGG_PmI',  // ← из Firebase Console → ⚙️ → Настройки проекта → Ваши приложения → Config
   authDomain:        'messenger-olesya123.firebaseapp.com',
   projectId:         'messenger-olesya123',
   storageBucket:     'messenger-olesya123.firebasestorage.app',
-  messagingSenderId: 'TODO_6622521938',          // ← из Firebase Console → ⚙️ → Настройки проекта → Cloud Messaging
-  appId:             'TODO_1:6622521938:web:6c7e6bf6f81b563b81cd8b'               // ← из Firebase Console → ⚙️ → Настройки проекта → Ваши приложения
+  messagingSenderId: '6622521938',          // ← из Firebase Console → ⚙️ → Настройки проекта → Cloud Messaging
+  appId:             '1:6622521938:web:6c7e6bf6f81b563b81cd8b'               // ← из Firebase Console → ⚙️ → Настройки проекта → Ваши приложения
 };
-const CLOUD_DEFAULT={ provider:'', workerUrl:'' /* olesya-api.vs2145061.workers.dev */, supabaseUrl:'', supabaseKey:'' };
+const CLOUD_DEFAULT={ provider:'worker', workerUrl:'https://olesya-api.vs2145061.workers.dev', supabaseUrl:'', supabaseKey:'' };
 function cloudCfg(){try{return Object.assign({},CLOUD_DEFAULT,JSON.parse(localStorage.getItem('om_cloud'))||{})}catch(e){return Object.assign({},CLOUD_DEFAULT)}}
 function saveCloudCfg(c){localStorage.setItem('om_cloud',JSON.stringify(c));}
 let CFG=cloudCfg();
