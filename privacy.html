@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Политика конфиденциальности — Olesya Messenger</title>
+<style>
+  :root{--bg:#0E1014;--card:#171A21;--fg:#E7E9EE;--muted:#9AA3B2;--accent:#6C7BFF;--line:#252A34}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 -apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  .wrap{max-width:820px;margin:0 auto;padding:32px 20px 80px}
+  h1{font-size:26px;margin:0 0 4px}
+  h2{font-size:19px;margin:32px 0 8px;color:#fff}
+  .upd{color:var(--muted);font-size:14px;margin-bottom:24px}
+  p,li{color:var(--fg)}
+  a{color:var(--accent)}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:var(--card);color:#fff}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:16px 0}
+  .muted{color:var(--muted)}
+  hr{border:0;border-top:1px solid var(--line);margin:36px 0}
+  code{background:#0b0d11;padding:1px 6px;border-radius:5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Политика конфиденциальности</h1>
+<div class="upd">Приложение «Olesya Messenger» · Дата вступления в силу: 24 июня 2026 г.</div>
+
+<div class="card">
+Эта политика описывает, какие данные собирает мессенджер «Olesya Messenger» (далее — «Приложение»),
+зачем и как они используются, кому передаются и как вы можете ими управлять. Используя Приложение,
+вы соглашаетесь с условиями этой политики.
+</div>
+
+<h2>1. Кто обрабатывает данные</h2>
+<p>Оператор Приложения — частный владелец проекта «Olesya Messenger». Контакт для вопросов о
+конфиденциальности и запросов на удаление данных: <a href="mailto:vs2145061@gmail.com">vs2145061@gmail.com</a>.</p>
+
+<h2>2. Какие данные мы собираем</h2>
+<table>
+  <tr><th>Категория</th><th>Что именно</th><th>Зачем</th></tr>
+  <tr><td>Номер телефона</td><td>Ваш номер в формате E.164</td><td>Регистрация и вход (подтверждение по SMS), поиск контактов</td></tr>
+  <tr><td>Профиль</td><td>Имя, аватар (буква/иконка/фото), цвет</td><td>Отображение вас в чатах собеседникам</td></tr>
+  <tr><td>Переписка</td><td>Текст, фото, голосовые, видео-кружки, документы</td><td>Доставка и синхронизация сообщений между устройствами</td></tr>
+  <tr><td>Техданные</td><td>Идентификатор сессии, время последней активности, статус онлайн</td><td>Поддержание входа (30 дней), доставка событий в реальном времени</td></tr>
+  <tr><td>Контакты (по запросу)</td><td>Номер, который вы вводите для поиска собеседника</td><td>Найти зарегистрированного пользователя по номеру</td></tr>
+</table>
+<p class="muted">Приложение не считывает вашу телефонную книгу автоматически — поиск выполняется только по номеру,
+который вы вводите вручную.</p>
+
+<h2>3. Доступ к камере, микрофону и галерее</h2>
+<p>Приложение запрашивает доступ к камере и микрофону для звонков, видео-кружков и голосовых сообщений,
+а к галерее — для прикрепления и сохранения фото. Доступ используется только в момент соответствующего
+действия и только по вашей инициативе.</p>
+
+<h2>4. Кому передаются данные (обработчики)</h2>
+<table>
+  <tr><th>Сервис</th><th>Что обрабатывает</th><th>Назначение</th></tr>
+  <tr><td>Google Firebase (Phone Auth)</td><td>Номер телефона</td><td>Отправка и проверка SMS-кода входа</td></tr>
+  <tr><td>Cloudflare (Workers, D1, R2)</td><td>Профиль, переписка, медиа, сессии</td><td>Серверная часть: хранение и доставка сообщений</td></tr>
+  <tr><td>SMSC.ru</td><td>Номер телефона</td><td>Доставка SMS-кода для номеров +7 (как альтернатива Firebase)</td></tr>
+  <tr><td>Anthropic (Claude API)</td><td>Текст сообщения, который вы переводите</td><td>Автоперевод сообщений — только когда вы пользуетесь переводчиком</td></tr>
+  <tr><td>GIPHY</td><td>Поисковый запрос GIF</td><td>Поиск GIF-анимаций (если функция используется)</td></tr>
+</table>
+<p>Мы <b>не продаём</b> ваши данные и не передаём их третьим лицам для рекламы.</p>
+
+<h2>5. Где хранятся данные</h2>
+<p>Серверные данные хранятся в инфраструктуре Cloudflare (база данных D1 в регионе Западная Европа,
+медиа — в хранилище R2). Передача данных между приложением и сервером защищена протоколом HTTPS.
+Токены сессий подписываются криптографически (HMAC-SHA256).</p>
+
+<h2>6. Сколько хранятся данные</h2>
+<ul>
+  <li>Профиль и переписка — пока существует ваша учётная запись.</li>
+  <li>Сессии входа — 30 дней с момента входа.</li>
+  <li>Коды подтверждения (OTP) — до 10 минут.</li>
+  <li>События реального времени (служебная шина) — до 6 часов.</li>
+</ul>
+
+<h2>7. Ваши права</h2>
+<p>Вы можете запросить удаление учётной записи и связанных данных, написав на
+<a href="mailto:vs2145061@gmail.com">vs2145061@gmail.com</a>. Мы удалим данные в разумный срок,
+за исключением сведений, которые обязаны хранить по закону.</p>
+
+<h2>8. Дети</h2>
+<p>Приложение не предназначено для детей младше 13 лет. Если вам стало известно, что ребёнок
+предоставил нам данные без согласия родителей, сообщите нам — мы их удалим.</p>
+
+<h2>9. Изменения политики</h2>
+<p>Мы можем обновлять эту политику. Существенные изменения будут отражены в дате вступления в силу
+вверху страницы.</p>
+
+<hr>
+
+<h2 id="en">Privacy Policy (English summary)</h2>
+<p class="muted">Olesya Messenger collects your phone number (for SMS login via Google Firebase / SMSC.ru),
+profile (name, avatar, colour) and your messages (text, photos, voice, video notes), which are stored on
+Cloudflare (Workers, D1 database, R2 storage) to deliver and sync your chats. Message text is sent to
+Anthropic's Claude API only when you use the in-app translator. Camera, microphone and gallery access are
+used only for the related in-app actions. We do not sell your data or share it for advertising. To request
+account and data deletion, contact <a href="mailto:vs2145061@gmail.com">vs2145061@gmail.com</a>.
+Effective date: 24 June 2026.</p>
+
+</div>
+</body>
+</html>

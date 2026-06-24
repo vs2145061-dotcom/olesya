@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Olesya Messenger — Панель метрик</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{--bg:#0E1014;--card:#171A21;--fg:#E7E9EE;--muted:#9AA3B2;--accent:#6C7BFF;--ok:#3ddc97;--line:#252A34}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 -apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  .wrap{max-width:1000px;margin:0 auto;padding:24px 18px 70px}
+  h1{font-size:22px;margin:0 0 2px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:18px}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:18px}
+  input{background:#0b0d11;border:1px solid var(--line);color:var(--fg);border-radius:8px;padding:9px 11px;font-size:14px}
+  input#url{flex:2;min-width:240px} input#token{flex:1;min-width:160px}
+  button{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:9px 18px;font-size:14px;font-weight:600;cursor:pointer}
+  button:hover{filter:brightness(1.08)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .kpi .n{font-size:26px;font-weight:700}
+  .kpi .l{color:var(--muted);font-size:12px;margin-top:2px}
+  .charts{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:720px){.charts{grid-template-columns:1fr}}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .panel h3{margin:0 0 10px;font-size:14px;color:var(--muted);font-weight:600}
+  .msg{padding:10px 12px;border-radius:8px;margin-bottom:14px;font-size:13px;display:none}
+  .msg.err{background:#3a1418;border:1px solid #6b2230;color:#ffb3bd;display:block}
+  .msg.ok{background:#10271d;border:1px solid #1f5740;color:#9af0c8;display:block}
+  .hint{color:var(--muted);font-size:12px;margin-top:6px}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📊 Olesya Messenger — метрики роста</h1>
+  <div class="sub">Датчик популярности. Когда цифры устойчиво растут — можно включать платный премиум (см. регламент).</div>
+
+  <div class="bar">
+    <input id="url" placeholder="URL воркера, напр. https://olesya-api.vs2145061.workers.dev">
+    <input id="token" type="password" placeholder="STATS_TOKEN">
+    <button onclick="load()">Обновить</button>
+    <label class="hint"><input type="checkbox" id="remember" style="vertical-align:middle"> запомнить</label>
+  </div>
+  <div id="msg" class="msg"></div>
+
+  <div class="grid" id="kpis"></div>
+
+  <div class="charts">
+    <div class="panel"><h3>Новые пользователи</h3><canvas id="cNew"></canvas></div>
+    <div class="panel"><h3>Активные пользователи</h3><canvas id="cAct"></canvas></div>
+    <div class="panel"><h3>Сообщения</h3><canvas id="cMsg"></canvas></div>
+    <div class="panel"><h3>Всего / премиум</h3><canvas id="cTot"></canvas></div>
+  </div>
+  <div class="hint" style="margin-top:16px">
+    ⓘ Размещайте эту страницу на том же GitHub Pages, что и приложение
+    (<code>…github.io/olesya/stats.html</code>) — иначе сервер отклонит запрос (CORS).
+    Метрики включаются на сервере: миграция БД + <code>wrangler secret put STATS_TOKEN</code> + <code>wrangler deploy</code>.
+  </div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const DEF_URL="https://olesya-api.vs2145061.workers.dev";
+// восстановить сохранённое
+try{const s=JSON.parse(localStorage.getItem('om_stats')||'{}');
+  $('#url').value=s.url||DEF_URL; $('#token').value=s.token||''; $('#remember').checked=!!s.remember;
+}catch(e){ $('#url').value=DEF_URL; }
+
+let charts={};
+function bar(id,labels,data,color){
+  if(charts[id])charts[id].destroy();
+  charts[id]=new Chart($('#'+id),{type:'bar',
+    data:{labels,datasets:[{data,backgroundColor:color,borderRadius:6}]},
+    options:{plugins:{legend:{display:false}},scales:{
+      x:{ticks:{color:'#9AA3B2'},grid:{display:false}},
+      y:{ticks:{color:'#9AA3B2'},grid:{color:'#252A34'},beginAtZero:true}}}});
+}
+function kpi(n,l){return `<div class="kpi"><div class="n">${n}</div><div class="l">${l}</div></div>`;}
+
+async function load(){
+  const url=$('#url').value.trim().replace(/\/+$/,''); const token=$('#token').value.trim();
+  const msg=$('#msg'); msg.className='msg'; msg.textContent='';
+  if(!url||!token){msg.className='msg err';msg.textContent='Укажите URL воркера и STATS_TOKEN.';return;}
+  if($('#remember').checked) localStorage.setItem('om_stats',JSON.stringify({url,token,remember:true}));
+  else localStorage.removeItem('om_stats');
+  try{
+    const r=await fetch(url+'/stats?key='+encodeURIComponent(token));
+    if(r.status===401){msg.className='msg err';msg.textContent='401: неверный STATS_TOKEN (или секрет не задан на сервере).';return;}
+    if(!r.ok){msg.className='msg err';msg.textContent='Ошибка '+r.status+'. Проверьте, что метрики включены (deploy) и страница на GitHub Pages.';return;}
+    const d=await r.json(); const s=d.stats||{};
+    msg.className='msg ok'; msg.textContent='Обновлено: '+new Date(d.ts||Date.now()).toLocaleString('ru-RU');
+    $('#kpis').innerHTML =
+      kpi(s.users_total??'—','Всего пользователей')+
+      kpi(s.users_new_24h??'—','Новые за 24 ч')+
+      kpi(s.users_new_7d??'—','Новые за 7 дней')+
+      kpi(s.active_24h??'—','Активные за 24 ч')+
+      kpi(s.active_7d??'—','Активные за 7 дней')+
+      kpi(s.messages_24h??'—','Сообщений за 24 ч');
+    bar('cNew',['24 ч','7 дн','30 дн'],[s.users_new_24h||0,s.users_new_7d||0,s.users_new_30d||0],'#6C7BFF');
+    bar('cAct',['24 ч','7 дн','30 дн'],[s.active_24h||0,s.active_7d||0,s.active_30d||0],'#3ddc97');
+    bar('cMsg',['24 ч','7 дн'],[s.messages_24h||0,s.messages_7d||0],'#f5a623');
+    bar('cTot',['Всего','Премиум'],[s.users_total||0,s.premium_users||0],'#b06cff');
+  }catch(e){
+    msg.className='msg err';
+    msg.textContent='Сеть/CORS: '+e.message+'. Откройте страницу с того же домена GitHub Pages, что и приложение.';
+  }
+}
+if($('#token').value) load();
+</script>
+</body>
+</html>
