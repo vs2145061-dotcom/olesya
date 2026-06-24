@@ -1334,6 +1334,18 @@ const CLOUD_DEFAULT={ provider:'worker', workerUrl:'https://olesya-api.vs2145061
 function cloudCfg(){try{return Object.assign({},CLOUD_DEFAULT,JSON.parse(localStorage.getItem('om_cloud'))||{})}catch(e){return Object.assign({},CLOUD_DEFAULT)}}
 function saveCloudCfg(c){localStorage.setItem('om_cloud',JSON.stringify(c));}
 function cloudCfgUpdate(patch){const c=cloudCfg();const merged=Object.assign({},c,patch||{});saveCloudCfg(merged);return merged;}
+/* ── ПЕРЕКЛЮЧАТЕЛЬ ТАРИФА ─────────────────────────────────────────────
+   Фаза роста: премиум БЕСПЛАТНО всем (PREMIUM_FREE_FOR_ALL=true).
+   Когда мессенджер станет популярным — поставить false; платным станет
+   НОВЫЙ премиум-слой, а всё бесплатное останется бесплатным навсегда.
+   Будущие платные функции гейтить через isPremium(), старое не удалять. */
+const PREMIUM_FREE_FOR_ALL = true;
+function isPremium(user){
+  if (PREMIUM_FREE_FOR_ALL) return true;
+  const u = user || (typeof me!=='undefined' ? me : null);
+  return !!(u && u.plan && u.plan !== 'free');
+}
+if (typeof window!=='undefined') window.isPremium = isPremium;
 let CFG=cloudCfg();
 let cloudOn=false; // инициализируется в boot() после проверки isCloudReady()
 let mediaReady=false, _mediaWarned=false; // R2 для медиа подключён? (из /health)
@@ -1562,14 +1574,7 @@ function handleBus(m){
 /* ================== AUTH FLOW ================== */
 /* ================== AUTH FLOW ================== */
 function showScreen(id){ $$(  '.screen').forEach(s=>{ if(s.id===id){s.classList.remove('hidden','back')} }); }
-function go(id){ $$('.screen').forEach(s=>s.classList.add('hidden')); const el=$('#'+id); if(el)el.classList.remove('hidden'); else console.error('go(): экран не найден:',id);
-  // Прогрев соединения: при показе экрана ввода номера заранее устанавливаем TCP/TLS к серверу,
-  // чтобы первый боевой запрос /otp/send не падал на «холодном» соединении (лечит «Сервер недоступен» на 1-м нажатии).
-  if(id==='scrPhone' && isCloudReady()){
-    try{ fetch(getApiUrl()+'/health',{method:'GET',signal:AbortSignal.timeout(8000)})
-      .then(r=>{ if(r&&r.ok){cloudOn=true;} }).catch(()=>{}); }catch(_){}
-  }
-}
+function go(id){ $$('.screen').forEach(s=>s.classList.add('hidden')); const el=$('#'+id); if(el)el.classList.remove('hidden'); else console.error('go(): экран не найден:',id); }
 
 let pendingPhone='', genCode='', otpFails=0, otpLocked=false, pendingUser=null, pendingMode='', pwFails=0, pwLockUntil=0;
 /* ── Production OTP (используется когда cloudCfg().url задан) ── */
@@ -3187,7 +3192,7 @@ $('#cardSocial').onclick=()=>{_social=null;go('scrSocial');renderSocial();};
 function renderSocial(){
   const cfg=loadSocialCfg();const wrap=$('#socialWrap');wrap.innerHTML='';
   const consent=el('<div class="consent"></div>');
-  consent.innerHTML='<div class="ct">🔐 Подключение соцсетей</div><div class="cd">Вы разрешаете Olesya открывать выбранные соцсети внутри мессенджера, чтобы просматривать свою страницу не выходя из приложения. Логины и пароли мы не храним — вход выполняется на сайте самой соцсети.</div>';
+  consent.innerHTML='<div class="ct">🔐 Подключение соцсетей</div><div class="cd">Соцсети открываются в вашем браузере на их официальном сайте — там вы входите сами. Логины и пароли мы никогда не храним и не запрашиваем. Так безопасно и разрешено магазинами приложений.</div>';
   const tg=el('<div class="setting" style="padding:0;background:none;border:none"><div class="lbl"><div class="t">Я согласен(на)</div><div class="d">подключать соцсети к Olesya</div></div><div class="switch'+(cfg.consent?' on':'')+'"></div></div>');
   consent.appendChild(tg);wrap.appendChild(consent);
   tg.querySelector('.switch').onclick=function(){cfg.consent=!cfg.consent;this.classList.toggle('on',cfg.consent);saveSocialCfg();renderSocial();};
@@ -3198,7 +3203,7 @@ function renderSocial(){
     const ic=el('<div class="sn-ic" style="background:radial-gradient(120% 120% at 32% 24%,'+s.grad[0]+','+s.grad[1]+' 72%)"></div>');ic.innerHTML='<svg viewBox="0 0 24 24">'+s.svg+'</svg>';
     const main=el('<div class="sn-main"><div class="sn-name">'+esc(s.name)+'</div><div class="sn-sub">'+esc(link||s.hint)+'</div></div>');
     const act=el('<button class="sn-act'+(link?' go':'')+'">'+(link?'Открыть':'Подключить')+'</button>');
-    act.onclick=()=>{if(link){openWebview(link,s.name,'scrSocial');}else{connectSocial(s);}};
+    act.onclick=()=>{if(link){openExternal(link);}else{connectSocial(s);}};
     row.appendChild(ic);row.appendChild(main);row.appendChild(act);
     if(link){const edit=el('<button class="sn-act" title="Изменить" style="padding:7px 10px">✎</button>');edit.onclick=()=>connectSocial(s);row.appendChild(edit);}
     list.appendChild(row);
@@ -3214,6 +3219,9 @@ function connectSocial(s){
   saveSocialCfg();renderSocial();
 }
 
+/* Открыть ссылку в системном браузере (безопасно: вход на настоящем сайте, паролей не касаемся) */
+function openExternal(u){ if(!u)return; try{ var w=window.open(u,'_blank','noopener,noreferrer'); if(!w){ location.href=u; } }catch(e){ try{location.href=u;}catch(_){}} }
+if(typeof window!=='undefined') window.openExternal=openExternal;
 /* ================== ВСТРОЕННЫЙ ПРОСМОТР (наш стиль) ================== */
 let _webBackTo='scrHome', _webUrl='';
 function openWebview(url,title,backTo){
