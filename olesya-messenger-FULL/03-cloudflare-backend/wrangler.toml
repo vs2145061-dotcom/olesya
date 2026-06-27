@@ -1,0 +1,38 @@
+name = "olesya-api"
+main = "worker.js"
+compatibility_date = "2026-06-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "olesya-messenger-db"
+database_id = "850a02fd-68ce-40be-8cfb-63ce2325f3a1"
+
+# R2-бакет для медиа (фото/голос/видео-кружки).
+# СЕЙЧАС ОТКЛЮЧЁН, чтобы `wrangler deploy` прошёл в одну команду (R2 в аккаунте не включён).
+# Медиа уходит как base64 (резерв) — всё работает, просто крупные файлы тяжелее.
+# Чтобы включить R2 (рекомендуется): в дашборде Cloudflare включите R2, затем:
+#   wrangler r2 bucket create olesya-messenger-media
+# и раскомментируйте 3 строки ниже, после чего повторите `wrangler deploy`.
+# [[r2_buckets]]
+# binding = "MEDIA"
+# bucket_name = "olesya-messenger-media"
+
+# ─── ПЕРЕМЕННЫЕ (vars) ───
+# [vars]
+# ALLOWED_ORIGINS = "https://vs2145061-dotcom.github.io"   # CORS-whitelist (через запятую; '*' = открыто)
+# ANTHROPIC_MODEL = "claude-haiku-4-5"                      # модель для /translate
+
+# ─── SECRETS (никогда не вписывайте сюда ключи!) ───
+# Устанавливаются командой: wrangler secret put <NAME>
+#
+# Обязательные:
+#   SESSION_SECRET        — случайная строка 64+ символа
+#   FIREBASE_PROJECT_ID   — ID проекта Firebase (ваш-проект-12345)
+#   FIREBASE_WEB_API_KEY  — Web API Key из Firebase Console
+#
+# SMS для России (SMSC.ru) — БЕЗ VPN, основной путь для +7 номеров:
+#   SMSC_LOGIN            — логин аккаунта на smsc.ru
+#   SMSC_PASSWORD         — пароль аккаунта на smsc.ru
+#
+# Опциональные:
+#   ANTHROPIC_API_KEY     — ключ Anthropic для прокси перевода /translate
