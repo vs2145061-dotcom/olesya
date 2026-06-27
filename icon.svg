@@ -1,0 +1,41 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Olesya Messenger">
+  <defs>
+    <clipPath id="sq"><rect width="512" height="512" rx="116"/></clipPath>
+    <radialGradient id="bg" cx="32%" cy="24%" r="92%">
+      <stop offset="0" stop-color="#A78BFF"/>
+      <stop offset="0.55" stop-color="#6E54FF"/>
+      <stop offset="1" stop-color="#4A2FD6"/>
+    </radialGradient>
+    <linearGradient id="dot" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#B9A6FF"/>
+      <stop offset="1" stop-color="#5A41FF"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <g clip-path="url(#sq)">
+    <rect width="512" height="512" fill="url(#bg)"/>
+    <rect width="512" height="300" fill="url(#sheen)"/>
+    <ellipse cx="170" cy="92" rx="190" ry="92" fill="#ffffff" opacity="0.10"/>
+  </g>
+  <!-- мягкая тень под пузырём -->
+  <ellipse cx="256" cy="372" rx="150" ry="26" fill="#2A1C6E" opacity="0.30"/>
+  <!-- белый чат-пузырь с хвостиком -->
+  <path d="M256 116
+           C346 116 412 174 412 246
+           C412 318 346 376 256 376
+           C236 376 217 373 200 368
+           L150 404
+           L162 344
+           C118 318 100 284 100 246
+           C100 174 166 116 256 116 Z" fill="#ffffff"/>
+  <!-- блик на пузыре -->
+  <ellipse cx="205" cy="178" rx="74" ry="30" fill="#ffffff" opacity="0.0"/>
+  <ellipse cx="206" cy="182" rx="84" ry="34" fill="#EEE9FF" opacity="0.55"/>
+  <!-- три фирменных точки (чат/печатает) -->
+  <circle cx="196" cy="250" r="23" fill="url(#dot)"/>
+  <circle cx="256" cy="250" r="23" fill="url(#dot)"/>
+  <circle cx="316" cy="250" r="23" fill="url(#dot)"/>
+</svg>
