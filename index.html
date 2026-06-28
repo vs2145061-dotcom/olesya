@@ -1152,7 +1152,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
       <button class="iconbtn fx-call" id="btnAudioCall" title="Аудиозвонок"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92Z"/></svg></button>
       <button class="iconbtn fx-video" id="btnVideoCall" title="Видеозвонок"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m23 7-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></button>
     </div>
-    <div class="e2ee-banner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Сообщения защищены сквозным шифрованием · <span id="fingerprint" style="font-family:var(--mono)"></span></div>
+    <div class="e2ee-banner" id="e2eeBanner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> <span id="e2eeText">Шифрование канала · данные на Cloudflare (не в США)</span> · <span id="fingerprint" style="font-family:var(--mono)"></span></div>
     <div class="pinned-bar" id="pinnedBar" style="display:none"></div>
     <div class="conv-search" id="convSearchBar">
       <input id="convSearchInput" placeholder="Поиск по сообщениям чата…" />
@@ -1791,7 +1791,7 @@ async function cloudLoadHistory(peerId,lookbackMs){
     const rows=(r&&r.messages)||[];if(!rows.length)return;
     const d=db();if(!d.chats[k])d.chats[k]={id:k,members:[me.id,peerId],messages:[]};
     const byId=new Map(d.chats[k].messages.map(x=>[x.id,x]));let added=false;
-    rows.forEach(row=>{
+    for(const row of rows){
       const isVoice=row.type==='voice';
       const ex=byId.get(row.id);
       if(ex){
@@ -1800,7 +1800,17 @@ async function cloudLoadHistory(peerId,lookbackMs){
           if(!isVoice&&!ex.src){ex.src=row.data_url;added=true;}
           if(isVoice&&!ex.audio){ex.audio=row.data_url;added=true;}
         }
-        return;
+        continue;
+      }
+      if(row.type==='e2e'){   // секретное сообщение — расшифровываем на устройстве
+        const partnerId=(row.from_id===me.id)?row.to_id:row.from_id;
+        let enc=null;try{enc=JSON.parse(row.text||'null');}catch(e){}
+        const dec=enc?await e2eDecryptFrom(partnerId,enc):null;
+        if(!isSecret(partnerId))setChatOpt(partnerId,{secret:1});
+        d.chats[k].messages.push(Object.assign({id:row.id,from:row.from_id,to:row.to_id,t:row.t,readBy:[row.from_id],e2e:1},
+          dec?{type:dec.mtype||'text',text:dec.text||'',src:dec.src,audio:dec.audio,dur:dec.dur,orig:dec.orig,origLang:dec.origLang}
+             :{type:'text',text:'🔒 Зашифрованное сообщение (не удалось расшифровать)',undecrypted:1}));
+        added=true;continue;
       }
       d.chats[k].messages.push({id:row.id,from:row.from_id,to:row.to_id,type:row.type||'text',
         text:row.text||'',
@@ -1809,7 +1819,7 @@ async function cloudLoadHistory(peerId,lookbackMs){
         dur:(row.dur!=null?row.dur:undefined),
         orig:row.orig||undefined,origLang:row.orig_lang||undefined,t:row.t,
         readBy:[row.from_id]});added=true;
-    });
+    }
     if(added){d.chats[k].messages.sort((a,b)=>a.t-b.t);save(d);
       if(current&&current.id===peerId)renderMessages();renderChats();}
   }catch(e){}
@@ -2450,6 +2460,7 @@ function enterApp(){
   startPollers();
   refreshSettings();
   try{if(typeof pushSubscribe==='function')setTimeout(pushSubscribe,2500);}catch(e){}   // подписка на push (если уведомления разрешены)
+  try{if(typeof e2ePublishKey==='function')setTimeout(e2ePublishKey,1800);}catch(e){}   // публикуем E2E-ключ (для секретных чатов)
   try{applyProAccent();refreshProUI();if(typeof cloudProStatus==='function')setTimeout(cloudProStatus,1500);}catch(e){}   // статус Olesya Pro
   // ensure a chat with the bot exists for first-timers
   ensureChat(BOT.id,true);
@@ -2642,6 +2653,7 @@ let current=null;        // peer user
 const trWant={},trDone={};
 function addTrBlock(b,m){
   if(m.type!=='text'||!m.text)return;
+  if(current&&!current.group&&!current.channel&&isSecret(current.id))return;   // секретный чат: серверный перевод отключён (иначе текст уйдёт на сервер)
   if(m.from===me.id&&m.orig){const o=document.createElement('div');o.className='tr-block';o.dir='auto';
     o.innerHTML='<div class="tr-label">✍ ваш текст · '+(LANGS[m.origLang]||m.origLang||'')+'</div>';o.appendChild(document.createTextNode(m.orig));b.appendChild(o);}
   const peer=current?current.id:null;const cfg=peer?trCfgFor(peer):{};
@@ -2666,6 +2678,7 @@ function openConv(peerId){
   $('#btnAudioCall').style.display=_sv?'none':'';
   $('#btnVideoCall').style.display=_sv?'none':'';
   $('#fingerprint').textContent=fpr(me.id+peerId);
+  updateE2eeBanner(peerId);
   searchTerm='';const _csb0=$('#convSearchBar');if(_csb0)_csb0.classList.remove('show');
   renderMessages();
   applyChatBg();
@@ -2821,6 +2834,20 @@ function applyRemoteReact(p){const d=db();const c=p.gid?d.chats[p.gid]:d.chats[c
    Медиа (поля src/audio как data:) сначала выгружаем в R2 и передаём ССЫЛКУ,
    а не base64 — экономит трафик и не упирается в лимиты D1. При неудаче — резерв base64. */
 async function transmitMessage(m,peerId,isBot){
+  // ── СЕКРЕТНЫЙ ЧАТ (E2E): шифруем содержимое; сервер/шина видят только шифртекст ──
+  if(!isBot&&peerId!==me.id&&isSecret(peerId)&&e2eAvailable()){
+    const enc=await e2eEncryptFor(peerId,{text:m.text,src:m.src,audio:m.audio,dur:m.dur,orig:m.orig,origLang:m.origLang,mtype:m.type});
+    if(enc){
+      emit('msg',{id:m.id,from:me.id,to:peerId,t:m.t,type:m.type,e2e:1,enc});
+      if(cloudOn&&isCloudReady()){
+        try{await cloudSend({id:m.id,chat_key:chatKey(me.id,peerId),from_id:me.id,to_id:peerId,type:'e2e',text:JSON.stringify(enc),data_url:null,dur:null,orig:null,orig_lang:null,t:m.t});}catch(e){}
+      }
+      return;
+    }
+    // нет ключа собеседника — открытый текст НЕ отправляем
+    toast('🔒 Не удалось зашифровать (нет ключа собеседника). Сообщение не отправлено.');
+    return;
+  }
   const tm=Object.assign({},m,{to:peerId});
   let dataUrlForCloud=null, leftAsBase64=false;
   if(cloudOn&&!isBot&&peerId!==me.id&&!isIncognito(peerId)){
@@ -2867,7 +2894,7 @@ async function sendText(){
   if(isSlash(t)&&current){$('#msgInput').value='';autoSize();toggleSendBtn();handleSlash(t);return;}
   $('#msgInput').value='';autoSize();toggleSendBtn();if(typeof liveTick==='function')liveTick();
   const peer=current?current.id:null;const cfg=peer?trCfgFor(peer):{};
-  if(cfg.out&&current&&!current.bot){const sl=detectLang(t);
+  if(cfg.out&&current&&!current.bot&&!isSecret(peer)){const sl=detectLang(t);   // в секретном чате серверный перевод отключён
     if(sl!==cfg.out){const r=await translate(t,cfg.out);if(r){pushMessage({type:'text',text:r.text,orig:t,origLang:sl});sendTyping(false);return;}}}
   pushMessage({type:'text',text:t});
   sendTyping(false);
@@ -2893,8 +2920,16 @@ function showTyping(on){
 }
 
 /* incoming */
-function onIncomingMessage(p){
+async function onIncomingMessage(p){
   if(p&&p.gid)return onIncomingGroupMessage(p);
+  // ── СЕКРЕТНЫЙ ЧАТ (E2E): расшифровываем на устройстве ──
+  if(p&&p.e2e&&p.enc){
+    const dec=await e2eDecryptFrom(p.from,p.enc);
+    if(dec)p=Object.assign({},p,{text:dec.text,src:dec.src,audio:dec.audio,dur:dec.dur,orig:dec.orig,origLang:dec.origLang,type:dec.mtype||p.type||'text'});
+    else p=Object.assign({},p,{text:'🔒 Зашифрованное сообщение (не удалось расшифровать)',type:'text',undecrypted:1});
+    delete p.enc;
+    if(!isSecret(p.from))setChatOpt(p.from,{secret:1});  // у получателя чат тоже становится секретным
+  }
   const d=db();const peerId=p.from;const k=chatKey(me.id,peerId);
   if(!d.users[peerId]){d.users[peerId]={id:peerId,name:'Пользователь',avatar:'🙂',color:'#6C7BFF',online:true,lastSeen:Date.now()};}
   if(!d.chats[k])d.chats[k]={id:k,members:[me.id,peerId],messages:[]};
@@ -2962,7 +2997,7 @@ function openGroup(gid){
   updateConvStatus();
   $('#btnAudioCall').style.display='';
   $('#btnVideoCall').style.display='';
-  $('#fingerprint').textContent=fpr(gid);
+  $('#fingerprint').textContent=fpr(gid);updateE2eeBanner(null);
   searchTerm='';const _csb1=$('#convSearchBar');if(_csb1)_csb1.classList.remove('show');
   renderMessages();renderPinnedBar();applyChatBg();
   go('scrConv');
@@ -3317,7 +3352,7 @@ function renderChannelView(c){
   $('#convName').textContent='📢 '+c.name;
   $('#convStatus').textContent='@'+c.handle+' · '+(c.subs||0)+' '+plural(c.subs||0,'подписчик','подписчика','подписчиков');
   $('#btnAudioCall').style.display='none';$('#btnVideoCall').style.display='none';
-  $('#fingerprint').textContent='@'+c.handle;
+  $('#fingerprint').textContent='@'+c.handle;updateE2eeBanner(null);
   searchTerm='';const _csbC=$('#convSearchBar');if(_csbC)_csbC.classList.remove('show');
   renderMessages();renderPinnedBar();applyChatBg();
   updateChannelBars();
@@ -3518,6 +3553,73 @@ function chatOpt(id){return (getChatOpts()[id])||{};}
 function setChatOpt(id,patch){const all=getChatOpts();all[id]=Object.assign({},all[id],patch);try{localStorage.setItem(chatOptsKey(),JSON.stringify(all));}catch(e){}}
 function chatTTL(id){return chatOpt(id).ttl||0;}
 function isIncognito(id){return !!chatOpt(id).incog;}
+function isSecret(id){return !!chatOpt(id).secret;}
+/* ═══════════ E2E «Секретный чат» (ECDH P-256 + AES-GCM) ═══════════
+   Содержимое шифруется на устройстве; сервер видит только шифртекст.
+   В секретных чатах отключены серверный перевод, ИИ-ответы и поиск (сервер не может читать). */
+const _e2eKeyCache={};   // peerId -> производный AES-CryptoKey
+const _e2ePubCache={};   // peerId -> JWK публичного ключа собеседника
+function e2eAvailable(){return typeof crypto!=='undefined'&&!!crypto.subtle&&!!crypto.subtle.deriveKey;}
+function _e2eB64(buf){const b=new Uint8Array(buf);let s='';const CH=0x8000;for(let i=0;i<b.length;i+=CH)s+=String.fromCharCode.apply(null,b.subarray(i,i+CH));return btoa(s);}
+function _e2eUnb64(s){return Uint8Array.from(atob(s),c=>c.charCodeAt(0));}
+async function e2eEnsureKeys(){
+  if(!e2eAvailable())return null;
+  const sp=localStorage.getItem('om_e2e_priv'),pp=localStorage.getItem('om_e2e_pub');
+  if(sp&&pp){try{return {priv:JSON.parse(sp),pub:JSON.parse(pp)};}catch(e){}}
+  const kp=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveKey']);
+  const jpriv=await crypto.subtle.exportKey('jwk',kp.privateKey);
+  const jpub=await crypto.subtle.exportKey('jwk',kp.publicKey);
+  localStorage.setItem('om_e2e_priv',JSON.stringify(jpriv));
+  localStorage.setItem('om_e2e_pub',JSON.stringify(jpub));
+  return {priv:jpriv,pub:jpub};
+}
+async function e2ePublishKey(){
+  if(!e2eAvailable()||!cloudOn||!isCloudReady())return false;
+  try{const k=await e2eEnsureKeys();if(!k)return false;await jpost(getApiUrl()+'/key/publish',{pubkey:k.pub});return true;}catch(e){return false;}
+}
+async function e2eGetPeerKey(peerId){
+  if(_e2ePubCache[peerId])return _e2ePubCache[peerId];
+  try{const r=await jget(getApiUrl()+'/key?uid='+encodeURIComponent(peerId));if(r&&r.pubkey){_e2ePubCache[peerId]=r.pubkey;return r.pubkey;}}catch(e){}
+  return null;
+}
+async function e2eSharedKey(peerId){
+  if(_e2eKeyCache[peerId])return _e2eKeyCache[peerId];
+  if(!e2eAvailable())return null;
+  const my=await e2eEnsureKeys(),peerPub=await e2eGetPeerKey(peerId);
+  if(!my||!peerPub)return null;
+  try{
+    const priv=await crypto.subtle.importKey('jwk',my.priv,{name:'ECDH',namedCurve:'P-256'},false,['deriveKey']);
+    const pub=await crypto.subtle.importKey('jwk',peerPub,{name:'ECDH',namedCurve:'P-256'},false,[]);
+    const aes=await crypto.subtle.deriveKey({name:'ECDH',public:pub},priv,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+    _e2eKeyCache[peerId]=aes;return aes;
+  }catch(e){return null;}
+}
+async function e2eEncryptFor(peerId,obj){
+  const key=await e2eSharedKey(peerId);if(!key)return null;
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(JSON.stringify(obj)));
+  return {iv:_e2eB64(iv),ct:_e2eB64(ct)};
+}
+async function e2eDecryptFrom(peerId,enc){
+  const key=await e2eSharedKey(peerId);if(!key||!enc)return null;
+  try{const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:_e2eUnb64(enc.iv)},key,_e2eUnb64(enc.ct));return JSON.parse(new TextDecoder().decode(pt));}catch(e){return null;}
+}
+/* Включить/выключить секретный режим для чата. При включении проверяем, что у собеседника есть ключ. */
+async function toggleSecret(peerId){
+  if(isSecret(peerId)){setChatOpt(peerId,{secret:0});return {ok:true,on:false};}
+  if(!e2eAvailable())return {ok:false,err:'Браузер не поддерживает шифрование'};
+  await e2eEnsureKeys();await e2ePublishKey();
+  const peerPub=await e2eGetPeerKey(peerId);
+  if(!peerPub)return {ok:false,err:'Собеседник ещё не активировал шифрование (нет ключа). Попросите его зайти в обновлённое приложение.'};
+  setChatOpt(peerId,{secret:1});
+  return {ok:true,on:true};
+}
+/* Текст баннера шифрования: честный по умолчанию, «сквозное» — только в секретном чате */
+function updateE2eeBanner(peerId){
+  const t=document.getElementById('e2eeText');if(!t)return;
+  if(peerId&&isSecret(peerId))t.textContent='Сквозное шифрование (E2E) · сервер не читает';
+  else t.textContent='Шифрование канала · данные на Cloudflare (не в США)';
+}
 const TTL_OPTS=[['Выкл',0],['1 час',3600000],['24 часа',86400000],['7 дней',604800000]];
 function sweepExpired(){
   const d=db();let changed=false,curHit=false;const now=Date.now();
@@ -5240,6 +5342,20 @@ function buildChatSettings(body){
     const ic=el('<div class="setting"><div class="ic">🕵️</div><div class="lbl"><div class="t">Чат без истории на сервере</div><div class="d">сообщения идут транзитом и не сохраняются в облаке — честная приватность</div></div><div class="switch'+(isIncognito(peer)?' on':'')+'"></div></div>');
     ic.querySelector('.switch').onclick=function(){const on=!isIncognito(peer);setChatOpt(peer,{incog:on});this.classList.toggle('on',on);toast(on?'🕵️ Инкогнито включён — сообщения не хранятся на сервере':'Инкогнито выключен');};
     body.appendChild(ic);
+    // ── Секретный чат (E2E) ──
+    body.appendChild(el('<div class="sec-head">🔒 Секретный чат (сквозное шифрование)</div>'));
+    const sc=el('<div class="setting"><div class="ic">🔒</div><div class="lbl"><div class="t">End-to-end шифрование</div><div class="d">сообщения шифруются на устройствах; сервер видит только шифртекст. Перевод и ИИ в таком чате отключены</div></div><div class="switch'+(isSecret(peer)?' on':'')+'"></div></div>');
+    sc.querySelector('.switch').onclick=async function(){
+      const sw=this;sw.style.pointerEvents='none';
+      const r=await toggleSecret(peer);
+      sw.style.pointerEvents='';
+      if(!r.ok){toast('🔒 '+r.err);return;}
+      sw.classList.toggle('on',r.on);
+      if(current&&current.id===peer&&typeof updateE2eeBanner==='function')updateE2eeBanner(peer);
+      toast(r.on?'🔒 Секретный чат включён — сквозное шифрование':'Секретный чат выключен');
+    };
+    body.appendChild(sc);
+    if(!e2eAvailable())body.appendChild(el('<div class="note">⚠️ Этот браузер не поддерживает сквозное шифрование.</div>'));
   }}
 
 function buildTwoFA(body){
@@ -5573,7 +5689,7 @@ function boot(){
   }
   else{go('scrPhone');}
 }
-window.__om={translate,detectLang,sha,db,save,bus:handleBus,TAB,getSec,saveSec,trCfgFor,setTrCfg,sessionsMap,cloudCfg,saveCloudCfg,cloudCfgUpdate,refreshSettings,get me(){return me;},forceLogout,startPinLock,gifSearch,sendGif,setGifKey,gifKey,startRec,pauseRecForCall,resumeRec,stopRec,discardDraft,endCall,startVnote,saveToFaves,openFwd,doForward,refreshLivePanel,liveTick,saveSessionToken,apiHeaders,isFirebaseReady,initFirebase,applyChatBg,setChatBgPreset,chatBgCfg,setVnoteShape:(s)=>{vnoteShape=s;},get vnoteShape(){return vnoteShape;},openVnoteRecorder,cycleVnoteShape,renderHome,renderContacts,renderCalls,callContact,getBook,getCalls,knownContacts,importDeviceContacts,applyHomeBg,removeHomeBg,autosaveEnabled,setAutosave,rememberEnabled,setRemember,sendDocument,startCall,acceptCall,hasRTC,callInfo:()=>({peer:callPeerId,kind:callKind,pc:!!pc,signaling:pc?pc.signalingState:null}),notifPref,notifGranted,ensureNotif,showNotif,fitViewport,get mediaReady(){return mediaReady;},recInfo:()=>({state:recState,kind:recKind,accum:recAccum,peer:recPeerId,elapsed:recElapsed()}),renderNews,renderSocial,openReader,openWebview,aiAsk,openTgChannel,renderTgFeed,openTgChannels,renderTgChannels,createGroup,openGroup,applyGroupInvite,onIncomingGroupMessage,markReadGroup,groupById,startGroupCall,leaveGroupCall,gcallInfo:()=>(gcall?{gid:gcall.gid,kind:gcall.kind,peers:Object.keys(gcall.peers),incoming:!!gcall.incoming}:null),get current(){return current;},processImportedContacts,getPhonebook,savePhonebook,matchPhonebook,parsePastedContacts,submitPastedContacts,importDeviceContacts,inviteContact,openGroupInfo,renameGroup,addGroupMembers,removeGroupMember,leaveGroup,applyGroupUpdate,applyGroupLeave,applyGroupRead,emitGroupRead,botReply,botReplyRuleBased,botAction,botHelp,botWelcomeIfEmpty,pinMessage,unpinMessage,promoteAdmin,demoteAdmin,isGroupAdmin,parseMentions,appendTextWithMentions,applyChatPin,applyGroupPin,renderPinnedBar,updateMentionPop,aiChat,aiPublic,olesyaRespond,olesyaTranslateOnce,aiCfg,saveAiCfg,aiEnabled,aiWantsWeb,setTranslateTarget,clearTranslateTarget,openLangPicker,langCodeFromName,editMessage,deleteMessage,applyMsgEdit,applyMsgDelete,getChatOpts,setChatOpt,chatTTL,isIncognito,sweepExpired,handleSlash,isSlash,openConvSearch,closeConvSearch,runConvSearch,openConv,transcribeVoice,pushSubscribe,urlB64ToU8,createChannel,openChannel,openChannelsScreen,renderChannelsScreen,onChannelPost,subscribeCurrentChannel,unsubscribeCurrentChannel,postChannelMessage,chIsAdmin,channelCurrent,isPro,proUntil,maxFileMB,setProUntil,redeemProCode,proCheckout,openPro,renderPro,refreshProUI,cloudProStatus,setProAccent,proAccentVal,get searchTerm(){return searchTerm;}};
+window.__om={translate,detectLang,sha,db,save,bus:handleBus,TAB,getSec,saveSec,trCfgFor,setTrCfg,sessionsMap,cloudCfg,saveCloudCfg,cloudCfgUpdate,refreshSettings,get me(){return me;},forceLogout,startPinLock,gifSearch,sendGif,setGifKey,gifKey,startRec,pauseRecForCall,resumeRec,stopRec,discardDraft,endCall,startVnote,saveToFaves,openFwd,doForward,refreshLivePanel,liveTick,saveSessionToken,apiHeaders,isFirebaseReady,initFirebase,applyChatBg,setChatBgPreset,chatBgCfg,setVnoteShape:(s)=>{vnoteShape=s;},get vnoteShape(){return vnoteShape;},openVnoteRecorder,cycleVnoteShape,renderHome,renderContacts,renderCalls,callContact,getBook,getCalls,knownContacts,importDeviceContacts,applyHomeBg,removeHomeBg,autosaveEnabled,setAutosave,rememberEnabled,setRemember,sendDocument,startCall,acceptCall,hasRTC,callInfo:()=>({peer:callPeerId,kind:callKind,pc:!!pc,signaling:pc?pc.signalingState:null}),notifPref,notifGranted,ensureNotif,showNotif,fitViewport,get mediaReady(){return mediaReady;},recInfo:()=>({state:recState,kind:recKind,accum:recAccum,peer:recPeerId,elapsed:recElapsed()}),renderNews,renderSocial,openReader,openWebview,aiAsk,openTgChannel,renderTgFeed,openTgChannels,renderTgChannels,createGroup,openGroup,applyGroupInvite,onIncomingGroupMessage,markReadGroup,groupById,startGroupCall,leaveGroupCall,gcallInfo:()=>(gcall?{gid:gcall.gid,kind:gcall.kind,peers:Object.keys(gcall.peers),incoming:!!gcall.incoming}:null),get current(){return current;},processImportedContacts,getPhonebook,savePhonebook,matchPhonebook,parsePastedContacts,submitPastedContacts,importDeviceContacts,inviteContact,openGroupInfo,renameGroup,addGroupMembers,removeGroupMember,leaveGroup,applyGroupUpdate,applyGroupLeave,applyGroupRead,emitGroupRead,botReply,botReplyRuleBased,botAction,botHelp,botWelcomeIfEmpty,pinMessage,unpinMessage,promoteAdmin,demoteAdmin,isGroupAdmin,parseMentions,appendTextWithMentions,applyChatPin,applyGroupPin,renderPinnedBar,updateMentionPop,aiChat,aiPublic,olesyaRespond,olesyaTranslateOnce,aiCfg,saveAiCfg,aiEnabled,aiWantsWeb,setTranslateTarget,clearTranslateTarget,openLangPicker,langCodeFromName,editMessage,deleteMessage,applyMsgEdit,applyMsgDelete,getChatOpts,setChatOpt,chatTTL,isIncognito,sweepExpired,handleSlash,isSlash,openConvSearch,closeConvSearch,runConvSearch,openConv,transcribeVoice,pushSubscribe,urlB64ToU8,createChannel,openChannel,openChannelsScreen,renderChannelsScreen,onChannelPost,subscribeCurrentChannel,unsubscribeCurrentChannel,postChannelMessage,chIsAdmin,channelCurrent,isPro,proUntil,maxFileMB,setProUntil,redeemProCode,proCheckout,openPro,renderPro,refreshProUI,cloudProStatus,setProAccent,proAccentVal,isSecret,toggleSecret,e2eAvailable,e2eEnsureKeys,e2eEncryptFor,e2eDecryptFrom,e2eSharedKey,updateE2eeBanner,e2ePublishKey,_e2eSetPeerPub:(id,jwk)=>{_e2ePubCache[id]=jwk;},_e2eMyPub:async()=>{const k=await e2eEnsureKeys();return k&&k.pub;},get searchTerm(){return searchTerm;}};
 if('serviceWorker'in navigator&&location.protocol.indexOf('http')===0){
   window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').then(r=>{_swReg=r;}).catch(()=>{});});
   navigator.serviceWorker.addEventListener('message',e=>{ if(e.data&&e.data.type==='open-chat'&&e.data.peer&&me){ try{window.focus();}catch(_){ } try{openConv(e.data.peer);}catch(_){ } } });
