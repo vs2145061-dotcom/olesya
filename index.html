@@ -2055,7 +2055,7 @@ $('#btnSendCode').onclick=async()=>{
         const url=getApiUrl();
         const resp=await fetch(url+'/otp/send',{method:'POST',
           headers:{'content-type':'application/json'},body:JSON.stringify({phone}),
-          signal:AbortSignal.timeout(15000)});
+          signal:AbortSignal.timeout(25000)});
         const data=await resp.json();
         if(data.error==='rate_limit'){toast('⏳ '+data.message);b.disabled=false;return;}
         if(data.error==='sms_not_configured'){
@@ -2124,7 +2124,7 @@ $('#btnSendCode').onclick=async()=>{
         const url=getApiUrl();
         const resp=await fetch(url+'/otp/send',{method:'POST',
           headers:{'content-type':'application/json'},body:JSON.stringify({phone}),
-          signal:AbortSignal.timeout(15000)});
+          signal:AbortSignal.timeout(25000)});
         const data=await resp.json();
         if(data.error==='rate_limit'){toast('⏳ '+data.message);b.disabled=false;return;}
         if(data.ok){workerOtpOk=true;}
@@ -2224,7 +2224,10 @@ async function verifyOtp(raw){
     const url=getApiUrl();
     otpInput.disabled=true;$('#btnVerifyOtp').disabled=true;
     try{
-      const resp=await fetch(url+'/otp/verify',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({phone:pendingPhone,code}),signal:AbortSignal.timeout(15000)});
+      const doVerify=()=>fetch(url+'/otp/verify',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({phone:pendingPhone,code}),signal:AbortSignal.timeout(25000)});
+      let resp;
+      try{ resp=await doVerify(); }
+      catch(eRetry){ if(eRetry&&(eRetry.name==='TimeoutError'||eRetry.name==='AbortError')){ resp=await doVerify(); } else throw eRetry; }   // авто-повтор один раз при таймауте (медленная сеть)
       const data=await resp.json();
       if(data.error==='wrong_code'){
         otpFails++;otpInput.disabled=false;$('#btnVerifyOtp').disabled=false;
@@ -2309,7 +2312,7 @@ $('#btnResend').onclick=async()=>{
     const url=getApiUrl();
     const b=$('#btnResend');b.disabled=true;
     try{
-      const resp=await fetch(url+'/otp/send',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({phone:pendingPhone}),signal:AbortSignal.timeout(15000)});
+      const resp=await fetch(url+'/otp/send',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({phone:pendingPhone}),signal:AbortSignal.timeout(25000)});
       const data=await resp.json();
       if(data.error==='rate_limit'){toast('⏳ '+data.message);b.disabled=false;return;}
       if(!data.ok){toast('Ошибка: '+(data.message||data.error));b.disabled=false;return;}
