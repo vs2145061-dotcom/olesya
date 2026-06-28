@@ -2043,10 +2043,10 @@ $('#btnSendCode').onclick=async()=>{
   }
   pendingPhone=phone;
   const b=$('#btnSendCode');b.disabled=true;
-  // Маршрутизация: предпочитаем Firebase (надёжный SMS через Google, не режется операторами РФ).
-  // SMSC через Worker — резерв, только если Firebase не настроен. (SMSC отклонял часть РФ-номеров: error_code 6.)
+  // Маршрутизация: РФ-номера (+7) → наш Worker (SMSC + тест-код), без Firebase.
+  // Firebase Phone Auth отключён для РФ: требует платный тариф Blaze (auth/billing-not-enabled на Spark).
   const isRussian=/^\+7\d{10}$/.test(phone);
-  const useWorkerSms=isRussian && isCloudReady() && !isFirebaseReady();
+  const useWorkerSms=isRussian && isCloudReady();
   try{
     if(useWorkerSms){
       /* ── SMSC.ru через Worker (РФ, без VPN) ── */
@@ -2332,7 +2332,7 @@ async function verifyOtp(raw){
 
 $('#btnResend').onclick=async()=>{
   const isRussian=/^\+7\d{10}$/.test(pendingPhone||'');
-  const useWorkerSms=isRussian && isCloudReady() && !isFirebaseReady();   // как и первая отправка: Firebase в приоритете, SMSC — резерв
+  const useWorkerSms=isRussian && isCloudReady();   // РФ → Worker (SMSC/тест-код); Firebase для РФ отключён (нужен Blaze)
   if(!useWorkerSms && isFirebaseReady() && initFirebase()){
     const b=$('#btnResend');b.disabled=true;
     try{
