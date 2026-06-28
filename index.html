@@ -2050,7 +2050,7 @@ $('#btnSendCode').onclick=async()=>{
     if(useWorkerSms){
       /* ── SMSC.ru через Worker (РФ, без VPN) ── */
       fbConfirmation=null; // помечаем что это НЕ Firebase-поток
-      let workerOtpOk=false, smscNotConfigured=false;
+      let workerOtpOk=false, smscNotConfigured=false, devCode=null;
       try{
         const url=getApiUrl();
         const resp=await fetch(url+'/otp/send',{method:'POST',
@@ -2063,7 +2063,7 @@ $('#btnSendCode').onclick=async()=>{
           if(isFirebaseReady()){smscNotConfigured=true;}
           else{toast('SMS-провайдер не настроен. Обратитесь к администратору.');b.disabled=false;return;}
         }
-        else if(data.ok){workerOtpOk=true;}
+        else if(data.ok){workerOtpOk=true;if(data.dev_code)devCode=String(data.dev_code);}
         else{toast('Ошибка отправки: '+(data.message||data.error||'неизвестная'));b.disabled=false;return;}
       }catch(netErr){
         const isTimeout=netErr&&(netErr.name==='TimeoutError'||netErr.name==='AbortError');
@@ -2093,9 +2093,18 @@ $('#btnSendCode').onclick=async()=>{
       if(workerOtpOk){
         $('#otpPhoneLabel') && ($('#otpPhoneLabel').textContent=phone);
         resetOtp();go('scrOtp');
-        const dpw=$('#demoPillWrap');if(dpw)dpw.style.display='none';
         const _phw=$('#phoneHelper');if(_phw)_phw.style.display='none';
-        const oh=$('#otpHint');if(oh)oh.textContent='SMS с кодом отправлено на '+phone;
+        const oh=$('#otpHint');
+        if(devCode){
+          // тест-режим: сервер вернул код для этого номера (SMS можно не ждать)
+          const dc=$('#demoCode');if(dc)dc.textContent=devCode;
+          const dpw=$('#demoPillWrap');if(dpw)dpw.style.display='block';
+          if(oh)oh.textContent='🔧 Тест-режим: код показан выше (SMS тоже отправлена)';
+          const oi=$('#otpInput');if(oi)oi.value=devCode;
+        }else{
+          const dpw=$('#demoPillWrap');if(dpw)dpw.style.display='none';
+          if(oh)oh.textContent='SMS с кодом отправлено на '+phone;
+        }
         startResendCooldown(60);
         setTimeout(()=>{const oi=$('#otpInput');if(oi)oi.focus();},300);
         b.disabled=false;return;
