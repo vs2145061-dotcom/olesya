@@ -367,6 +367,35 @@ h1.brandname{font-family:var(--brand);font-weight:400;font-size:52px;line-height
 .ch-sub-btn:active{transform:scale(.98)}
 .ch-share-btn{flex:none;width:46px;height:46px;border-radius:14px;background:var(--raised-2);border:1px solid var(--line);font-size:18px;cursor:pointer}
 .ch-share-btn:active{transform:scale(.92)}
+/* Olesya Pro */
+.pro-row .ic{filter:drop-shadow(0 0 6px rgba(245,158,11,.5))}
+.pro-row{background:linear-gradient(100deg,rgba(245,158,11,.12),rgba(168,85,247,.1))}
+.pro-badge{display:none;align-items:center;gap:2px;background:linear-gradient(135deg,#F59E0B,#A855F7);color:#fff;font-size:10px;font-weight:800;padding:1px 6px;border-radius:8px;vertical-align:middle;margin-left:6px}
+.pro-hero{text-align:center;padding:26px 20px 14px;background:radial-gradient(120% 90% at 50% 0%,rgba(168,85,247,.22),transparent 70%)}
+.pro-crown{font-size:46px;filter:drop-shadow(0 6px 16px rgba(168,85,247,.5))}
+.pro-h1{font-family:var(--disp);font-size:27px;font-weight:800;margin-top:4px;background:linear-gradient(135deg,#F59E0B,#A855F7);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.pro-status{font-size:13px;color:var(--muted);margin-top:6px}
+.pro-status.on{color:#10B981;font-weight:700}
+.pro-benefits{padding:6px 14px}
+.pro-b{display:flex;align-items:center;gap:13px;padding:11px 4px;border-bottom:1px solid var(--line-soft)}
+.pro-b span{font-size:22px;flex:none;width:30px;text-align:center}
+.pro-b b{font-size:14.5px;display:block}
+.pro-b i{font-size:12.5px;color:var(--muted);font-style:normal}
+.pro-accent-wrap{padding:6px 16px 0}
+.pro-accents{display:flex;flex-wrap:wrap;gap:11px;padding:4px 0 8px}
+.pro-acc{width:38px;height:38px;border-radius:50%;border:2px solid transparent;cursor:pointer;position:relative;transition:transform .1s}
+.pro-acc.sel{border-color:#fff;box-shadow:0 0 0 2px var(--text)}
+.pro-acc.locked::after{content:"🔒";position:absolute;inset:0;display:grid;place-items:center;font-size:13px;background:rgba(0,0,0,.35);border-radius:50%}
+.pro-acc:active{transform:scale(.9)}
+.pro-plans{display:flex;gap:11px;padding:10px 14px}
+.pro-plan{flex:1;background:var(--raised);border:1px solid var(--line);border-radius:16px;padding:15px 10px;cursor:pointer;text-align:center;position:relative;transition:transform .1s}
+.pro-plan.best{border-color:var(--primary);background:linear-gradient(160deg,rgba(108,123,255,.14),var(--raised))}
+.pro-plan:active{transform:scale(.97)}
+.pp-best{position:absolute;top:-9px;right:10px;background:linear-gradient(135deg,#F59E0B,#A855F7);color:#fff;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:8px}
+.pp-t{font-size:13px;color:var(--muted)}
+.pp-price{font-size:21px;font-weight:800;margin-top:3px}
+.pp-price span{font-size:12px;font-weight:600;color:var(--muted)}
+.pro-redeem{padding:6px 14px}
 /* индикатор «ИИ думает» */
 .ai-typing .typing-ind i{background:var(--primary)}
 /* упоминания @имя */
@@ -1034,6 +1063,42 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
     <div class="list" id="channelsList"></div>
   </section>
 
+  <!-- ============ OLESYA PRO ============ -->
+  <section class="screen hidden" id="scrPro">
+    <div class="topbar">
+      <button class="iconbtn" data-back="scrHome" title="Главная">←</button>
+      <div class="grow"><div class="title">✨ Olesya Pro</div><div class="sub">больше возможностей</div></div>
+    </div>
+    <div style="overflow-y:auto;padding-bottom:28px">
+      <div class="pro-hero">
+        <div class="pro-crown">✨</div>
+        <div class="pro-h1">Olesya Pro</div>
+        <div class="pro-status" id="proStatus">Подписка не активна</div>
+      </div>
+      <div class="pro-benefits">
+        <div class="pro-b"><span>🚫</span><div><b>Без рекламы</b><i>чистый интерфейс навсегда</i></div></div>
+        <div class="pro-b"><span>📎</span><div><b>Файлы до 100 МБ</b><i>вместо 12 МБ — большие документы и медиа</i></div></div>
+        <div class="pro-b"><span>🎨</span><div><b>Эксклюзивные цвета и темы</b><i>персональный акцент оформления</i></div></div>
+        <div class="pro-b"><span>🤖</span><div><b>Приоритетный ИИ-ассистент</b><i>Олеся отвечает быстрее, без лимитов</i></div></div>
+        <div class="pro-b"><span>😎</span><div><b>Бейдж ✨ и стикер-паки</b><i>выделяйтесь в чатах</i></div></div>
+      </div>
+      <div class="pro-accent-wrap">
+        <div class="sec-head">🎨 Цвет акцента</div>
+        <div class="pro-accents" id="proAccents"></div>
+      </div>
+      <div class="pro-plans">
+        <button class="pro-plan" id="proPlanMonth"><div class="pp-t">Месяц</div><div class="pp-price">199 ₽<span>/мес</span></div></button>
+        <button class="pro-plan best" id="proPlanYear"><div class="pp-best">−17%</div><div class="pp-t">Год</div><div class="pp-price">1990 ₽<span>/год</span></div></button>
+      </div>
+      <div class="pro-redeem">
+        <div class="sec-head">Есть промокод?</div>
+        <div class="searchbar"><input id="proCode" placeholder="Промокод" style="text-transform:uppercase" /></div>
+        <button class="btn" id="btnRedeemPro" style="background:var(--raised);color:var(--text);border:1px solid var(--line);box-shadow:none">Активировать</button>
+      </div>
+      <div class="note" style="margin:14px 12px">Цена ниже Telegram Premium. Подписка поддерживает развитие мессенджера. Онлайн-оплата — через ЮKassa (подключается владельцем); промокоды работают уже сейчас.</div>
+    </div>
+  </section>
+
   <!-- ============ ЧИТАЛКА НОВОСТЕЙ ============ -->
   <div class="sheet" id="readerSheet">
     <div class="topbar"><button class="iconbtn" id="readerClose">←</button><div class="title" style="font-size:17px">Статья</div></div>
@@ -1219,7 +1284,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
     <div style="overflow-y:auto">
       <div class="prof-hero">
         <div class="avatar xl" id="profAvatar" style="cursor:pointer"></div>
-        <div class="nm" id="profName"></div>
+        <div class="nm" id="profName"></div><span class="pro-badge">✨ PRO</span>
         <div class="ph" id="profPhone"></div>
       </div>
       <input type="file" id="avatarInput" accept="image/*" hidden />
@@ -1231,6 +1296,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
       <div class="setting"><div class="ic">💾</div><div class="lbl"><div class="t">Сохранять медиа на устройство</div><div class="d">Фото, видео, голосовые и документы — в галерею/загрузки (экономит место на сервере)</div></div><div class="switch" id="autosaveToggle"></div></div>
       <div class="setting"><div class="ic">🔔</div><div class="lbl"><div class="t">Уведомления</div><div class="d">Оповещения о сообщениях и звонках, когда приложение свёрнуто</div></div><div class="switch" id="notifToggle"></div></div>
       <div class="sec-head">Оформление</div>
+      <div class="setting pro-row" id="rowPro" style="cursor:pointer"><div class="ic">✨</div><div class="lbl"><div class="t">Olesya Pro</div><div class="d" id="stPro">оформить подписку</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowTheme" style="cursor:pointer"><div class="ic">🎨</div><div class="lbl"><div class="t">Тема оформления</div><div class="d" id="stTheme">Авто</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowChatBg" style="cursor:pointer"><div class="ic">🖼️</div><div class="lbl"><div class="t">Фон чатов</div><div class="d" id="stChatBg">Стандартный</div></div><div style="color:var(--faint)">›</div></div>
       <div class="sec-head">🔥 Firebase (бесплатные SMS)</div>
@@ -2344,6 +2410,7 @@ function enterApp(){
   startPollers();
   refreshSettings();
   try{if(typeof pushSubscribe==='function')setTimeout(pushSubscribe,2500);}catch(e){}   // подписка на push (если уведомления разрешены)
+  try{applyProAccent();refreshProUI();if(typeof cloudProStatus==='function')setTimeout(cloudProStatus,1500);}catch(e){}   // статус Olesya Pro
   // ensure a chat with the bot exists for first-timers
   ensureChat(BOT.id,true);
   paintMe();renderChats();renderHome();
@@ -2522,8 +2589,8 @@ function fileEl(m){
 function sendDocument(file){
   if(!file)return;
   if(!current){toast('Откройте чат, чтобы отправить документ');return;}
-  const MAXB=12*1024*1024;
-  if(file.size>MAXB){toast('⚠️ Файл слишком большой (макс. 12 МБ)');return;}
+  const MB=maxFileMB();const MAXB=MB*1024*1024;
+  if(file.size>MAXB){toast('⚠️ Файл слишком большой (макс. '+MB+' МБ'+(isPro()?'':'. В Olesya Pro — до 100 МБ')+')');return;}
   const r=new FileReader();
   r.onload=()=>{ try{ pushMessage({type:'file',name:file.name||'документ',mime:file.type||'',size:file.size||0,src:r.result}); }catch(e){toast('Не удалось отправить файл');} };
   r.onerror=()=>toast('Не удалось прочитать файл');
@@ -3306,6 +3373,43 @@ function channelRow(ch){
 }
 function openNewChannel(){const h=$('#chHandle'),n=$('#chName'),de=$('#chDescr');if(h)h.value='';if(n)n.value='';if(de)de.value='';$('#newChannelModal').classList.add('show');}
 function closeChannelModal(){$('#newChannelModal').classList.remove('show');}
+
+/* ============== OLESYA PRO (подписка) ============== */
+const PRO_ACCENTS=[['Фиолет','#6C7BFF'],['Аметист','#A855F7'],['Закат','#FF6B6B'],['Изумруд','#10B981'],['Океан','#06B6D4'],['Золото','#F59E0B'],['Роза','#FF6CAB'],['Индиго','#4F46E5']];
+function proUntil(){return (me&&me.proUntil)||0;}
+function isPro(){return proUntil()>Date.now();}
+function maxFileMB(){return isPro()?100:12;}
+function setProUntil(until){const d=db();if(d.users[me.id]){d.users[me.id].proUntil=until||0;me=d.users[me.id];save(d);}}
+async function cloudProStatus(){
+  if(!me||!cloudOn||!isCloudReady()||CFG.provider!=='worker')return;
+  try{const r=await jget(wapi('/pro/status'));if(r&&typeof r.until!=='undefined'){setProUntil(r.until||0);refreshProUI();}}catch(e){}
+}
+async function redeemProCode(code){
+  code=String(code||'').trim();if(!code){toast('Введите промокод');return;}
+  if(!cloudOn||CFG.provider!=='worker'){toast('Активация промокода — при подключённом сервере');return;}
+  try{const r=await jpost(wapi('/pro/redeem'),{code});
+    if(r&&r.ok){setProUntil(r.until);refreshProUI();renderPro();toast('✨ Olesya Pro активирована на '+r.days+' дн.!');}
+  }catch(e){toast(e.message==='bad_code'?'Неверный промокод':(e.message==='code_exhausted'?'Промокод исчерпан':'Не удалось активировать'));}
+}
+async function proCheckout(plan){
+  if(!cloudOn||CFG.provider!=='worker'){toast('Оплата — при подключённом сервере');return;}
+  try{const r=await jpost(wapi('/pro/checkout'),{plan});if(r&&r.url){location.href=r.url;return;}}
+  catch(e){ if(e.message==='payment_not_configured'){toast('💳 Онлайн-оплата подключается. Пока активируйте Pro по промокоду 👇');return;} toast('Оплата временно недоступна'); }
+}
+function proAccentVal(){try{return localStorage.getItem('om_proaccent')||'';}catch(e){return '';}}
+function applyProAccent(){const a=isPro()?proAccentVal():'';if(a){document.documentElement.style.setProperty('--primary',a);}else{document.documentElement.style.removeProperty('--primary');}}
+function setProAccent(color){if(!isPro()){openPro();toast('Цвета акцента — в Olesya Pro ✨');return;}try{localStorage.setItem('om_proaccent',color);}catch(e){}applyProAccent();renderPro();toast('Цвет акцента обновлён ✨');}
+function openPro(){go('scrPro');renderPro();cloudProStatus();}
+function renderPro(){
+  const active=isPro();
+  const st=$('#proStatus');if(st){if(active){st.textContent='✨ Подписка активна до '+new Date(proUntil()).toLocaleDateString('ru-RU');st.className='pro-status on';}else{st.textContent='Подписка не активна';st.className='pro-status';}}
+  const ap=$('#proAccents');if(ap){ap.innerHTML='';PRO_ACCENTS.forEach(([nm,c])=>{const b=el('<button class="pro-acc" title="'+nm+'"></button>');b.style.background=c;if(proAccentVal()===c)b.classList.add('sel');if(!active)b.classList.add('locked');b.onclick=()=>setProAccent(c);ap.appendChild(b);});}
+}
+function refreshProUI(){
+  applyProAccent();
+  const r=$('#stPro');if(r)r.textContent=isPro()?('активна до '+new Date(proUntil()).toLocaleDateString('ru-RU')):'оформить подписку';
+  document.querySelectorAll('.pro-badge').forEach(b=>b.style.display=isPro()?'inline-flex':'none');
+}
 
 /* ============== КОНКУРЕНТНЫЕ ФУНКЦИИ ============== */
 /* ----- подсветка поиска ----- */
@@ -4438,6 +4542,12 @@ $('#channelsSearch').addEventListener('input',()=>renderChannelsScreen());
 $('#btnNewChannel').onclick=openNewChannel;
 $('#btnCreateChannel').onclick=()=>{createChannel($('#chHandle').value,$('#chName').value,$('#chDescr').value);};
 $('#newChannelModal').addEventListener('click',e=>{if(e.target.id==='newChannelModal')closeChannelModal();});
+/* Olesya Pro */
+$('#rowPro').onclick=openPro;
+$('#proPlanMonth').onclick=()=>proCheckout('month');
+$('#proPlanYear').onclick=()=>proCheckout('year');
+$('#btnRedeemPro').onclick=()=>redeemProCode($('#proCode').value);
+$('#proCode').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();redeemProCode($('#proCode').value);}});
 
 /* ===================== ЛИЦЕВАЯ СТРАНИЦА · ТЕЛЕФОННАЯ КНИГА · ЗВОНКИ ===================== */
 const SVG_PHONE="<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path d='M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z'/></svg>";
@@ -5423,7 +5533,7 @@ function boot(){
   }
   else{go('scrPhone');}
 }
-window.__om={translate,detectLang,sha,db,save,bus:handleBus,TAB,getSec,saveSec,trCfgFor,setTrCfg,sessionsMap,cloudCfg,saveCloudCfg,cloudCfgUpdate,refreshSettings,get me(){return me;},forceLogout,startPinLock,gifSearch,sendGif,setGifKey,gifKey,startRec,pauseRecForCall,resumeRec,stopRec,discardDraft,endCall,startVnote,saveToFaves,openFwd,doForward,refreshLivePanel,liveTick,saveSessionToken,apiHeaders,isFirebaseReady,initFirebase,applyChatBg,setChatBgPreset,chatBgCfg,setVnoteShape:(s)=>{vnoteShape=s;},get vnoteShape(){return vnoteShape;},openVnoteRecorder,cycleVnoteShape,renderHome,renderContacts,renderCalls,callContact,getBook,getCalls,knownContacts,importDeviceContacts,applyHomeBg,removeHomeBg,autosaveEnabled,setAutosave,rememberEnabled,setRemember,sendDocument,startCall,acceptCall,hasRTC,callInfo:()=>({peer:callPeerId,kind:callKind,pc:!!pc,signaling:pc?pc.signalingState:null}),notifPref,notifGranted,ensureNotif,showNotif,fitViewport,get mediaReady(){return mediaReady;},recInfo:()=>({state:recState,kind:recKind,accum:recAccum,peer:recPeerId,elapsed:recElapsed()}),renderNews,renderSocial,openReader,openWebview,aiAsk,openTgChannel,renderTgFeed,openTgChannels,renderTgChannels,createGroup,openGroup,applyGroupInvite,onIncomingGroupMessage,markReadGroup,groupById,startGroupCall,leaveGroupCall,gcallInfo:()=>(gcall?{gid:gcall.gid,kind:gcall.kind,peers:Object.keys(gcall.peers),incoming:!!gcall.incoming}:null),get current(){return current;},processImportedContacts,getPhonebook,savePhonebook,matchPhonebook,parsePastedContacts,submitPastedContacts,importDeviceContacts,inviteContact,openGroupInfo,renameGroup,addGroupMembers,removeGroupMember,leaveGroup,applyGroupUpdate,applyGroupLeave,applyGroupRead,emitGroupRead,botReply,botReplyRuleBased,botAction,botHelp,botWelcomeIfEmpty,pinMessage,unpinMessage,promoteAdmin,demoteAdmin,isGroupAdmin,parseMentions,appendTextWithMentions,applyChatPin,applyGroupPin,renderPinnedBar,updateMentionPop,aiChat,aiPublic,olesyaRespond,olesyaTranslateOnce,aiCfg,saveAiCfg,aiEnabled,aiWantsWeb,setTranslateTarget,clearTranslateTarget,openLangPicker,langCodeFromName,editMessage,deleteMessage,applyMsgEdit,applyMsgDelete,getChatOpts,setChatOpt,chatTTL,isIncognito,sweepExpired,handleSlash,isSlash,openConvSearch,closeConvSearch,runConvSearch,openConv,transcribeVoice,pushSubscribe,urlB64ToU8,createChannel,openChannel,openChannelsScreen,renderChannelsScreen,onChannelPost,subscribeCurrentChannel,unsubscribeCurrentChannel,postChannelMessage,chIsAdmin,channelCurrent,get searchTerm(){return searchTerm;}};
+window.__om={translate,detectLang,sha,db,save,bus:handleBus,TAB,getSec,saveSec,trCfgFor,setTrCfg,sessionsMap,cloudCfg,saveCloudCfg,cloudCfgUpdate,refreshSettings,get me(){return me;},forceLogout,startPinLock,gifSearch,sendGif,setGifKey,gifKey,startRec,pauseRecForCall,resumeRec,stopRec,discardDraft,endCall,startVnote,saveToFaves,openFwd,doForward,refreshLivePanel,liveTick,saveSessionToken,apiHeaders,isFirebaseReady,initFirebase,applyChatBg,setChatBgPreset,chatBgCfg,setVnoteShape:(s)=>{vnoteShape=s;},get vnoteShape(){return vnoteShape;},openVnoteRecorder,cycleVnoteShape,renderHome,renderContacts,renderCalls,callContact,getBook,getCalls,knownContacts,importDeviceContacts,applyHomeBg,removeHomeBg,autosaveEnabled,setAutosave,rememberEnabled,setRemember,sendDocument,startCall,acceptCall,hasRTC,callInfo:()=>({peer:callPeerId,kind:callKind,pc:!!pc,signaling:pc?pc.signalingState:null}),notifPref,notifGranted,ensureNotif,showNotif,fitViewport,get mediaReady(){return mediaReady;},recInfo:()=>({state:recState,kind:recKind,accum:recAccum,peer:recPeerId,elapsed:recElapsed()}),renderNews,renderSocial,openReader,openWebview,aiAsk,openTgChannel,renderTgFeed,openTgChannels,renderTgChannels,createGroup,openGroup,applyGroupInvite,onIncomingGroupMessage,markReadGroup,groupById,startGroupCall,leaveGroupCall,gcallInfo:()=>(gcall?{gid:gcall.gid,kind:gcall.kind,peers:Object.keys(gcall.peers),incoming:!!gcall.incoming}:null),get current(){return current;},processImportedContacts,getPhonebook,savePhonebook,matchPhonebook,parsePastedContacts,submitPastedContacts,importDeviceContacts,inviteContact,openGroupInfo,renameGroup,addGroupMembers,removeGroupMember,leaveGroup,applyGroupUpdate,applyGroupLeave,applyGroupRead,emitGroupRead,botReply,botReplyRuleBased,botAction,botHelp,botWelcomeIfEmpty,pinMessage,unpinMessage,promoteAdmin,demoteAdmin,isGroupAdmin,parseMentions,appendTextWithMentions,applyChatPin,applyGroupPin,renderPinnedBar,updateMentionPop,aiChat,aiPublic,olesyaRespond,olesyaTranslateOnce,aiCfg,saveAiCfg,aiEnabled,aiWantsWeb,setTranslateTarget,clearTranslateTarget,openLangPicker,langCodeFromName,editMessage,deleteMessage,applyMsgEdit,applyMsgDelete,getChatOpts,setChatOpt,chatTTL,isIncognito,sweepExpired,handleSlash,isSlash,openConvSearch,closeConvSearch,runConvSearch,openConv,transcribeVoice,pushSubscribe,urlB64ToU8,createChannel,openChannel,openChannelsScreen,renderChannelsScreen,onChannelPost,subscribeCurrentChannel,unsubscribeCurrentChannel,postChannelMessage,chIsAdmin,channelCurrent,isPro,proUntil,maxFileMB,setProUntil,redeemProCode,proCheckout,openPro,renderPro,refreshProUI,cloudProStatus,setProAccent,proAccentVal,get searchTerm(){return searchTerm;}};
 if('serviceWorker'in navigator&&location.protocol.indexOf('http')===0){
   window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').then(r=>{_swReg=r;}).catch(()=>{});});
   navigator.serviceWorker.addEventListener('message',e=>{ if(e.data&&e.data.type==='open-chat'&&e.data.peer&&me){ try{window.focus();}catch(_){ } try{openConv(e.data.peer);}catch(_){ } } });
