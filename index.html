@@ -2043,9 +2043,10 @@ $('#btnSendCode').onclick=async()=>{
   }
   pendingPhone=phone;
   const b=$('#btnSendCode');b.disabled=true;
-  // Маршрутизация: РФ-номера (+7) → SMSC через Worker (без VPN); остальные → Firebase
+  // Маршрутизация: предпочитаем Firebase (надёжный SMS через Google, не режется операторами РФ).
+  // SMSC через Worker — резерв, только если Firebase не настроен. (SMSC отклонял часть РФ-номеров: error_code 6.)
   const isRussian=/^\+7\d{10}$/.test(phone);
-  const useWorkerSms=isRussian && isCloudReady();
+  const useWorkerSms=isRussian && isCloudReady() && !isFirebaseReady();
   try{
     if(useWorkerSms){
       /* ── SMSC.ru через Worker (РФ, без VPN) ── */
@@ -2176,6 +2177,35 @@ $('#btnSendCode').onclick=async()=>{
     $('#otpPhoneLabel') && ($('#otpPhoneLabel').textContent=phone);
     resetOtp();go('scrOtp');setTimeout(()=>{const oi=$('#otpInput');if(oi)oi.focus();},300);
   }catch(e){
+    console.error('Firebase Auth Error:', e.code, e.message);
+    resetRecaptcha();
+    // РЕЗЕРВ: Firebase не смог отправить (reCAPTCHA/квота/сеть) → пробуем наш воркер (SMSC + тест-код),
+    // чтобы пользователь не застрял. Для тест-номеров вернётся dev_code и вход без SMS.
+    if(isCloudReady() && pendingPhone){
+      try{
+        const resp=await fetch(getApiUrl()+'/otp/send',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({phone:pendingPhone}),signal:AbortSignal.timeout(25000)});
+        const data=await resp.json();
+        if(data.ok){
+          fbConfirmation=null;
+          $('#otpPhoneLabel') && ($('#otpPhoneLabel').textContent=pendingPhone);
+          resetOtp();go('scrOtp');
+          const _phf=$('#phoneHelper');if(_phf)_phf.style.display='none';
+          const oh=$('#otpHint');
+          if(data.dev_code){
+            const dc=$('#demoCode');if(dc)dc.textContent=String(data.dev_code);
+            const dpw=$('#demoPillWrap');if(dpw)dpw.style.display='block';
+            if(oh)oh.textContent='🔧 Тест-режим: код показан выше';
+            const oi=$('#otpInput');if(oi)oi.value=String(data.dev_code);
+          }else{
+            const dpw=$('#demoPillWrap');if(dpw)dpw.style.display='none';
+            if(oh)oh.textContent='SMS с кодом отправлено на '+pendingPhone;
+          }
+          startResendCooldown(60);
+          setTimeout(()=>{const oi=$('#otpInput');if(oi)oi.focus();},300);
+          return;
+        }
+      }catch(_fbk){/* резерв не сработал — покажем исходную ошибку Firebase ниже */}
+    }
     const domain=window.location.hostname;
     const msg=e.code==='auth/unauthorized-domain'||e.code==='auth/internal-error'?
       `Домен "${domain}" не добавлен в Firebase.\nОткройте: console.firebase.google.com/project/messenger-olesya123 → Authentication → Settings → Авторизованные домены → Добавить: ${domain}`:
@@ -2183,9 +2213,7 @@ $('#btnSendCode').onclick=async()=>{
       e.code==='auth/too-many-requests'?'Слишком много попыток. Подождите 5 минут.':
       e.code==='auth/quota-exceeded'?'Исчерпан лимит Firebase. Попробуйте позже.':
       (e.message||String(e));
-    console.error('Firebase Auth Error:', e.code, e.message);
     alert('⚠️ '+msg);
-    resetRecaptcha();
   }finally{b.disabled=false;}
 };
 
@@ -2304,7 +2332,7 @@ async function verifyOtp(raw){
 
 $('#btnResend').onclick=async()=>{
   const isRussian=/^\+7\d{10}$/.test(pendingPhone||'');
-  const useWorkerSms=isRussian && isCloudReady();   // РФ-номера: всегда SMSC (как и первая отправка) — без смены провайдера
+  const useWorkerSms=isRussian && isCloudReady() && !isFirebaseReady();   // как и первая отправка: Firebase в приоритете, SMSC — резерв
   if(!useWorkerSms && isFirebaseReady() && initFirebase()){
     const b=$('#btnResend');b.disabled=true;
     try{
