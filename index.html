@@ -1692,11 +1692,14 @@ const FIREBASE_CONFIG = {
   appId:             '1:6622521938:web:6c7e6bf6f81b563b81cd8b',
   measurementId:     'G-N6RYG92F4S'
 };
-const CLOUD_DEFAULT={ provider:'worker', workerUrl:'https://olesya-api.vs2145061.workers.dev', supabaseUrl:'', supabaseKey:'' };
+const CLOUD_DEFAULT={ provider:'worker', workerUrl:'https://api.zemex.pro', supabaseUrl:'', supabaseKey:'' };
 function cloudCfg(){try{return Object.assign({},CLOUD_DEFAULT,JSON.parse(localStorage.getItem('om_cloud'))||{})}catch(e){return Object.assign({},CLOUD_DEFAULT)}}
 function saveCloudCfg(c){localStorage.setItem('om_cloud',JSON.stringify(c));}
 function cloudCfgUpdate(patch){const c=cloudCfg();const merged=Object.assign({},c,patch||{});saveCloudCfg(merged);return merged;}
 let CFG=cloudCfg();
+/* МИГРАЦИЯ адреса сервера: старый *.workers.dev режут операторы РФ → переводим на свой домен api.zemex.pro.
+   У уже залогиненных в om_cloud сохранён старый URL (он перекрывает дефолт) — переписываем его. */
+try{ if(CFG.workerUrl && CFG.workerUrl.indexOf('workers.dev')>=0){ CFG=cloudCfgUpdate({workerUrl:'https://api.zemex.pro'}); } }catch(e){}
 let cloudOn=false; // инициализируется в boot() после проверки isCloudReady()
 let mediaReady=false, _mediaWarned=false; // R2 для медиа подключён? (из /health)
 let sb=null;
