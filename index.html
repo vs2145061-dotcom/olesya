@@ -559,6 +559,12 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 .call-info .stat{color:var(--muted);font-size:15px;font-family:var(--mono);display:flex;align-items:center;gap:7px}
 .call-secure{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--amber);background:rgba(0,0,0,.3);padding:5px 12px;border-radius:20px;z-index:3}
 .call-actions{display:flex;gap:18px;z-index:3}
+/* Видеозвонок: аватар/имя уезжают наверх, чтобы не закрывать видео собеседника */
+#callScreen.video .call-secure{position:absolute;top:14px;left:0;right:0;z-index:3}
+#callScreen.video .call-info{position:absolute;top:44px;left:0;right:0;gap:6px;z-index:3;text-shadow:0 1px 6px rgba(0,0,0,.5)}
+#callScreen.video .call-info .avatar.xl{width:52px;height:52px;font-size:21px;box-shadow:0 2px 12px rgba(0,0,0,.4)}
+#callScreen.video .call-info .nm{font-size:18px}
+#callScreen.video .call-info .stat{font-size:13px}
 .callbtn{width:62px;height:62px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.12);backdrop-filter:blur(8px);transition:transform .1s,background .15s}
 .callbtn:active{transform:scale(.92)}
 .callbtn svg{width:26px;height:26px;color:#fff}
@@ -1250,6 +1256,8 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
   <section class="screen hidden" id="callScreen">
     <video id="remoteVideo" autoplay playsinline></video>
     <video id="localVideo" autoplay playsinline muted></video>
+    <!-- Отдельный аудио-элемент для звука собеседника: видео-элемент в скрытом состоянии на мобильных часто НЕ проигрывает звук -->
+    <audio id="remoteAudio" autoplay playsinline></audio>
     <div class="call-wrap">
       <div class="call-secure">🔒 <span>Сквозное шифрование звонка</span></div>
       <div class="call-info">
@@ -2766,9 +2774,18 @@ function voiceEl(m,mine){
   v.innerHTML='<div class="play"><svg viewBox="0 0 24 24" fill="currentColor" width="14"><path d="M8 5v14l11-7z"/></svg></div><div class="wave"></div><span class="dur">'+fmtDur(m.dur)+'</span>';
   const wave=v.querySelector('.wave');for(let i=0;i<22;i++){const bar=document.createElement('i');bar.style.height=(6+Math.abs(Math.sin(i*1.7))*16)+'px';wave.appendChild(bar);}
   const playBtn=v.querySelector('.play');
+  const bars=[...wave.children];
+  const waveOn=()=>bars.forEach(b=>b.style.opacity='1');
+  const waveOff=()=>bars.forEach(b=>b.style.opacity='');
   playBtn.onclick=e=>{e.stopPropagation();
-    if(m.audio){const a=new Audio(m.audio);a.play().catch(()=>simulatePlay());}else simulatePlay();
-    function simulatePlay(){const bars=[...wave.children];let i=0;const t=setInterval(()=>{bars.forEach((b,k)=>b.style.opacity=k===i?'1':'.4');i++;if(i>bars.length){clearInterval(t);bars.forEach(b=>b.style.opacity='.5');}},(m.dur*1000)/bars.length);}
+    if(!m.audio){toast('🎤 Голосовое ещё подгружается — попробуйте через пару секунд');return;}
+    if(v._a&&!v._a.paused){v._a.pause();waveOff();return;}   // повторный тап — пауза
+    const a=v._a||(v._a=new Audio(m.audio));
+    a.onended=waveOff; a.onpause=waveOff;
+    a.onerror=()=>{waveOff();toast('Не удалось воспроизвести голосовое — формат не поддерживается этим устройством. Файл можно скачать из меню сообщения (⋯).');};
+    const pr=a.play();
+    if(pr&&pr.then)pr.then(waveOn).catch(()=>{waveOff();toast('Не удалось воспроизвести голосовое — формат не поддерживается. Скачайте из меню (⋯).');});
+    else waveOn();
   };
   wrap.appendChild(v);
   // расшифровка голосового (Cloudflare Workers AI · Whisper)
@@ -4063,7 +4080,7 @@ function recElapsed(){return recAccum+(recState==='recording'?(Date.now()-recSta
 const VNOTE_MAX=30;
 function fmtRecTime(){const t=recElapsed();$('#recTime').textContent=fmtDur(t);const v=$('#vnoteTime');if(v)v.textContent=fmtDur(t)+' / '+fmtDur(VNOTE_MAX);
   if(recKind==='video'&&recState==='recording'&&t>=VNOTE_MAX){stopRec(true);toast('🎥 Лимит 0:30 — кружок отправлен');}}
-function pickVideoMime(){if(!window.MediaRecorder)return '';const c=['video/webm;codecs=vp8,opus','video/webm','video/mp4'];for(const m of c){try{if(MediaRecorder.isTypeSupported(m))return m;}catch(e){}}return '';}
+function pickVideoMime(){if(!window.MediaRecorder)return '';const c=['video/mp4;codecs=h264,aac','video/mp4','video/webm;codecs=vp8,opus','video/webm'];for(const m of c){try{if(MediaRecorder.isTypeSupported(m))return m;}catch(e){}}return '';}
 /* Оверлей в режиме записи (камера + таймер, кнопка ● скрыта, появляется ➤) */
 function showVnote(){const ov=$('#vnoteOverlay');ov.classList.add('show');ov.classList.remove('ready');
   const rb=$('#vnRecord');if(rb)rb.style.display='none';
@@ -4099,7 +4116,7 @@ function cycleVnoteShape(){
   toast((m?m.emoji+' ':'')+'Форма кружка: '+(m?m.name:vnoteShape)+(m?' · '+m.mood:''));
 }
 function hideVnote(){const ov=$('#vnoteOverlay');ov.classList.remove('show','ready');const pv=$('#vnotePreview');if(pv){try{pv.srcObject=null;}catch(e){}}}
-function pickAudioMime(){if(!window.MediaRecorder)return '';const c=['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/aac','audio/ogg'];for(const m of c){try{if(MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(m))return m;}catch(e){}}return '';}
+function pickAudioMime(){if(!window.MediaRecorder)return '';const c=['audio/mp4;codecs=mp4a.40.2','audio/mp4','audio/aac','audio/webm;codecs=opus','audio/webm','audio/ogg'];for(const m of c){try{if(MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(m))return m;}catch(e){}}return '';}
 function startMediaRec(kind){
   recMime='';
   if(navigator.mediaDevices&&window.MediaRecorder){
@@ -4190,7 +4207,7 @@ function sendMediaTo(peerId,obj){
 }
 function stopRec(send){
   if(recState==='idle')return;
-  const finalDur=recElapsed();const peerId=recPeerId;const kind=recKind;const mime=recMime||'video/webm';
+  const finalDur=recElapsed();const peerId=recPeerId;const kind=recKind;const mime=recMime||(recKind==='video'?'video/webm':'audio/webm');
   const shp=vnoteShape; // форма сохраняется между записями — меняется двойным тапом по кружку
   clearInterval(recTimer);
   $('#recBar').classList.remove('show');$('#recSend').style.display='none';$('#composer').style.display='flex';$('#voiceDraft').style.display='none';hideVnote();
@@ -4204,7 +4221,7 @@ function stopRec(send){
     }catch(e){console.error('send media error',e);toast('Не удалось отправить запись');}
   };
   if(mediaRec&&mediaRec.state!=='inactive'){
-    mediaRec.onstop=()=>{const blob=new Blob(recChunks,{type:(kind==='video')?mime:'audio/webm'});const r=new FileReader();r.onload=()=>finish(r.result);r.onerror=()=>finish(null);r.readAsDataURL(blob);try{if(recStream)recStream.getTracks().forEach(t=>t.stop());}catch(e){}};
+    mediaRec.onstop=()=>{const blob=new Blob(recChunks,{type:mime});const r=new FileReader();r.onload=()=>finish(r.result);r.onerror=()=>finish(null);r.readAsDataURL(blob);try{if(recStream)recStream.getTracks().forEach(t=>t.stop());}catch(e){}};
     try{mediaRec.stop();}catch(e){finish(null);}
   }else{ try{if(recStream)recStream.getTracks().forEach(t=>t.stop());}catch(e){} finish(null); }
 }
@@ -4255,6 +4272,9 @@ $('#vdCancel').onclick=()=>{discardDraft();refreshVoiceDraft();toast('Черно
 /* ================== CALLS (реальный WebRTC P2P) ================== */
 let callPeerId=null,callKind='audio',callTimer=null,callStart=0,localStream=null,callIncoming=false,callRingTO=null;
 let pc=null, pendingOffer=null, callPollTimer=null;
+let _pendingRemoteAudio=false, _spkOn=true;
+// Если автоплей звука собеседника заблокирован — включаем по первому касанию экрана звонка
+document.addEventListener('pointerdown',()=>{ if(_pendingRemoteAudio){ const ra=document.getElementById('remoteAudio'); if(ra){ ra.muted=false; const pr=ra.play(); if(pr&&pr.then)pr.then(()=>{_pendingRemoteAudio=false;}).catch(()=>{}); } } },{passive:true});
 /* ICE-серверы. STUN — обнаружение публичного адреса; TURN — РЕЛЕ для звонков между
    разными сетями (мобильный интернет/симметричный NAT), без него звонки часто не проходят.
    Ниже — бесплатные публичные TURN (Open Relay). Для продакшна заведите свой TURN
@@ -4292,7 +4312,11 @@ async function setupPeer(isCaller,kind){
   try{
     pc=new RTCPeerConnection(RTC_CFG);
     if(localStream)localStream.getTracks().forEach(t=>{try{pc.addTrack(t,localStream);}catch(e){}});
-    pc.ontrack=ev=>{ const rv=$('#remoteVideo'); if(rv&&ev.streams&&ev.streams[0]){ if(rv.srcObject!==ev.streams[0])rv.srcObject=ev.streams[0]; if(rv.play)rv.play().catch(()=>{}); } };
+    pc.ontrack=ev=>{ const st=ev.streams&&ev.streams[0]; if(!st)return;
+      const rv=$('#remoteVideo'); if(rv){ if(rv.srcObject!==st)rv.srcObject=st; if(rv.play)rv.play().catch(()=>{}); }
+      // ЗВУК собеседника — через отдельный <audio>, иначе на мобильных при скрытом видео звука нет
+      const ra=$('#remoteAudio'); if(ra){ if(ra.srcObject!==st)ra.srcObject=st; ra.muted=false; ra.volume=1; const pr=ra.play(); if(pr&&pr.catch)pr.catch(()=>{ /* автоплей мог быть заблокирован — включим по тапу */ _pendingRemoteAudio=true; }); }
+    };
     pc.onconnectionstatechange=()=>{ if(!pc)return; const st=pc.connectionState;
       if(st==='failed'){ const cs=$('#callStatus'); if(cs)cs.textContent='Не удалось соединиться (сеть/NAT)'; setTimeout(()=>{try{endCall(true);}catch(e){}},1800); }
     };
@@ -4372,7 +4396,8 @@ function endCall(remote){
   if(callTimer){clearInterval(callTimer);callTimer=null;}
   closePeer();
   if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}
-  try{$('#localVideo').srcObject=null;$('#remoteVideo').srcObject=null;}catch(e){}
+  try{$('#localVideo').srcObject=null;$('#remoteVideo').srcObject=null;const ra=$('#remoteAudio');if(ra){ra.srcObject=null;}}catch(e){}
+  _pendingRemoteAudio=false;
   if(!remote&&callPeerId)emit('call:end',{to:callPeerId,from:me.id});
   $('#callAvatar').classList.remove('incoming-ring');
   const fromHub=!!_callOrigin; const dest=_callOrigin||(current?'scrConv':'scrChats'); _callOrigin=null;
@@ -4390,12 +4415,15 @@ function initLocalVideo(){
   if(navigator.mediaDevices){navigator.mediaDevices.getUserMedia({video:true,audio:true}).then(s=>{localStream=s;$('#localVideo').srcObject=s;}).catch(()=>{toast('Камера недоступна — звук активен');});}
 }
 function renderCallActions(incoming,active,opt){
+  try{const cs=document.getElementById('callScreen');if(cs)cs.classList.toggle('video',callKind==='video');}catch(e){}
   const a=$('#callActions');a.innerHTML='';
   const btn=(cls,svg,fn)=>{const b=document.createElement('button');b.className='callbtn '+cls;b.innerHTML=svg;b.onclick=fn;return b;};
   const ICON={mic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>',
     cam:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m23 7-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>',
     end:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 15.46l-5.27-.61-2.52 2.52a15.05 15.05 0 0 1-6.59-6.59l2.53-2.53L8.54 3H3.03C2.46 13.18 10.82 21.54 21 20.97v-5.51z" transform="rotate(135 12 12)"/></svg>',
-    accept:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24 11.36 11.36 0 0 0 3.57.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1.02l-2.2 2.2z"/></svg>'};
+    accept:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24 11.36 11.36 0 0 0 3.57.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1.02l-2.2 2.2z"/></svg>',
+    spk:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg>',
+    spkoff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m23 9-6 6M17 9l6 6"/></svg>'};
   if(incoming){
     a.appendChild(btn('end',ICON.end,()=>endCall(false)));
     if(opt&&opt.unknown){a.appendChild(btn('',"<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><circle cx='12' cy='12' r='10'/><path d='m4.9 4.9 14.2 14.2'/></svg>",()=>{const s=getSec();if(!s.blocked.includes(opt.from))s.blocked.push(opt.from);saveSec(s);logSec('🚫 Заблокирован номер из входящего звонка');toast('Номер заблокирован');emit('call:reject',{to:opt.from,from:me.id,reason:'blocked'});refreshSettings();endCall(true);}));}
@@ -4404,6 +4432,10 @@ function renderCallActions(incoming,active,opt){
     let muted=false,camOff=false;
     const mb=btn('',ICON.mic,()=>{muted=!muted;mb.classList.toggle('active',muted);if(localStream)localStream.getAudioTracks().forEach(t=>t.enabled=!muted);toast(muted?'Микрофон выключен':'Микрофон включён');});
     a.appendChild(mb);
+    // Громкая связь: на мобильных медиа-звук идёт в динамик; кнопка управляет громкостью/выводом
+    const applySpk=()=>{const ra=$('#remoteAudio');if(ra){ra.muted=false;ra.volume=_spkOn?1:0.4;if(_spkOn&&ra.setSinkId){try{ra.setSinkId('');}catch(e){}}}};
+    const sb=btn('',_spkOn?ICON.spk:ICON.spkoff,()=>{_spkOn=!_spkOn;sb.innerHTML=_spkOn?ICON.spk:ICON.spkoff;sb.classList.toggle('active',!_spkOn);applySpk();toast(_spkOn?'🔊 Громкая связь включена':'🔉 Тихий режим');});
+    a.appendChild(sb);applySpk();
     a.appendChild(btn('end',ICON.end,()=>endCall(false)));
     if(callKind==='video'){const cb=btn('',ICON.cam,()=>{camOff=!camOff;cb.classList.toggle('active',camOff);if(localStream)localStream.getVideoTracks().forEach(t=>t.enabled=!camOff);});a.appendChild(cb);}
   }
@@ -5675,7 +5707,7 @@ window.addEventListener('orientationchange',()=>setTimeout(fitViewport,250));
 /* ─────── Авто-обновление (чтобы кэш браузера не держал старую версию) ───────
    На сайте лежит version.txt. Если там версия новее зашитой APP_VERSION —
    один раз принудительно перезагружаемся на свежую (минуя кэш) через ?_v=<версия>. */
-const APP_VERSION='v4.7-20260628';
+const APP_VERSION='v4.8-20260628';
 let _updTried=false;
 async function checkForUpdate(silent){
   try{
