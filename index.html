@@ -5672,7 +5672,32 @@ window.addEventListener('orientationchange',()=>setTimeout(fitViewport,250));
 })();
 
 /* ================== boot ================== */
+/* ─────── Авто-обновление (чтобы кэш браузера не держал старую версию) ───────
+   На сайте лежит version.txt. Если там версия новее зашитой APP_VERSION —
+   один раз принудительно перезагружаемся на свежую (минуя кэш) через ?_v=<версия>. */
+const APP_VERSION='v4.7-20260628';
+let _updTried=false;
+async function checkForUpdate(silent){
+  try{
+    const r=await fetch('version.txt?_='+Date.now(),{cache:'no-store'});
+    if(!r.ok)return false;
+    const latest=((await r.text())||'').trim().split(/\s+/)[0];
+    if(latest && latest!==APP_VERSION){
+      const u=new URL(location.href);
+      if(_updTried || u.searchParams.get('_v')===latest) return false;   // не зацикливаемся
+      _updTried=true; u.searchParams.set('_v',latest);
+      if(!silent){try{console.log('🔄 Обновление: '+APP_VERSION+' → '+latest);}catch(e){}}
+      location.replace(u.toString());
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+// при возврате в приложение проверяем обновление, но перезагружаем только если на экране входа (не мешаем чату)
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'){ const s=document.getElementById('scrPhone'); if(!me || (s&&!s.classList.contains('hidden'))) checkForUpdate(true); } });
+
 function boot(){
+  checkForUpdate();   // если версия устарела — подтянет свежую и перезагрузит (минуя кэш)
   // cloudOn проверяется асинхронно — до ответа сервера работаем локально
   cloudOn=false;
   if(CFG.provider==='supabase'){try{loadSupabaseSDK();}catch(e){}}
