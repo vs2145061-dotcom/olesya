@@ -1,7 +1,7 @@
 {
-  "name": "Olesya Messenger",
-  "short_name": "Olesya",
-  "description": "Olesya Messenger — защищённый мессенджер: чаты, звонки, стикеры, ИИ-перевод, новости и соцсети в одном приложении.",
+  "name": "Zemex",
+  "short_name": "Zemex",
+  "description": "Zemex — защищённый мессенджер: чаты, звонки, стикеры, ИИ-ассистент Олеся, перевод, новости и соцсети в одном приложении.",
   "lang": "ru",
   "start_url": "./",
   "scope": "./",

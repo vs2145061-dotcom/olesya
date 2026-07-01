@@ -4,14 +4,14 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content" />
 <meta name="theme-color" content="#0E1014" />
-<meta name="description" content="Olesya Messenger — кроссплатформенный мессенджер с ИИ-переводом, анти-спамом и защитой аккаунта" />
+<meta name="description" content="Zemex — кроссплатформенный мессенджер с ИИ-переводом, анти-спамом и защитой аккаунта" />
 <link rel="manifest" href="manifest.webmanifest" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <!-- Supabase SDK грузится лениво (loadSupabaseSDK) только если выбран провайдер Supabase -->
-<title>Olesya Messenger — защищённый чат</title>
+<title>Zemex — защищённый чат</title>
 <!-- Тема выставляется ДО отрисовки CSS, чтобы не было вспышки чужой темы -->
 <script>(function(){try{
   var p=localStorage.getItem('om_theme')||'auto';
@@ -367,7 +367,7 @@ h1.brandname{font-family:var(--brand);font-weight:400;font-size:52px;line-height
 .ch-sub-btn:active{transform:scale(.98)}
 .ch-share-btn{flex:none;width:46px;height:46px;border-radius:14px;background:var(--raised-2);border:1px solid var(--line);font-size:18px;cursor:pointer}
 .ch-share-btn:active{transform:scale(.92)}
-/* Olesya Pro */
+/* Zemex Pro */
 .pro-row .ic{filter:drop-shadow(0 0 6px rgba(245,158,11,.5))}
 .pro-row{background:linear-gradient(100deg,rgba(245,158,11,.12),rgba(168,85,247,.1))}
 .pro-badge{display:none;align-items:center;gap:2px;background:linear-gradient(135deg,#F59E0B,#A855F7);color:#fff;font-size:10px;font-weight:800;padding:1px 6px;border-radius:8px;vertical-align:middle;margin-left:6px}
@@ -944,7 +944,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
         <div class="logo"><span class="pulse"></span>
           <svg viewBox="0 0 24 24" fill="none"><path d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5Zm3 8H9V7a3 3 0 0 1 6 0v3Z" fill="#fff"/></svg>
         </div>
-        <h1 class="brandname">Olesya</h1>
+        <h1 class="brandname">Zemex</h1>
         <div class="brandsub">Messenger</div>
         <p class="tagline"><span class="lk">🔒</span> Сквозное шифрование · звонки · приватность</p>
       </div>
@@ -994,7 +994,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
   <section class="screen hidden" id="scrHome">
     <div class="topbar" style="border-bottom-color:transparent">
       <div class="orb brand o-brand" style="width:42px;height:42px;font-size:19px"><span>O</span></div>
-      <div class="grow"><div class="title brandmark" style="font-size:27px;line-height:1.05">Olesya</div><div class="sub" style="letter-spacing:3px;text-transform:uppercase;font-size:10px">Messenger</div></div>
+      <div class="grow"><div class="title brandmark" style="font-size:27px;line-height:1.05">Zemex</div><div class="sub" style="letter-spacing:3px;text-transform:uppercase;font-size:10px">Messenger</div></div>
       <button class="iconbtn" id="btnHomeBgRemove" title="Убрать фон" style="display:none;font-size:18px">✕</button>
       <button class="iconbtn fx-bg" id="btnHomeBg" title="Фон страницы"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button>
       <button class="iconbtn fx-theme" id="btnTheme" title="Тема" style="font-size:18px">🌙</button>
@@ -1014,7 +1014,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
         <div class="home-card hc-social" id="cardSocial"><div class="orb o-social hc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="6" cy="12" r="2.4"/><circle cx="17" cy="6" r="2.4"/><circle cx="17" cy="18" r="2.4"/><path d="M8.2 11l6.6-3.6M8.2 13l6.6 3.6" stroke-linecap="round"/></svg></div><div><div class="hc-t">Социальные сети</div><div class="hc-d">ваши страницы внутри</div></div></div>
         <div class="home-card hc-channels" id="cardChannels"><div class="orb o-channels hc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"><path d="M4 9v6h3l6 4V5L7 9z" fill="#fff" stroke="none"/><path d="M16.5 8.5a4 4 0 0 1 0 7M19 6a7 7 0 0 1 0 12" stroke-linecap="round"/></svg></div><div><div class="hc-t">Каналы</div><div class="hc-d">публичные ленты · подписки</div></div></div>
       </div>
-      <div class="home-foot">Olesya Messenger · защищённый чат<br>сквозное шифрование · ИИ-перевод · анти-спам · 2FA</div>
+      <div class="home-foot">Zemex · защищённый чат<br>сквозное шифрование · ИИ-перевод · анти-спам · 2FA</div>
     </div>
   </section>
 
@@ -1046,7 +1046,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
   <section class="screen hidden" id="scrTgChannels">
     <div class="topbar">
       <button class="iconbtn" data-back="scrSocial" title="Назад">←</button>
-      <div class="grow"><div class="title">Telegram-каналы</div><div class="sub">новости внутри Olesya</div></div>
+      <div class="grow"><div class="title">Telegram-каналы</div><div class="sub">новости внутри Zemex</div></div>
     </div>
     <div class="social-wrap" id="tgList"></div>
   </section>
@@ -1073,7 +1073,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
       <div class="web-fallback" id="webFallback" style="display:none">
         <div class="wf-ic">🌐</div>
         <div class="wf-t">Открывается во встроенном браузере</div>
-        <div class="wf-d">В установленном приложении Olesya эта страница открывается прямо внутри мессенджера — с входом в аккаунт и лентой. В обычном веб-браузере соцсети запрещают встраивание, поэтому откройте страницу в новой вкладке.</div>
+        <div class="wf-d">В установленном приложении Zemex эта страница открывается прямо внутри мессенджера — с входом в аккаунт и лентой. В обычном веб-браузере соцсети запрещают встраивание, поэтому откройте страницу в новой вкладке.</div>
         <button class="btn" id="webFallbackOpen" style="max-width:260px;margin-top:6px">Открыть в новой вкладке</button>
       </div>
     </div>
@@ -1094,12 +1094,12 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
   <section class="screen hidden" id="scrPro">
     <div class="topbar">
       <button class="iconbtn" data-back="scrHome" title="Главная">←</button>
-      <div class="grow"><div class="title">✨ Olesya Pro</div><div class="sub">больше возможностей</div></div>
+      <div class="grow"><div class="title">✨ Zemex Pro</div><div class="sub">больше возможностей</div></div>
     </div>
     <div style="overflow-y:auto;padding-bottom:28px">
       <div class="pro-hero">
         <div class="pro-crown">✨</div>
-        <div class="pro-h1">Olesya Pro</div>
+        <div class="pro-h1">Zemex Pro</div>
         <div class="pro-status" id="proStatus">Подписка не активна</div>
       </div>
       <div class="pro-benefits">
@@ -1346,7 +1346,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
       <div class="setting"><div class="ic">💾</div><div class="lbl"><div class="t">Сохранять медиа на устройство</div><div class="d">Фото, видео, голосовые и документы — в галерею/загрузки (экономит место на сервере)</div></div><div class="switch" id="autosaveToggle"></div></div>
       <div class="setting"><div class="ic">🔔</div><div class="lbl"><div class="t">Уведомления</div><div class="d">Оповещения о сообщениях и звонках, когда приложение свёрнуто</div></div><div class="switch" id="notifToggle"></div></div>
       <div class="sec-head">Оформление</div>
-      <div class="setting pro-row" id="rowPro" style="cursor:pointer"><div class="ic">✨</div><div class="lbl"><div class="t">Olesya Pro</div><div class="d" id="stPro">оформить подписку</div></div><div style="color:var(--faint)">›</div></div>
+      <div class="setting pro-row" id="rowPro" style="cursor:pointer"><div class="ic">✨</div><div class="lbl"><div class="t">Zemex Pro</div><div class="d" id="stPro">оформить подписку</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowTheme" style="cursor:pointer"><div class="ic">🎨</div><div class="lbl"><div class="t">Тема оформления</div><div class="d" id="stTheme">Авто</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowChatBg" style="cursor:pointer"><div class="ic">🖼️</div><div class="lbl"><div class="t">Фон чатов</div><div class="d" id="stChatBg">Стандартный</div></div><div style="color:var(--faint)">›</div></div>
       <div class="sec-head">🔥 Firebase (бесплатные SMS)</div>
@@ -1378,7 +1378,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
       <div class="sec-head">Данные</div>
       <div class="setting" id="btnClearAll" style="cursor:pointer"><div class="ic" style="color:var(--red)">🗑️</div><div class="lbl"><div class="t" style="color:var(--red)">Очистить все данные</div><div class="d">Удалить аккаунт и историю на этом устройстве</div></div></div>
       <div class="setting" id="btnLogout" style="cursor:pointer"><div class="ic">🚪</div><div class="lbl"><div class="t">Выйти</div></div></div>
-      <div style="text-align:center;color:var(--faint);font-size:12px;padding:24px">Olesya Messenger v4.8.0<br>Две темы (день/ночь) · Облако · ИИ-перевод · Анти-спам · 2FA · PWA</div>
+      <div style="text-align:center;color:var(--faint);font-size:12px;padding:24px">Zemex v4.8.0<br>Две темы (день/ночь) · Облако · ИИ-перевод · Анти-спам · 2FA · PWA</div>
     </div>
   </div>
 
@@ -1439,7 +1439,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
       <div class="paste-hint">Вставьте номера телефонов — по одному в строке. Можно с именем:<br><b>Анна +7 900 123 45 67</b></div>
       <textarea id="pasteArea" class="paste-area" placeholder="Анна +7 900 123 45 67&#10;Иван 8 901 555 22 33&#10;+7 902 000 11 22"></textarea>
       <button class="btn primary" id="btnPasteImport" style="margin-top:10px">Загрузить</button>
-      <div class="paste-foot">📱 На iPhone и в браузере доступ к полной книге контактов даёт только установленное приложение Olesya. Здесь — добавление вставкой.</div>
+      <div class="paste-foot">📱 На iPhone и в браузере доступ к полной книге контактов даёт только установленное приложение Zemex. Здесь — добавление вставкой.</div>
     </div>
   </div>
 
@@ -1727,7 +1727,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.1', BUILD_ID='2026-07-01-yandex-gateway';
+const APP_VERSION='4.9.2', BUILD_ID='2026-07-01-rebrand-zemex';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -2607,7 +2607,7 @@ function enterApp(){
   refreshSettings();
   try{if(typeof pushSubscribe==='function')setTimeout(pushSubscribe,2500);}catch(e){}
   try{if(typeof e2ePublishKey==='function')setTimeout(e2ePublishKey,1800);}catch(e){}   // подписка на push (если уведомления разрешены)
-  try{applyProAccent();refreshProUI();if(typeof cloudProStatus==='function')setTimeout(cloudProStatus,1500);}catch(e){}   // статус Olesya Pro
+  try{applyProAccent();refreshProUI();if(typeof cloudProStatus==='function')setTimeout(cloudProStatus,1500);}catch(e){}   // статус Zemex Pro
   try{if(typeof cloudSyncChats==='function'){_chatsSynced=false;_chatsSyncTries=0;setTimeout(cloudSyncChats,1500);}}catch(e){}   // server-as-source: восстановить все диалоги с сервера
   // ensure a chat with the bot exists for first-timers
   ensureChat(BOT.id,true);
@@ -2812,7 +2812,7 @@ function sendDocument(file){
   if(!file)return;
   if(!current){toast('Откройте чат, чтобы отправить документ');return;}
   const MB=maxFileMB();const MAXB=MB*1024*1024;
-  if(file.size>MAXB){toast('⚠️ Файл слишком большой (макс. '+MB+' МБ'+(isPro()?'':'. В Olesya Pro — до 100 МБ')+')');return;}
+  if(file.size>MAXB){toast('⚠️ Файл слишком большой (макс. '+MB+' МБ'+(isPro()?'':'. В Zemex Pro — до 100 МБ')+')');return;}
   const r=new FileReader();
   r.onload=()=>{ try{ pushMessage({type:'file',name:file.name||'документ',mime:file.type||'',size:file.size||0,src:r.result}); }catch(e){toast('Не удалось отправить файл');} };
   r.onerror=()=>toast('Не удалось прочитать файл');
@@ -3590,7 +3590,7 @@ function onChannelPost(p){
 }
 function shareChannel(c){
   const link=inviteLink()+'?ch='+encodeURIComponent(c.handle);
-  const text='Подпишись на канал «'+c.name+'» в Olesya: '+link;
+  const text='Подпишись на канал «'+c.name+'» в Zemex: '+link;
   if(navigator.share){navigator.share({title:c.name,text,url:link}).catch(()=>{});return;}
   try{navigator.clipboard.writeText(text);toast('🔗 Ссылка на канал скопирована');}catch(e){toast(link);}
 }
@@ -3640,7 +3640,7 @@ async function redeemProCode(code){
   code=String(code||'').trim();if(!code){toast('Введите промокод');return;}
   if(!cloudOn||CFG.provider!=='worker'){toast('Активация промокода — при подключённом сервере');return;}
   try{const r=await jpost(wapi('/pro/redeem'),{code});
-    if(r&&r.ok){setProUntil(r.until);refreshProUI();renderPro();toast('✨ Olesya Pro активирована на '+r.days+' дн.!');}
+    if(r&&r.ok){setProUntil(r.until);refreshProUI();renderPro();toast('✨ Zemex Pro активирована на '+r.days+' дн.!');}
   }catch(e){toast(e.message==='bad_code'?'Неверный промокод':(e.message==='code_exhausted'?'Промокод исчерпан':'Не удалось активировать'));}
 }
 async function proCheckout(plan){
@@ -3650,7 +3650,7 @@ async function proCheckout(plan){
 }
 function proAccentVal(){try{return localStorage.getItem('om_proaccent')||'';}catch(e){return '';}}
 function applyProAccent(){const a=isPro()?proAccentVal():'';if(a){document.documentElement.style.setProperty('--primary',a);}else{document.documentElement.style.removeProperty('--primary');}}
-function setProAccent(color){if(!isPro()){openPro();toast('Цвета акцента — в Olesya Pro ✨');return;}try{localStorage.setItem('om_proaccent',color);}catch(e){}applyProAccent();renderPro();toast('Цвет акцента обновлён ✨');}
+function setProAccent(color){if(!isPro()){openPro();toast('Цвета акцента — в Zemex Pro ✨');return;}try{localStorage.setItem('om_proaccent',color);}catch(e){}applyProAccent();renderPro();toast('Цвет акцента обновлён ✨');}
 function openPro(){go('scrPro');renderPro();cloudProStatus();}
 function renderPro(){
   const active=isPro();
@@ -3869,7 +3869,7 @@ function botPush(text,actions){
 }
 function botSend(text,actions){return botPush(text,actions);}   // совместимость
 function botHelp(){
-  botPush('Я — Олеся, ваш ИИ-ассистент в Olesya Messenger 🤖✨ Я умею рассуждать и анализировать, советовать, искать информацию в интернете и переводить на любой язык. Просто напишите вопрос — или выберите быстрое действие:',BOT_HELP_CHIPS);
+  botPush('Я — Олеся, ваш ИИ-ассистент в Zemex 🤖✨ Я умею рассуждать и анализировать, советовать, искать информацию в интернете и переводить на любой язык. Просто напишите вопрос — или выберите быстрое действие:',BOT_HELP_CHIPS);
 }
 function botWelcomeIfEmpty(){
   const c=db().chats[chatKey(me.id,BOT.id)];
@@ -3879,7 +3879,7 @@ function botWelcomeIfEmpty(){
 }
 /* действия-кнопки ассистента: открывают нужный экран/функцию */
 /* ============== ИИ-ДВИЖОК ОЛЕСИ (ChatGPT-аналог) ============== */
-const OLESYA_SYSTEM='Тебя зовут Олеся — умный, дружелюбный ИИ-ассистент внутри мессенджера Olesya. Ты умеешь рассуждать, анализировать, давать советы, искать информацию и переводить на любой язык. Отвечай ясно, структурно и по делу, тёплым человеческим тоном, по умолчанию на языке собеседника. Если в сообщении есть блок [ВЕБ] — опирайся на эти свежие данные из интернета и кратко укажи, что информация из поиска. Не выдумывай факты; если не уверена — честно скажи.';
+const OLESYA_SYSTEM='Тебя зовут Олеся — умный, дружелюбный ИИ-ассистент внутри мессенджера Zemex. Ты умеешь рассуждать, анализировать, давать советы, искать информацию и переводить на любой язык. Отвечай ясно, структурно и по делу, тёплым человеческим тоном, по умолчанию на языке собеседника. Если в сообщении есть блок [ВЕБ] — опирайся на эти свежие данные из интернета и кратко укажи, что информация из поиска. Не выдумывай факты; если не уверена — честно скажи.';
 function aiCfg(){try{return JSON.parse(localStorage.getItem('om_ai'))||{};}catch(e){return {};}}
 function saveAiCfg(c){try{localStorage.setItem('om_ai',JSON.stringify(c||{}));}catch(e){}}
 function aiEnabled(){return aiCfg().off!==true;}
@@ -4019,7 +4019,7 @@ function botReplyRuleBased(userMsg){
     else if(userMsg.type==='sticker')text='Класс! 😄';
     else if(/помощ|что ты умеешь|что умеешь|команд|help|меню|подскаж|умеешь/.test(t)){return botHelp();}
     else if(/групп|общий чат|конференц|создать чат/.test(t)){text='Создадим группу: выберите участников и название. В группах есть звонки, упоминания @имя, закреплённые сообщения и роли админов.';actions=[{label:'➕ Создать группу',act:'newgroup'}];}
-    else if(/контакт|телефонн.{0,4}\s?книг|импорт|друз|номер/.test(t)){text='Подгружу вашу телефонную книгу: кто уже в Olesya — попадёт в контакты, остальных можно пригласить одной кнопкой.';actions=[{label:'📇 Импорт контактов',act:'import'}];}
+    else if(/контакт|телефонн.{0,4}\s?книг|импорт|друз|номер/.test(t)){text='Подгружу вашу телефонную книгу: кто уже в Zemex — попадёт в контакты, остальных можно пригласить одной кнопкой.';actions=[{label:'📇 Импорт контактов',act:'import'}];}
     else if(/\bтем\b|тёмн|темн|светл|оформлен|внешн.* вид|дизайн/.test(t)){text='Могу переключить тёмную и светлую тему 🎨';actions=[{label:'🎨 Сменить тему',act:'theme'}];}
     else if(/новост|финанс|рассказ|лент/.test(t)){text='Открою ленту новостей — вкладки «Новости», «Финансы», «Рассказы», прямо внутри мессенджера.';actions=[{label:'📰 Открыть новости',act:'news'}];}
     else if(/соцсет|телеграм|телеграмм|instagram|инстаграм|\bvk\b|вконтакт/.test(t)){text='В разделе «Соцсети» можно добавить Telegram-каналы и читать ленту, не выходя из приложения.';actions=[{label:'🌐 Открыть соцсети',act:'social'}];}
@@ -4447,12 +4447,12 @@ mic.addEventListener('mousedown',startRec);mic.addEventListener('touchstart',e=>
 mic.addEventListener('touchend',e=>{e.preventDefault();micReleaseSend();});
 $('#recCancel').onclick=()=>{ if(recState==='recording'&&$('#recSend').style.display!=='none'){discardDraft();$('#composer').style.display='flex';} else stopRec(false); };
 $('#recSend').onclick=()=>stopRec(true);
-/* ─────── ГОЛОСОВОЕ УПРАВЛЕНИЕ ОЛЕСЕЙ (Olesya Pro): говоришь → распознаём → Олеся отвечает и читает вслух ─────── */
+/* ─────── ГОЛОСОВОЕ УПРАВЛЕНИЕ ОЛЕСЕЙ (Zemex Pro): говоришь → распознаём → Олеся отвечает и читает вслух ─────── */
 let _ovRec=null,_ovChunks=[],_ovStream=null,_ovActive=false,_olesyaSpeak=false;
 function speakText(t){ try{ if(!('speechSynthesis'in window)||!t)return; const u=new SpeechSynthesisUtterance(String(t).replace(/[*_#`>]/g,'').slice(0,600)); u.lang='ru-RU';u.rate=1;u.pitch=1; const vs=speechSynthesis.getVoices();const ru=vs.find(v=>/ru/i.test(v.lang));if(ru)u.voice=ru; speechSynthesis.cancel(); speechSynthesis.speak(u);}catch(e){} }
 function updateOvMic(on){const m=$('#btnMic');if(m)m.classList.toggle('listening',on);}
 async function olesyaVoiceToggle(){
-  if(!isPro()){ toast('🎙️ Голосовое управление — функция Olesya Pro ✨'); try{openPro();}catch(e){} return; }
+  if(!isPro()){ toast('🎙️ Голосовое управление — функция Zemex Pro ✨'); try{openPro();}catch(e){} return; }
   if(_ovActive){ try{ if(_ovRec&&_ovRec.state!=='inactive')_ovRec.stop(); }catch(e){} _ovActive=false; updateOvMic(false); return; }
   if(!micAllowed()){ toast('🎤 Микрофон выключен — включите в Настройках → Доступ к устройствам'); return; }
   if(!navigator.mediaDevices||!window.MediaRecorder){ toast('Голос недоступен в этом браузере'); return; }
@@ -4958,7 +4958,7 @@ $('#channelsSearch').addEventListener('input',()=>renderChannelsScreen());
 $('#btnNewChannel').onclick=openNewChannel;
 $('#btnCreateChannel').onclick=()=>{createChannel($('#chHandle').value,$('#chName').value,$('#chDescr').value);};
 $('#newChannelModal').addEventListener('click',e=>{if(e.target.id==='newChannelModal')closeChannelModal();});
-/* Olesya Pro */
+/* Zemex Pro */
 $('#rowPro').onclick=openPro;
 $('#proPlanMonth').onclick=()=>proCheckout('month');
 $('#proPlanYear').onclick=()=>proCheckout('year');
@@ -4997,7 +4997,7 @@ function markCallsSeen(){try{localStorage.setItem(callsSeenKey(),String(Date.now
 
 /* ---- Телефонная книга ---- */
 /* Локальная книга телефона: ВСЕ номера устройства сохраняются здесь (видны сразу,
-   даже если контакт ещё не в Olesya). Затем фоном помечаем, кто уже зарегистрирован. */
+   даже если контакт ещё не в Zemex). Затем фоном помечаем, кто уже зарегистрирован. */
 function pbKey(){return 'om_pb_'+(me?me.id:'x');}
 function getPhonebook(){try{return JSON.parse(localStorage.getItem(pbKey()))||[];}catch(e){return [];}}
 function savePhonebook(arr){try{localStorage.setItem(pbKey(),JSON.stringify(arr||[]));}catch(e){}}
@@ -5027,12 +5027,12 @@ async function processImportedContacts(list,more){
   await matchPhonebook();
 }
 
-/* Параллельное сопоставление номеров с зарегистрированными в Olesya (батчами по 8). */
+/* Параллельное сопоставление номеров с зарегистрированными в Zemex (батчами по 8). */
 let _matchBusy=false;
 async function matchPhonebook(force){
   const entries=getPhonebook();
   const pending=entries.filter(e=>e&&!e.uid&&(force||(!e.checked&&!e.notreg)));
-  if(!cloudOn){ if(pending.length)toast('Контакты загружены. Поиск друзей в Olesya включится с сервером (Настройки → Облачный сервер).'); renderContacts(); return; }
+  if(!cloudOn){ if(pending.length)toast('Контакты загружены. Поиск друзей в Zemex включится с сервером (Настройки → Облачный сервер).'); renderContacts(); return; }
   if(!pending.length){renderContacts();return;}
   if(_matchBusy)return;
   _matchBusy=true;renderContacts();
@@ -5052,16 +5052,16 @@ async function matchPhonebook(force){
     }
   }finally{_matchBusy=false;}
   renderContacts();
-  if(matched)toast('✅ Уже в Olesya: '+matched+' — можно писать и звонить');
-  else toast('Контакты загружены. Пока никто из них не в Olesya — пригласите друзей 👇');
+  if(matched)toast('✅ Уже в Zemex: '+matched+' — можно писать и звонить');
+  else toast('Контакты загружены. Пока никто из них не в Zemex — пригласите друзей 👇');
 }
 
-/* Пригласить контакт в Olesya (ссылка на наш мессенджер). */
+/* Пригласить контакт в Zemex (ссылка на наш мессенджер). */
 function inviteLink(){try{return location.origin+location.pathname;}catch(e){return 'https://olesya.app';}}
 async function inviteContact(entry){
   const link=inviteLink();
-  const text='Привет! Пишу из мессенджера Olesya — приватный, с шифрованием, звонками и группами. Присоединяйся: '+link;
-  try{ if(navigator.share){ await navigator.share({title:'Olesya Messenger',text,url:link}); return; } }
+  const text='Привет! Пишу из мессенджера Zemex — приватный, с шифрованием, звонками и группами. Присоединяйся: '+link;
+  try{ if(navigator.share){ await navigator.share({title:'Zemex',text,url:link}); return; } }
   catch(e){ if(e&&e.name==='AbortError')return; }
   try{ await navigator.clipboard.writeText(text); toast('🔗 Приглашение скопировано — отправьте контакту'); return; }catch(e){}
   toast('Пригласите по ссылке: '+link);
@@ -5096,7 +5096,7 @@ window.olesyaImportContacts=function(payload){
   processImportedContacts(list,!!payload.more);
 };
 function importDeviceContacts(){
-  // 1) Установленное приложение Olesya — читаем контакты телефона нативно (expo-contacts)
+  // 1) Установленное приложение Zemex — читаем контакты телефона нативно (expo-contacts)
   if(nativeBridge()){
     try{ window.ReactNativeWebView.postMessage(JSON.stringify({type:'pick-contacts'})); toast('Открываю контакты телефона…'); return; }catch(e){}
   }
@@ -5135,7 +5135,7 @@ function renderContacts(){
   if(pb.length){
     const inOl=pb.filter(e=>e&&e.uid).length;
     const st=el('<div class="pb-status"></div>');
-    const info=el('<span></span>');info.innerHTML='📇 В книге: <b>'+pb.length+'</b> · в Olesya: <b>'+inOl+'</b>'+(_matchBusy?' · ищем…':'');
+    const info=el('<span></span>');info.innerHTML='📇 В книге: <b>'+pb.length+'</b> · в Zemex: <b>'+inOl+'</b>'+(_matchBusy?' · ищем…':'');
     st.appendChild(info);
     const ref=el('<button class="pb-refresh">↻ Обновить</button>');
     ref.onclick=()=>{toast('Обновляю совпадения…');matchPhonebook(true);};
@@ -5179,10 +5179,10 @@ function renderContacts(){
     wrap.appendChild(row);
   };
 
-  // секция: уже в Olesya
+  // секция: уже в Zemex
   if(list.length){
     if(hint)hint.textContent='Нажмите на контакт — откроется чат. Кнопки справа — звонок и переименование.';
-    wrap.appendChild(el('<div class="cn-sec">В Olesya</div>'));
+    wrap.appendChild(el('<div class="cn-sec">В Zemex</div>'));
     list.forEach(u=>{
       mkRow(contactDisplayName(u),u.phone||'',
         ()=>{ensureChat(u.id);current=null;openConv(u.id);},
@@ -5194,12 +5194,12 @@ function renderContacts(){
     });
   }
 
-  // секция: пригласить (контакты телефона, которых ещё нет в Olesya)
+  // секция: пригласить (контакты телефона, которых ещё нет в Zemex)
   let invites=pb.filter(e=>e&&!e.uid&&!e.self);
   if(term)invites=invites.filter(e=>((e.name||'')+' '+(e.phone||'')).toLowerCase().includes(term));
   invites.sort((a,b)=>(a.name||a.phone).localeCompare(b.name||b.phone,'ru'));
   if(invites.length){
-    wrap.appendChild(el('<div class="cn-sec">Пригласить в Olesya · '+invites.length+'</div>'));
+    wrap.appendChild(el('<div class="cn-sec">Пригласить в Zemex · '+invites.length+'</div>'));
     invites.slice(0,400).forEach(e=>{
       mkRow(e.name||e.phone,e.phone,null,
         (acts)=>{const inv=el('<button class="cn-invite">Пригласить</button>');inv.onclick=ev=>{ev.stopPropagation();inviteContact(e);};acts.appendChild(inv);},
@@ -5369,8 +5369,8 @@ $('#cardSocial').onclick=()=>{_social=null;go('scrSocial');renderSocial();};
 function renderSocial(){
   const cfg=loadSocialCfg();const wrap=$('#socialWrap');wrap.innerHTML='';
   const consent=el('<div class="consent"></div>');
-  consent.innerHTML='<div class="ct">🔐 Соцсети внутри Olesya</div><div class="cd">Нажмите «Войти» — откроется страница входа выбранной соцсети прямо внутри мессенджера. Вы входите в свой личный кабинет и остаётесь в Olesya. Логины и пароли мы не храним и не видим — вход идёт на сайте самой соцсети, сессия сохраняется в приложении.</div>';
-  const tg=el('<div class="setting" style="padding:0;background:none;border:none"><div class="lbl"><div class="t">Я согласен(на)</div><div class="d">подключать соцсети к Olesya</div></div><div class="switch'+(cfg.consent?' on':'')+'"></div></div>');
+  consent.innerHTML='<div class="ct">🔐 Соцсети внутри Zemex</div><div class="cd">Нажмите «Войти» — откроется страница входа выбранной соцсети прямо внутри мессенджера. Вы входите в свой личный кабинет и остаётесь в Zemex. Логины и пароли мы не храним и не видим — вход идёт на сайте самой соцсети, сессия сохраняется в приложении.</div>';
+  const tg=el('<div class="setting" style="padding:0;background:none;border:none"><div class="lbl"><div class="t">Я согласен(на)</div><div class="d">подключать соцсети к Zemex</div></div><div class="switch'+(cfg.consent?' on':'')+'"></div></div>');
   consent.appendChild(tg);wrap.appendChild(consent);
   tg.querySelector('.switch').onclick=function(){cfg.consent=!cfg.consent;this.classList.toggle('on',cfg.consent);saveSocialCfg();renderSocial();};
   const list=el('<div'+(cfg.consent?'':' class="social-locked"')+'></div>');
@@ -5382,7 +5382,7 @@ function renderSocial(){
       // Telegram — несколько новостных каналов: открываем список каналов
       const n=(cfg.tgChannels||[]).length;
       const badge=' <span style="font-size:9px;font-family:var(--mono);color:var(--accent-2);border:1px solid rgba(157,123,255,.4);border-radius:5px;padding:0 4px;vertical-align:1px">НОВОСТИ</span>';
-      const subTxt=n?(n+' '+plural(n,'канал','канала','каналов')+' · посты внутри Olesya'):'новостные каналы — посты внутри Olesya';
+      const subTxt=n?(n+' '+plural(n,'канал','канала','каналов')+' · посты внутри Zemex'):'новостные каналы — посты внутри Zemex';
       const main=el('<div class="sn-main"><div class="sn-name">'+esc(s.name)+badge+'</div><div class="sn-sub">'+esc(subTxt)+'</div></div>');
       const act=el('<button class="sn-act'+(n?' go':'')+'">'+(n?'Открыть':'Добавить канал')+'</button>');
       act.onclick=()=>openTgChannels();
@@ -5425,7 +5425,7 @@ function renderTgChannels(){
     const del=el('<button class="sn-act" title="Удалить" style="padding:7px 11px">✕</button>');del.onclick=()=>removeTgChannel(ch);
     row.appendChild(ic);row.appendChild(main);row.appendChild(open);row.appendChild(del);box.appendChild(row);
   });
-  if(!(cfg.tgChannels||[]).length){box.appendChild(el('<div class="news-empty" style="padding:24px 16px"><div class="ne-ic">📣</div>Добавьте публичные Telegram-каналы — их посты будут показываться здесь, в стиле Olesya.</div>'));}
+  if(!(cfg.tgChannels||[]).length){box.appendChild(el('<div class="news-empty" style="padding:24px 16px"><div class="ne-ic">📣</div>Добавьте публичные Telegram-каналы — их посты будут показываться здесь, в стиле Zemex.</div>'));}
 }
 function addTgChannel(){
   const cfg=loadSocialCfg();
@@ -5453,7 +5453,7 @@ async function renderTgFeed(channel,force){
     const r=await jget(wapi('/tg?channel='+encodeURIComponent(channel)));items=(r&&r.items)||[];
   }catch(e){
     box.innerHTML='';box.appendChild(newsEmpty(e.message==='no_cloud'
-      ?'Лента Telegram-канала загружается через ваш сервер (Настройки → Облачный сервер). Подключите его — и посты канала появятся здесь, в стиле Olesya.'
+      ?'Лента Telegram-канала загружается через ваш сервер (Настройки → Облачный сервер). Подключите его — и посты канала появятся здесь, в стиле Zemex.'
       :'Не удалось загрузить канал @'+channel+'. Проверьте имя канала и интернет.'));return;
   }
   if(channel!==_tgChannel)return;
@@ -5475,7 +5475,7 @@ let _webBackTo='scrHome', _webUrl='';
 function nativeBridge(){return !!(typeof window!=='undefined'&&window.ReactNativeWebView&&typeof window.ReactNativeWebView.postMessage==='function');}
 function openWebview(url,title,backTo,preferExternal){
   if(!url)return;
-  // В установленном приложении Olesya — открываем системный встроенный браузер (логин и лента работают)
+  // В установленном приложении Zemex — открываем системный встроенный браузер (логин и лента работают)
   if(nativeBridge()){
     try{window.ReactNativeWebView.postMessage(JSON.stringify({type:'open-browser',url:url,title:title||''}));return;}catch(e){}
   }
@@ -5601,7 +5601,7 @@ function buildLegal(body){
   docs.forEach(d=>{const row=el('<div class="setting" style="cursor:pointer"><div class="ic">📄</div><div class="lbl"><div class="t">'+d[0]+'</div><div class="d">Открыть документ</div></div><div style="color:var(--faint)">›</div></div>');row.onclick=()=>openWebview(d[1],d[0],'scrHome',true);body.appendChild(row);});
   body.appendChild(el('<div class="sec-head">Удаление аккаунта</div>'));
   const del=el('<button class="kill sub-btn" style="text-align:center">Удалить аккаунт на сервере</button>');
-  del.onclick=async()=>{if(!confirm('Удалить аккаунт Olesya/ZEMEX на сервере, сеансы, контакты, заявки и сообщения? Действие необратимо.'))return;try{if(cloudOn&&CFG.provider==='worker'&&sessionToken){await jpost(wapi('/account/delete'),{});}Object.keys(localStorage).filter(k=>k.indexOf('om')===0).forEach(k=>localStorage.removeItem(k));sessionStorage.removeItem(SS);forceLogout('Аккаунт удалён');}catch(e){toast('Не удалось удалить аккаунт: '+String(e.message||e));}};
+  del.onclick=async()=>{if(!confirm('Удалить аккаунт Zemex/ZEMEX на сервере, сеансы, контакты, заявки и сообщения? Действие необратимо.'))return;try{if(cloudOn&&CFG.provider==='worker'&&sessionToken){await jpost(wapi('/account/delete'),{});}Object.keys(localStorage).filter(k=>k.indexOf('om')===0).forEach(k=>localStorage.removeItem(k));sessionStorage.removeItem(SS);forceLogout('Аккаунт удалён');}catch(e){toast('Не удалось удалить аккаунт: '+String(e.message||e));}};
   body.appendChild(del);
 }
 
@@ -5637,7 +5637,7 @@ async function buildServerContacts(body){
   load();
 }
 async function buildBusiness(body){
-  body.appendChild(el('<div class="note">Бизнес-режим превращает Olesya в рабочий инструмент: карточка компании, заявки клиентов, статусы, заметки и чек-листы.</div>'));
+  body.appendChild(el('<div class="note">Бизнес-режим превращает Zemex в рабочий инструмент: карточка компании, заявки клиентов, статусы, заметки и чек-листы.</div>'));
   const card=el('<div></div>');card.innerHTML='<div class="sec-head">Карточка бизнеса</div><input class="input sub-input" id="bcCompany" placeholder="Компания / проект"/><input class="input sub-input" id="bcRole" placeholder="Роль / услуга"/><input class="input sub-input" id="bcPhone" placeholder="Рабочий телефон"/><input class="input sub-input" id="bcSite" placeholder="Сайт"/><textarea class="input sub-input" id="bcDesc" placeholder="Описание услуг" style="height:90px"></textarea><button class="btn sub-btn" id="bcSave">Сохранить карточку</button>';body.appendChild(card);
   const tk=el('<div></div>');tk.innerHTML='<div class="sec-head">Новая заявка</div><input class="input sub-input" id="btClient" placeholder="Клиент"/><input class="input sub-input" id="btPhone" placeholder="Телефон клиента"/><input class="input sub-input" id="btTitle" placeholder="Что нужно сделать"/><textarea class="input sub-input" id="btNote" placeholder="Заметка, чек-лист, фото до/после текстом" style="height:100px"></textarea><button class="btn sub-btn" id="btAdd">Создать заявку</button>';body.appendChild(tk);
   const list=el('<div class="note">Загружаю заявки...</div>');body.appendChild(list);
