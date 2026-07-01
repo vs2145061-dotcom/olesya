@@ -1727,7 +1727,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.0', BUILD_ID='2026-06-28-zemex-merged';
+const APP_VERSION='4.9.1', BUILD_ID='2026-07-01-yandex-gateway';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -1761,7 +1761,7 @@ const FIREBASE_CONFIG = {
   appId:             '1:6622521938:web:6c7e6bf6f81b563b81cd8b',
   measurementId:     'G-N6RYG92F4S'
 };
-const CLOUD_DEFAULT={ provider:'worker', workerUrl:'https://api.zemex.pro', backupUrls:['https://backup-api.zemex.pro','https://olesya-api.vs2145061.workers.dev'], supabaseUrl:'', supabaseKey:'' };
+const CLOUD_DEFAULT={ provider:'worker', workerUrl:'https://d5d5j7dqdhjflpo07rpo.iwzqm34r.apigw.yandexcloud.net', backupUrls:['https://api.zemex.pro','https://backup-api.zemex.pro','https://olesya-api.vs2145061.workers.dev'], supabaseUrl:'', supabaseKey:'' };
 /* v4.8.0: диагностика нестабильного входа через мобильных операторов (Т2/без VPN).
    Если через VPN вход стабильный, проблема чаще всего в маршруте/доступе к workers.dev,
    а не в коде OTP. Эти функции дают понятную ошибку и сохраняют последнюю диагностику. */
@@ -1837,9 +1837,11 @@ async function checkApiRoute(){
 function cloudCfg(){try{
   const stored=JSON.parse(localStorage.getItem('om_cloud'))||{};
   const c=Object.assign({},CLOUD_DEFAULT,stored);
-  // v4.8.0: если в старом localStorage остался workers.dev — переводим основной API на домен zemex.pro,
-  // а старый workers.dev оставляем только как аварийный резерв.
-  if(!stored.workerUrl || String(stored.workerUrl).indexOf('olesya-api.vs2145061.workers.dev')>=0)c.workerUrl=CLOUD_DEFAULT.workerUrl;
+  // v4.9.1: Cloudflare (workers.dev И api.zemex.pro) режется операторами РФ → основной API переезжает
+  // на Yandex API Gateway (российские IP, не блокируется), Cloudflare оставляем только резервом.
+  if(!stored.workerUrl || /olesya-api\.vs2145061\.workers\.dev|api\.zemex\.pro|backup-api\.zemex\.pro/.test(String(stored.workerUrl)))c.workerUrl=CLOUD_DEFAULT.workerUrl;
+  // одноразово: сбросить закреплённый Cloudflare-адрес, чтобы переехать на шлюз
+  try{ if(localStorage.getItem('om_apimig')!=='yc1'){ const aa=localStorage.getItem('om_active_api'); if(aa&&/zemex\.pro|workers\.dev/.test(aa))localStorage.removeItem('om_active_api'); localStorage.setItem('om_apimig','yc1'); } }catch(e){}
   if(!Array.isArray(c.backupUrls)||!c.backupUrls.length)c.backupUrls=CLOUD_DEFAULT.backupUrls.slice();
   c.backupUrls=[...new Set(c.backupUrls.concat(CLOUD_DEFAULT.backupUrls))].filter(Boolean);
   if(!c.provider&&c.workerUrl)c.provider='worker';
