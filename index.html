@@ -1374,7 +1374,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
       <div class="sec-head">Перевод · ИИ</div>
       <div class="setting" id="rowLang" style="cursor:pointer"><div class="ic">🌐</div><div class="lbl"><div class="t">Мой язык</div><div class="d" id="stLang">Русский</div></div><div style="color:var(--faint)">›</div></div>
       <div class="sec-head">Медиа</div>
-      <div class="setting" id="rowGif" style="cursor:pointer"><div class="ic">🎞️</div><div class="lbl"><div class="t">GIF-поиск (GIPHY)</div><div class="d" id="stGif">Демо-ключ</div></div><div style="color:var(--faint)">›</div></div>
+      <div class="setting" id="rowGif" style="cursor:pointer"><div class="ic">🎞️</div><div class="lbl"><div class="t">GIF-поиск (GIPHY)</div><div class="d" id="stGif">Встроенный ключ</div></div><div style="color:var(--faint)">›</div></div>
       <div class="sec-head">Данные</div>
       <div class="setting" id="btnClearAll" style="cursor:pointer"><div class="ic" style="color:var(--red)">🗑️</div><div class="lbl"><div class="t" style="color:var(--red)">Очистить все данные</div><div class="d">Удалить аккаунт и историю на этом устройстве</div></div></div>
       <div class="setting" id="btnLogout" style="cursor:pointer"><div class="ic">🚪</div><div class="lbl"><div class="t">Выйти</div></div></div>
@@ -1727,7 +1727,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.2', BUILD_ID='2026-07-01-rebrand-zemex';
+const APP_VERSION='4.9.3', BUILD_ID='2026-07-01-giphy-key';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -4104,7 +4104,7 @@ function sendSticker(key){ if(!current||!STICKERS[key])return; pushMessage({type
 $('#btnEmoji').onclick=()=>{$('#gifPanel').classList.remove('show');eb.classList.toggle('show');};
 
 /* ---------- GIF (GIPHY) — поиск и отправка ---------- */
-const GIPHY_DEFAULT='dc6zaTOxFJmzC'; // публичный демо-ключ GIPHY (для теста; в продакшене впишите свой в Настройках)
+const GIPHY_DEFAULT='kJLqQzOswOvGyKOeOJ4NDsp5xJraqN6O'; // рабочий GIPHY API key (Zemex; web-ключ публичный по своей природе). Свой можно вписать в Настройках
 function gifKey(){return localStorage.getItem('om_gifkey')||GIPHY_DEFAULT;}
 function setGifKey(k){if(k)localStorage.setItem('om_gifkey',k);else localStorage.removeItem('om_gifkey');}
 let gifTO=null, gifReq=0;
@@ -5552,7 +5552,7 @@ function refreshSettings(){if(!me)return;
   const swc=$('#swCam');if(swc)swc.classList.toggle('on',camAllowed());
   const lw=$('#stLockWhen');if(lw)lw.textContent=lockWhenLabel();
   const sl=$('#stLang');if(sl)sl.textContent=LANGS[myLang()]||'Русский';
-  const sg=$('#stGif');if(sg)sg.textContent=localStorage.getItem('om_gifkey')?'Свой ключ':'Демо-ключ';
+  const sg=$('#stGif');if(sg)sg.textContent=localStorage.getItem('om_gifkey')?'Свой ключ':'Встроенный ключ';
   const stt=$('#stTheme');if(stt){const tp=getThemePref();stt.textContent=tp==='light'?'Светлая':tp==='dark'?'Тёмная':('Авто · '+(resolveTheme('auto')==='dark'?'тёмная':'светлая'));}
   const scb=$('#stChatBg');if(scb)scb.textContent=chatBgLabel();
   const rt=$('#rememberToggle');if(rt)rt.classList.toggle('on',rememberEnabled());
@@ -5845,13 +5845,13 @@ $('#btnLogout').onclick=async()=>{try{if(cloudOn&&CFG.provider==='worker'&&sessi
 $('#btnClearAll').onclick=()=>{if(confirm('Удалить все данные мессенджера на этом устройстве?')){Object.keys(localStorage).filter(k=>k.indexOf('om')===0).forEach(k=>localStorage.removeItem(k));sessionStorage.removeItem(SS);me=null;current=null;forceLogout('Данные удалены');}};
 
 function buildGif(body){
-  body.appendChild(el('<div class="note">GIF ищутся через GIPHY и подгружаются из интернета прямо в поиске внутри чата. По умолчанию работает публичный демо-ключ (для теста). Для продакшена получите бесплатный ключ на developers.giphy.com и вставьте сюда.</div>'));
+  body.appendChild(el('<div class="note">GIF ищутся через GIPHY и подгружаются из интернета прямо в поиске внутри чата. По умолчанию уже работает встроенный ключ Zemex — ничего вводить не нужно. При желании можно вписать свой ключ с developers.giphy.com.</div>'));
   const cur=localStorage.getItem('om_gifkey')||'';
   const i=el('<input class="input sub-input" placeholder="GIPHY API key (необязательно)" />');i.value=cur;
   const b=el('<button class="btn sub-btn">Сохранить</button>');
   b.onclick=()=>{setGifKey(i.value.trim());refreshSettings();toast('Ключ сохранён');$('#subSheet').classList.remove('show');};
   body.appendChild(i);body.appendChild(b);
-  if(cur){const c=el('<button class="kill sub-btn" style="text-align:center">Сбросить на демо-ключ</button>');c.onclick=()=>{setGifKey('');refreshSettings();buildSubRefresh();toast('Возвращён демо-ключ');};body.appendChild(c);}
+  if(cur){const c=el('<button class="kill sub-btn" style="text-align:center">Вернуть встроенный ключ</button>');c.onclick=()=>{setGifKey('');refreshSettings();buildSubRefresh();toast('Возвращён встроенный ключ');};body.appendChild(c);}
 }
 $('#rowGif').onclick=()=>openSub('GIF-поиск',buildGif);
 
