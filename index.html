@@ -1731,7 +1731,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.7', BUILD_ID='2026-07-02-username-search';
+const APP_VERSION='4.9.8', BUILD_ID='2026-07-02-native-push';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -2618,6 +2618,7 @@ function enterApp(){
   startPollers();
   refreshSettings();
   try{if(typeof pushSubscribe==='function')setTimeout(pushSubscribe,2500);}catch(e){}
+  try{if(typeof registerExpoPush==='function')setTimeout(()=>registerExpoPush(),2600);}catch(e){}   // нативный push (Expo) — если запущены в обёртке
   try{if(typeof e2ePublishKey==='function')setTimeout(e2ePublishKey,1800);}catch(e){}   // подписка на push (если уведомления разрешены)
   try{applyProAccent();refreshProUI();if(typeof cloudProStatus==='function')setTimeout(cloudProStatus,1500);}catch(e){}   // статус Zemex Pro
   try{if(typeof cloudSyncChats==='function'){_chatsSynced=false;_chatsSyncTries=0;setTimeout(cloudSyncChats,1500);}}catch(e){}   // server-as-source: восстановить все диалоги с сервера
@@ -6122,6 +6123,18 @@ async function pushSubscribe(){
     await jpost(wapi('/push/subscribe'),{subscription:json});
   }catch(e){}
 }
+/* Нативный push (Expo): токен приходит из оболочки через window.olesyaNativePush / __OLESYA_PUSH_TOKEN__.
+   Регистрируем его на воркере (POST /push/expo). Если ещё не залогинены — запомним и зарегистрируем позже (см. onCloudReady). */
+let _expoPushToken=null;
+function registerExpoPush(token){
+  if(token)_expoPushToken=token;
+  const t=_expoPushToken; if(!t)return;
+  if(!(me&&cloudOn&&CFG.provider==='worker'&&isCloudReady()))return;
+  try{ jpost(wapi('/push/expo'),{token:t}); }catch(e){}
+}
+window.olesyaNativePush=registerExpoPush;
+window.olesyaOpenChat=function(peer){ try{window.focus();}catch(e){} if(peer&&me){try{openConv(peer);}catch(e){}} };
+try{ if(window.__OLESYA_PUSH_TOKEN__)registerExpoPush(window.__OLESYA_PUSH_TOKEN__); }catch(e){}
 function appHidden(){ try{return document.hidden || !document.hasFocus();}catch(e){return document.hidden;} }
 function fallbackNotif(title,opts){ try{ const n=new Notification(title,opts); n.onclick=()=>{try{window.focus();}catch(e){} if(opts.data&&opts.data.peer&&me){try{openConv(opts.data.peer);}catch(_){}} n.close();}; }catch(e){} }
 function showNotif(title,body,peer){
