@@ -1407,6 +1407,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
       <div style="font-family:var(--disp);font-size:20px" id="lockTitle">Введите PIN-код</div>
       <div class="pin-dots" id="pinDots"></div>
       <div class="keypad" id="keypad"></div>
+      <button id="lockBio" style="display:none;margin-top:16px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.22);color:#fff;padding:11px 20px;border-radius:13px;font-size:14.5px;cursor:pointer">👆 Face ID / отпечаток</button>
     </div>
   </section>
 
@@ -1731,7 +1732,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.8', BUILD_ID='2026-07-02-native-push';
+const APP_VERSION='4.9.9', BUILD_ID='2026-07-02-biometric-lock';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -6018,8 +6019,13 @@ function buildLockOptions(body){
     const ch=el('<button class="kill sub-btn" style="text-align:center;margin-top:8px">Сменить PIN-код</button>');
     ch.onclick=()=>{const ss=$('#subSheet');if(ss)ss.classList.remove('show');const st=$('#settingsSheet');if(st)st.classList.remove('show');enterPinSetup();};
     body.appendChild(ch);
+    if(window.__OLESYA_NATIVE__){
+      const bioBtn=el('<button class="sub-btn" style="text-align:center;margin-top:8px">'+(c.bio?'✅ Face ID / отпечаток — включён':'👆 Включить Face ID / отпечаток')+'</button>');
+      bioBtn.onclick=()=>{const cc=lockCfg();cc.bio=!cc.bio;setLockCfg(cc);buildSubRefresh();toast(cc.bio?'Биометрия включена':'Биометрия выключена');};
+      body.appendChild(bioBtn);
+    }
   }
-  body.appendChild(el('<div class="note" style="margin-top:10px">«Только при закрытии» — PIN спросится при следующем запуске приложения, но не при кратком сворачивании. Биометрия (Face ID/отпечаток) — на этапе нативного приложения.</div>'));
+  body.appendChild(el('<div class="note" style="margin-top:10px">«Только при закрытии» — PIN спросится при следующем запуске приложения, но не при кратком сворачивании.'+(window.__OLESYA_NATIVE__?' Биометрия (Face ID/отпечаток) разблокирует быстрее PIN.':' Биометрия (Face ID/отпечаток) — в приложении из магазина.')+'</div>'));
 }
 $('#lockToggle').onclick=function(){
   const c=lockCfg();
@@ -6032,7 +6038,16 @@ function enterPinSetup(){pinMode='set1';pinBuffer='';$('#lockTitle').textContent
 function startPinLock(){pinLockUntil=Date.now()+30000;logSec('⛔ 5 неверных PIN — блокировка ввода на 30 секунд');clearInterval(pinLockInt);
   const upd=()=>{const left=Math.ceil((pinLockUntil-Date.now())/1000);if(left<=0){clearInterval(pinLockInt);$('#lockTitle').textContent='Введите PIN-код';pinFails=0;}else{$('#lockTitle').textContent='Слишком много попыток · '+left+' с';}};upd();pinLockInt=setInterval(upd,1000);}
 document.addEventListener('visibilitychange',()=>{if(!me)return;if(document.hidden){hidAt=Date.now();}else{let c={};try{c=lockCfg();}catch(e){}const thr=(c&&c.autolock!=null)?c.autolock:60000;if(c&&c.pin&&hidAt&&thr>=0&&Date.now()-hidAt>=thr)maybeLock();}});
-function maybeLock(){const c=lockCfg();if(c.pin){pinMode='check';pinBuffer='';$('#lockTitle').textContent='Введите PIN-код';renderPinDots();go('lockScreen');}}
+function maybeLock(){const c=lockCfg();if(c.pin){pinMode='check';pinBuffer='';$('#lockTitle').textContent='Введите PIN-код';renderPinDots();go('lockScreen');tryBiometricUnlock();}}
+/* Биометрия (Face ID/отпечаток) — только в нативной обёртке, как быстрая замена PIN. */
+function bioAvailable(){try{const c=lockCfg();return !!(c&&c.pin&&c.bio&&window.__OLESYA_NATIVE__&&window.ReactNativeWebView);}catch(e){return false;}}
+function tryBiometricUnlock(){
+  const btn=$('#lockBio'); if(btn)btn.style.display=bioAvailable()?'':'none';
+  if(!bioAvailable())return;
+  try{ window.ReactNativeWebView.postMessage(JSON.stringify({type:'biometric-unlock'})); }catch(e){}
+}
+window.olesyaBiometricResult=function(ok){ if(pinMode!=='check')return; if(ok){pinFails=0;pinBuffer='';go('scrChats');} };
+{const _lb=$('#lockBio'); if(_lb)_lb.onclick=()=>tryBiometricUnlock();}
 function renderPinDots(){const w=$('#pinDots');w.innerHTML='';for(let i=0;i<4;i++){const d=document.createElement('div');d.className='pd'+(i<pinBuffer.length?' f':'');w.appendChild(d);}}
 (function buildKeypad(){const k=$('#keypad');['1','2','3','4','5','6','7','8','9','','0','⌫'].forEach(d=>{const b=document.createElement('button');b.className='key'+(d===''||d==='⌫'?' fn':'');b.textContent=d;if(d==='')b.style.visibility='hidden';b.onclick=()=>pinPress(d);k.appendChild(b);});})();
 function pinPress(d){
