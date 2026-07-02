@@ -1731,7 +1731,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.5', BUILD_ID='2026-07-02-img-proxy';
+const APP_VERSION='4.9.6', BUILD_ID='2026-07-02-delete-chat';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -2703,6 +2703,28 @@ function lastSeenText(u){
   if(diff<86400000)return 'был(а) '+Math.floor(diff/3600000) +' ч назад';
   return 'был(а) недавно';
 }
+/* --- Удаление чата «у себя» (локально). Переживает перезагрузку и синк с сервером:
+   прячем чат, пока не придёт СООБЩЕНИЕ новее момента удаления. Собеседник свою копию сохраняет. --- */
+function hiddenChats(){try{return JSON.parse(localStorage.getItem('om_hidden_chats')||'{}')||{};}catch(e){return {};}}
+function saveHiddenChats(h){try{localStorage.setItem('om_hidden_chats',JSON.stringify(h));}catch(e){}}
+function isChatHidden(chat){const ts=hiddenChats()[chat.id];if(!ts)return false;const last=(chat.messages&&chat.messages.at(-1)&&chat.messages.at(-1).t)||0;return last<=ts;}
+function deleteChatForMe(chat,label){
+  if(!chat)return;
+  if(!confirm('Удалить чат'+(label?' «'+label+'»':'')+' у себя?\nСобеседник свою копию сохранит. Чат вернётся, если придёт новое сообщение.'))return;
+  const d=db();const c=d.chats[chat.id];if(c){c.messages=[];}                     // локальную историю чистим (на сервере остаётся)
+  const h=hiddenChats();h[chat.id]=Date.now();saveHiddenChats(h);save(d);
+  try{renderChats();}catch(e){}try{if(typeof renderHome==='function')renderHome();}catch(e){}
+  toast('Чат удалён у вас');
+}
+/* Долгое нажатие (или правый клик на ПК) по строке чата → удалить. Обычный тап открывает чат. */
+function attachChatDelete(row,chat,label){
+  let tmr=null,long=false;
+  row.addEventListener('touchstart',()=>{long=false;tmr=setTimeout(()=>{long=true;tmr=null;deleteChatForMe(chat,label);},550);},{passive:true});
+  const cancel=()=>{if(tmr){clearTimeout(tmr);tmr=null;}};
+  row.addEventListener('touchend',cancel);row.addEventListener('touchmove',cancel);
+  row.addEventListener('contextmenu',e=>{e.preventDefault();deleteChatForMe(chat,label);});
+  row.addEventListener('click',e=>{if(long){e.stopImmediatePropagation();e.preventDefault();long=false;}},true);
+}
 function renderChats(){
   if(!me)return;const d=db();const wrap=$('#chatList');
   const term=($('#searchInput').value||'').toLowerCase();
@@ -2712,6 +2734,7 @@ function renderChats(){
   wrap.innerHTML='';
   let shown=0;
   myChats.forEach(c=>{
+    if(isChatHidden(c))return;
     if(c.channel){
       const last=(c.messages||[]).at(-1);
       if(term){const hay=(c.name+' @'+c.handle+' '+(last?previewText(last):'')).toLowerCase();if(!hay.includes(term))return;}
@@ -2721,6 +2744,7 @@ function renderChats(){
       row.querySelector('.cr-name').textContent='📢 '+c.name;
       row.querySelector('.cr-msg').textContent=last?previewText(last):('@'+c.handle);
       row.onclick=()=>openChannel(c.id);
+      attachChatDelete(row,c,c.name);
       wrap.appendChild(row);shown++;return;
     }
     if(c.group){
@@ -2743,6 +2767,7 @@ function renderChats(){
       }else{msgEl.textContent=(c.members||[]).length+' '+plural((c.members||[]).length,'участник','участника','участников');}
       if(unread>0){const bg=document.createElement('span');bg.className='badge';bg.textContent=unread;row.querySelector('.cr-bottom').appendChild(bg);}
       row.onclick=()=>openGroup(c.id);
+      attachChatDelete(row,c,c.name);
       wrap.appendChild(row);shown++;return;
     }
     const peerId=(c.members.find(x=>x!==me.id))??me.id;const u=d.users[peerId];if(!u)return;
@@ -2766,6 +2791,7 @@ function renderChats(){
     }else{msgEl.textContent='Нет сообщений';}
     if(unread>0){const b=document.createElement('span');b.className='badge';b.textContent=unread;row.querySelector('.cr-bottom').appendChild(b);}
     row.onclick=()=>openConv(peerId);
+    attachChatDelete(row,c,isSaved?'Избранное':u.name);
     wrap.appendChild(row);shown++;
   });
   if(shown===0){wrap.innerHTML=`<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><div>${term?'Ничего не найдено':'Пока нет чатов.<br>Нажмите + чтобы начать.'}</div></div>`;}
