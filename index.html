@@ -1154,7 +1154,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
       <div class="grow"><div class="title">Телефонная книга</div><div class="sub" id="contactsCount">контакты</div></div>
       <button class="iconbtn fx-add" id="btnImportContacts" title="Импорт из телефона"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg></button>
     </div>
-    <div class="searchbar"><input id="contactsSearch" placeholder="Имя или номер телефона…" /></div>
+    <div class="searchbar"><input id="contactsSearch" placeholder="Имя, @ник или номер телефона…" /></div>
     <div class="cn-hint" id="cnHint"></div>
     <div class="list" id="contactsList"></div>
   </section>
@@ -1415,7 +1415,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
     <div class="modal">
       <div class="grip"></div>
       <h3>Новый чат</h3>
-      <div class="searchbar"><input id="contactSearch" placeholder="Поиск по имени или номеру…" /></div>
+      <div class="searchbar"><input id="contactSearch" placeholder="Имя, @ник или номер…" /></div>
       <div class="list" id="contactList" style="padding-bottom:10px"></div>
     </div>
   </div>
@@ -1731,7 +1731,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.6', BUILD_ID='2026-07-02-delete-chat';
+const APP_VERSION='4.9.7', BUILD_ID='2026-07-02-username-search';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -1886,6 +1886,14 @@ async function cloudLookup(phone){
   if(CFG.provider==='worker')return (await jget(wapi('/lookup?phone='+encodeURIComponent(phone)))).user||null;
   const c=sbClient();if(c){const {data}=await c.from('om_users').select('id,phone,name,avatar,color,pass_hint').eq('phone',phone).maybeSingle();return data||null;}
   return null;}
+/* Поиск нового человека по @username на сервере (приватный способ, точное совпадение ника). */
+function cleanUsername(s){return String(s||'').replace(/^@+/,'').trim();}
+function looksLikeUsername(s){return /^[a-zA-Z0-9_.]{3,24}$/.test(cleanUsername(s));}
+async function cloudResolveUsername(name){
+  if(!(cloudOn&&isCloudReady()&&CFG.provider==='worker'))return null;
+  const clean=cleanUsername(name); if(!looksLikeUsername(clean))return null;
+  try{ const r=await jget(wapi('/resolve?username='+encodeURIComponent(clean))); return (r&&r.user)||null; }catch(e){ return null; }
+}
 async function cloudRegister(row){
   if(CFG.provider==='worker'){await jpost(wapi('/register'),row);return;}
   const c=sbClient();if(c){const {error}=await c.from('om_users').insert(row);if(error)throw new Error(/dupl/i.test(error.message)?'taken':error.message);}}
@@ -4906,9 +4914,26 @@ function openNewChat(){
     wrap.appendChild(btn);
   }
 
-  if(others.length<=1 && matched.length===0 && !isPhone){
+  const uname=cleanUsername(rawTerm);
+  const isUsername=!isPhone && looksLikeUsername(uname) && !matched.some(x=>(x.username||'').toLowerCase()===uname.toLowerCase());
+  if(isUsername && cloudOn){
+    const ub=document.createElement('div');ub.className='chat-row';ub.style.cursor='pointer';
+    ub.innerHTML='<div class="avatar lg" style="background:#6C7BFF">@</div><div class="cr-main"><div class="cr-name">Найти @'+esc(uname)+'</div><div class="cr-msg">Поиск по нику на сервере…</div></div>';
+    ub.onclick=async()=>{
+      ub.querySelector('.cr-msg').textContent='Ищем…';
+      try{
+        const u=await cloudResolveUsername(uname);
+        if(u&&u.id&&u.id!==me.id){cacheUser(u);ensureChat(u.id);closeModal();openConv(u.id);toast('Найден: '+(u.name||('@'+uname)));}
+        else if(u&&u.id===me.id){ub.querySelector('.cr-msg').textContent='Это ваш ник';}
+        else{ub.querySelector('.cr-msg').textContent='Пользователь @'+uname+' не найден';}
+      }catch(e){ub.querySelector('.cr-msg').textContent='Ошибка поиска. Проверьте связь.';}
+    };
+    wrap.appendChild(ub);
+  }
+
+  if(others.length<=1 && matched.length===0 && !isPhone && !isUsername){
     const note=document.createElement('div');note.className='empty';note.style.padding='30px 24px';
-    note.innerHTML='Введите номер телефона собеседника в формате <b>+7 900 123 45 67</b>, чтобы найти его и начать переписку.';
+    note.innerHTML='Найдите собеседника по <b>номеру телефона</b> (+7 900 123 45 67) или по <b>@нику</b>, чтобы начать переписку.';
     wrap.appendChild(note);
   }
 
@@ -5193,6 +5218,22 @@ function renderContacts(){
       }catch(e){sub.textContent='Ошибка поиска. Проверьте связь.';}
     };
     wrap.appendChild(add);
+  }
+  // добавление по @username (серверный поиск по нику)
+  const cuname=cleanUsername(rawTerm);
+  const isUname=!isPhone&&looksLikeUsername(cuname)&&!knownContacts().some(x=>(x.username||'').toLowerCase()===cuname.toLowerCase());
+  if(isUname&&cloudOn){
+    const addu=el('<div class="cn-add"><div class="ad-ic">@</div><div><div class="ad-t">Найти @'+esc(cuname)+'</div><div class="ad-d" data-sub="1">поиск по нику в мессенджере</div></div></div>');
+    addu.onclick=async()=>{
+      const sub=addu.querySelector('[data-sub]');sub.textContent='Ищем…';
+      try{
+        const u=await cloudResolveUsername(cuname);
+        if(u&&u.id&&u.id!==me.id){cacheUser(u);bookSet(u.id,{});const s=$('#contactsSearch');if(s)s.value='';renderContacts();toast('✅ Добавлен: '+(u.name||('@'+cuname)));}
+        else if(u&&u.id===me.id){sub.textContent='Это ваш ник';}
+        else{sub.textContent='Пользователь @'+cuname+' не найден';}
+      }catch(e){sub.textContent='Ошибка поиска. Проверьте связь.';}
+    };
+    wrap.appendChild(addu);
   }
   const cc=$('#contactsCount');if(cc)cc.textContent=knownContacts().length?(knownContacts().length+' контакт.'):'контакты';
   const hint=$('#cnHint');
