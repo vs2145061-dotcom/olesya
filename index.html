@@ -1488,6 +1488,10 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 <script>
 /* Глобальный перехватчик ошибок — точная строка падения на экране */
 window.addEventListener('error',function(ev){
+  // Игнорируем ошибки ЗАГРУЗКИ РЕСУРСОВ (картинки новостей, скрипты): это не баги JS,
+  // а внешние сбои сети/CDN. Обрабатываются локально (img.onerror). Иначе всплывал
+  // бесполезный баннер «unknown @ :?:?» при недоступной картинке ленты.
+  if(ev&&ev.target&&ev.target!==window&&ev.target.nodeName)return;
   try{
     var msg=(ev.error&&ev.error.message)||ev.message||'unknown';
     var where=(ev.filename||'')+':'+(ev.lineno||'?')+':'+(ev.colno||'?');
@@ -1727,7 +1731,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.3', BUILD_ID='2026-07-01-giphy-key';
+const APP_VERSION='4.9.4', BUILD_ID='2026-07-02-feed-images';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -5297,7 +5301,7 @@ async function renderNews(cat,force){
   if(!items.length){box.appendChild(newsEmpty('Пока нет свежих материалов. Нажмите «Обновить».'));return;}
   items.forEach(it=>{
     const c=document.createElement('div');c.className='news-card';
-    const img=it.image?('<img class="nthumb" loading="lazy" src="'+esc(it.image)+'" onerror="this.style.display=\'none\'">'):'';
+    const img=it.image?('<img class="nthumb" loading="lazy" referrerpolicy="no-referrer" src="'+esc(it.image)+'" onerror="this.style.display=\'none\'">'):'';
     c.innerHTML=img+'<div class="nbody"><div class="ntitle">'+esc(it.title)+'</div><div class="nmeta">'+esc(hostOf(it.link)||'')+(it.date?(' · '+esc(fmtAgo(it.date))):'')+'</div></div>';
     c.onclick=()=>openReader(it);box.appendChild(c);
   });
@@ -5305,7 +5309,7 @@ async function renderNews(cat,force){
 let _curArticle=null;
 function openReader(it){
   _curArticle=it;const b=$('#readerBody');b.innerHTML='';
-  if(it.image){const im=document.createElement('img');im.className='rhero';im.src=it.image;im.onerror=()=>im.remove();b.appendChild(im);}
+  if(it.image){const im=document.createElement('img');im.className='rhero';im.referrerPolicy='no-referrer';im.src=it.image;im.onerror=()=>im.remove();b.appendChild(im);}
   const h=document.createElement('h2');h.textContent=it.title;b.appendChild(h);
   const meta=document.createElement('div');meta.className='rmeta';meta.textContent=(hostOf(it.link)||'')+(it.date?(' · '+fmtAgo(it.date)):'');b.appendChild(meta);
   if(it.summary){const p=document.createElement('p');p.textContent=it.summary;b.appendChild(p);}
@@ -5461,7 +5465,7 @@ async function renderTgFeed(channel,force){
   if(!items.length){box.appendChild(newsEmpty('В канале @'+channel+' пока нет постов, либо он закрыт.'));return;}
   items.forEach(it=>{
     const c=document.createElement('div');c.className='news-card';
-    const img=it.image?('<img class="nthumb" loading="lazy" src="'+esc(it.image)+'" onerror="this.style.display=\'none\'">'):'';
+    const img=it.image?('<img class="nthumb" loading="lazy" referrerpolicy="no-referrer" src="'+esc(it.image)+'" onerror="this.style.display=\'none\'">'):'';
     c.innerHTML=img+'<div class="nbody"><div class="ntitle">'+esc(it.title||it.text||'Пост')+'</div><div class="nmeta">@'+esc(channel)+(it.date?(' · '+esc(fmtAgo(it.date))):'')+'</div></div>';
     c.onclick=()=>openReader({title:(it.title||'Пост из @'+channel),summary:(it.text||it.summary||''),image:it.image,link:it.link,date:it.date});
     box.appendChild(c);
