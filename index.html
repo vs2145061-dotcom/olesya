@@ -192,6 +192,11 @@ h1.brandname{font-family:var(--brand);font-weight:400;font-size:52px;line-height
 .iconbtn.fx-theme{color:#F59E0B;background:rgba(245,158,11,.13)}
 .iconbtn.fx-reload{color:#3B82F6;background:rgba(59,130,246,.12)}
 .iconbtn.fx-search{color:#6C7BFF;background:rgba(108,123,255,.13)}
+/* кнопка «назад» — крупнее и заметнее */
+.iconbtn[data-back]{font-size:26px;line-height:1;color:var(--primary);font-weight:500}
+.iconbtn.fx-back{width:44px;height:44px;color:var(--primary)}
+.iconbtn.fx-back svg{width:27px;height:27px;stroke-width:2.4}
+.iconbtn.fx-back:active{transform:scale(.88)}
 .iconbtn.fx-add{color:#22C55E;background:rgba(34,197,94,.13)}
 .iconbtn.fx-tr:hover,.iconbtn.fx-call:hover,.iconbtn.fx-video:hover,.iconbtn.fx-set:hover,.iconbtn.fx-bg:hover,.iconbtn.fx-theme:hover,.iconbtn.fx-reload:hover,.iconbtn.fx-search:hover,.iconbtn.fx-add:hover{filter:brightness(1.15)}
 .grow{flex:1}
@@ -631,6 +636,20 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 .confirm-card .cf-btn{border:none;background:none;font-size:15px;font-weight:600;color:var(--primary);padding:9px 15px;border-radius:11px;cursor:pointer;font-family:inherit}
 .confirm-card .cf-btn:active{background:var(--raised)}
 .confirm-card .cf-btn.cf-danger{color:#ff5b5b}
+
+/* контекст-меню чата (долгое нажатие) */
+.chat-row.sel{background:rgba(108,123,255,.16)}
+.sheet-back{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center;opacity:0;transition:opacity .2s}
+.sheet-back.show{opacity:1}
+.act-sheet{width:100%;max-width:460px;background:var(--surface);border-radius:22px 22px 0 0;padding:8px 8px calc(14px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .26s cubic-bezier(.4,0,.2,1);box-shadow:0 -18px 50px -20px rgba(0,0,0,.6)}
+.sheet-back.show .act-sheet{transform:none}
+.act-title{font-size:12.5px;color:var(--faint);text-align:center;padding:10px 8px 6px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.act-item{width:100%;display:flex;align-items:center;gap:14px;padding:14px 16px;background:none;border:none;color:var(--text);font-size:15.5px;font-weight:500;font-family:inherit;cursor:pointer;border-radius:14px;text-align:left}
+.act-item:active{background:var(--raised)}
+.act-item .act-ic{font-size:18px;width:24px;text-align:center;flex:0 0 24px}
+.act-item.act-danger{color:#ff5b5b}
+.act-item.act-cancel{justify-content:center;color:var(--muted);margin-top:4px;font-weight:600}
+.chat-row.pinned .cr-time::before{content:'📌 ';font-size:10px}
 
 /* toast */
 #toast{position:absolute;left:50%;bottom:90px;transform:translateX(-50%) translateY(20px);
@@ -1183,7 +1202,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
   <!-- ============ CONVERSATION ============ -->
   <section class="screen hidden" id="scrConv">
     <div class="conv-head">
-      <button class="iconbtn" data-back="scrChats">←</button>
+      <button class="iconbtn fx-back" data-back="scrChats" title="Назад" aria-label="Назад"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
       <div class="avatar md" id="convAvatar"></div>
       <div class="who" id="convWho"><div class="nm" id="convName"></div><div class="st" id="convStatus"></div></div>
       <button class="iconbtn fx-search" id="btnConvSearch" title="Поиск в чате"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
@@ -1743,7 +1762,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.10', BUILD_ID='2026-07-02-ui-batch';
+const APP_VERSION='4.9.11', BUILD_ID='2026-07-03-nav-batch';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -2182,7 +2201,7 @@ function handleBus(m){
 /* ================== AUTH FLOW ================== */
 /* ================== AUTH FLOW ================== */
 function showScreen(id){ $$(  '.screen').forEach(s=>{ if(s.id===id){s.classList.remove('hidden','back')} }); }
-function go(id){ $$('.screen').forEach(s=>s.classList.add('hidden')); const el=$('#'+id); if(el)el.classList.remove('hidden'); else console.error('go(): экран не найден:',id); }
+function go(id){ $$('.screen').forEach(s=>s.classList.add('hidden')); const el=$('#'+id); if(el)el.classList.remove('hidden'); else {console.error('go(): экран не найден:',id);return;} if(typeof omPushScreen==='function')omPushScreen(id); }
 
 let pendingPhone='', genCode='', otpFails=0, otpLocked=false, pendingUser=null, pendingMode='', pwFails=0, pwLockUntil=0;
 /* ── Production OTP (используется когда cloudCfg().url задан) ── */
@@ -2739,12 +2758,37 @@ async function deleteChatForMe(chat,label){
   toast('Чат удалён у вас');
 }
 /* Долгое нажатие (или правый клик на ПК) по строке чата → удалить. Обычный тап открывает чат. */
-function attachChatDelete(row,chat,label){
+/* --- Закрепление чатов и «отметить прочитанным» --- */
+function pinnedChats(){try{return JSON.parse(localStorage.getItem('om_pinned')||'[]')||[];}catch(e){return[];}}
+function isPinned(id){return pinnedChats().includes(id);}
+function togglePin(id){let p=pinnedChats();p=p.includes(id)?p.filter(x=>x!==id):[id,...p];try{localStorage.setItem('om_pinned',JSON.stringify(p));}catch(e){}}
+function markChatRead(chat){const d=db();const c=d.chats[chat.id];if(!c)return;(c.messages||[]).forEach(m=>{if(m.from!==me.id){m.readBy=m.readBy||[];if(!m.readBy.includes(me.id))m.readBy.push(me.id);}});save(d);}
+/* --- Контекст-меню чата (долгое нажатие / правый клик): выделение строки + лист действий --- */
+function openChatActions(row,chat,label){
+  if(row)row.classList.add('sel');
+  const pinned=isPinned(chat.id);
+  const back=document.createElement('div');back.className='sheet-back';
+  const sheet=document.createElement('div');sheet.className='act-sheet';
+  const ttl=document.createElement('div');ttl.className='act-title';ttl.textContent=label||'Чат';sheet.appendChild(ttl);
+  const items=[
+    {ic:pinned?'📍':'📌',t:pinned?'Открепить':'Закрепить сверху',fn:()=>{togglePin(chat.id);renderChats();}},
+    {ic:'✓',t:'Отметить прочитанным',fn:()=>{markChatRead(chat);renderChats();}},
+    {ic:'🗑️',t:'Удалить чат',danger:true,fn:()=>deleteChatForMe(chat,label)},
+  ];
+  let closed=false;const close=()=>{if(closed)return;closed=true;back.classList.remove('show');if(row)row.classList.remove('sel');setTimeout(()=>{try{back.remove();}catch(e){}},220);};
+  items.forEach(a=>{const b=document.createElement('button');b.className='act-item'+(a.danger?' act-danger':'');const ic=document.createElement('span');ic.className='act-ic';ic.textContent=a.ic;const tx=document.createElement('span');tx.textContent=a.t;b.appendChild(ic);b.appendChild(tx);b.onclick=()=>{close();a.fn();};sheet.appendChild(b);});
+  const cancel=document.createElement('button');cancel.className='act-item act-cancel';cancel.textContent='Отмена';cancel.onclick=close;sheet.appendChild(cancel);
+  back.appendChild(sheet);document.body.appendChild(back);
+  requestAnimationFrame(()=>back.classList.add('show'));
+  back.onclick=e=>{if(e.target===back)close();};
+}
+function attachChatMenu(row,chat,label){
+  if(isPinned(chat.id))row.classList.add('pinned');
   let tmr=null,long=false;
-  row.addEventListener('touchstart',()=>{long=false;tmr=setTimeout(()=>{long=true;tmr=null;deleteChatForMe(chat,label);},550);},{passive:true});
+  row.addEventListener('touchstart',()=>{long=false;tmr=setTimeout(()=>{long=true;tmr=null;openChatActions(row,chat,label);},500);},{passive:true});
   const cancel=()=>{if(tmr){clearTimeout(tmr);tmr=null;}};
   row.addEventListener('touchend',cancel);row.addEventListener('touchmove',cancel);
-  row.addEventListener('contextmenu',e=>{e.preventDefault();deleteChatForMe(chat,label);});
+  row.addEventListener('contextmenu',e=>{e.preventDefault();openChatActions(row,chat,label);});
   row.addEventListener('click',e=>{if(long){e.stopImmediatePropagation();e.preventDefault();long=false;}},true);
 }
 function renderChats(){
@@ -2752,7 +2796,7 @@ function renderChats(){
   const term=($('#searchInput').value||'').toLowerCase();
   const myChats=Object.values(d.chats).filter(c=>(c.members&&c.members.includes(me.id))||(c.channel&&c.subscribed));
   // sort by last message time
-  myChats.sort((a,b)=>{const la=a.messages.at(-1)?.t||0,lb=b.messages.at(-1)?.t||0;return lb-la;});
+  myChats.sort((a,b)=>{const pa=isPinned(a.id)?1:0,pb=isPinned(b.id)?1:0;if(pa!==pb)return pb-pa;const la=a.messages.at(-1)?.t||0,lb=b.messages.at(-1)?.t||0;return lb-la;});
   wrap.innerHTML='';
   let shown=0;
   myChats.forEach(c=>{
@@ -2766,7 +2810,7 @@ function renderChats(){
       row.querySelector('.cr-name').textContent='📢 '+c.name;
       row.querySelector('.cr-msg').textContent=last?previewText(last):('@'+c.handle);
       row.onclick=()=>openChannel(c.id);
-      attachChatDelete(row,c,c.name);
+      attachChatMenu(row,c,c.name);
       wrap.appendChild(row);shown++;return;
     }
     if(c.group){
@@ -2789,7 +2833,7 @@ function renderChats(){
       }else{msgEl.textContent=(c.members||[]).length+' '+plural((c.members||[]).length,'участник','участника','участников');}
       if(unread>0){const bg=document.createElement('span');bg.className='badge';bg.textContent=unread;row.querySelector('.cr-bottom').appendChild(bg);}
       row.onclick=()=>openGroup(c.id);
-      attachChatDelete(row,c,c.name);
+      attachChatMenu(row,c,c.name);
       wrap.appendChild(row);shown++;return;
     }
     const peerId=(c.members.find(x=>x!==me.id))??me.id;const u=d.users[peerId];if(!u)return;
@@ -2813,7 +2857,7 @@ function renderChats(){
     }else{msgEl.textContent='Нет сообщений';}
     if(unread>0){const b=document.createElement('span');b.className='badge';b.textContent=unread;row.querySelector('.cr-bottom').appendChild(b);}
     row.onclick=()=>openConv(peerId);
-    attachChatDelete(row,c,isSaved?'Избранное':u.name);
+    attachChatMenu(row,c,isSaved?'Избранное':u.name);
     wrap.appendChild(row);shown++;
   });
   if(shown===0){wrap.innerHTML=`<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><div>${term?'Ничего не найдено':'Пока нет чатов.<br>Нажмите + чтобы начать.'}</div></div>`;}
@@ -6091,8 +6135,27 @@ $('#searchInput').addEventListener('input',renderChats);
 function refreshIfPresence(){if($('#scrChats')&&!$('#scrChats').classList.contains('hidden'))renderChats();if(current){const u=userById(current.id);if(u){current=u;updateConvStatus();const dot=$('#convAvatar .dot');if(dot)dot.classList.toggle('on',u.online);}}}
 setInterval(()=>{if(me){const d=db();if(d.users[me.id]){d.users[me.id].lastSeen=Date.now();save(d);}refreshIfPresence();}},15000);
 
+/* ===== История экранов: аппаратная/жестовая/браузерная «назад» закрывает подэкран, а не выходит из приложения ===== */
+let _omPopping=false;
+const OM_ROOT_SCREENS=['scrChats','scrHome'];
+function omPushScreen(id){
+  if(_omPopping||!me)return;                       // при возврате и до входа историю не трогаем
+  if(OM_ROOT_SCREENS.includes(id))return;          // корневые экраны — без записи
+  try{ if(!(history.state&&history.state.__omScr===id)) history.pushState({__omScr:id},''); }catch(e){}
+}
+window.addEventListener('popstate',()=>{
+  if(!me)return;
+  const scr=[...document.querySelectorAll('.screen')].find(s=>!s.classList.contains('hidden'));
+  if(!scr||OM_ROOT_SCREENS.includes(scr.id))return; // уже на корне — пусть система решает (выход из приложения)
+  const bb=scr.querySelector('[data-back]');
+  _omPopping=true;
+  try{ if(bb)bb.click(); else { current=null; go('scrChats'); try{renderChats();}catch(e){} } }
+  finally{ _omPopping=false; }
+});
 /* ================== back buttons ================== */
-$$('[data-back]').forEach(b=>b.onclick=()=>{const t=b.dataset.back;
+$$('[data-back]').forEach(b=>b.onclick=()=>{
+  if(!_omPopping && me && history.state && history.state.__omScr){ history.back(); return; } // назад через историю (синхрон с аппаратной кнопкой)
+  const t=b.dataset.back;
   if(t==='scrChats'||t==='scrHome'){current=null;}
   go(t);
   if(t==='scrChats')renderChats();
