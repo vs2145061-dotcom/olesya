@@ -1202,7 +1202,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
   <!-- ============ CONVERSATION ============ -->
   <section class="screen hidden" id="scrConv">
     <div class="conv-head">
-      <button class="iconbtn fx-back" data-back="scrChats" title="Назад" aria-label="Назад"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+      <button class="iconbtn fx-back" data-back="scrChats" title="Назад" aria-label="Назад"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/></svg></button>
       <div class="avatar md" id="convAvatar"></div>
       <div class="who" id="convWho"><div class="nm" id="convName"></div><div class="st" id="convStatus"></div></div>
       <button class="iconbtn fx-search" id="btnConvSearch" title="Поиск в чате"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
@@ -1762,7 +1762,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.11', BUILD_ID='2026-07-03-nav-batch';
+const APP_VERSION='4.9.12', BUILD_ID='2026-07-03-back-arrow';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -6153,15 +6153,19 @@ window.addEventListener('popstate',()=>{
   finally{ _omPopping=false; }
 });
 /* ================== back buttons ================== */
-$$('[data-back]').forEach(b=>b.onclick=()=>{
-  if(!_omPopping && me && history.state && history.state.__omScr){ history.back(); return; } // назад через историю (синхрон с аппаратной кнопкой)
-  const t=b.dataset.back;
-  if(t==='scrChats'||t==='scrHome'){current=null;}
-  go(t);
-  if(t==='scrChats')renderChats();
-  else if(t==='scrHome')renderHome();
-  else if(t==='scrContacts')renderContacts();
-  else if(t==='scrCalls')renderCalls();
+const BACK_ARROW_SVG='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/></svg>';
+$$('[data-back]').forEach(b=>{
+  b.classList.add('fx-back'); b.innerHTML=BACK_ARROW_SVG;   // единая стрелка «назад» на всех экранах
+  b.onclick=()=>{
+    if(!_omPopping && me && history.state && history.state.__omScr){ history.back(); return; } // назад через историю (синхрон с аппаратной кнопкой)
+    const t=b.dataset.back;
+    if(t==='scrChats'||t==='scrHome'){current=null;}
+    go(t);
+    if(t==='scrChats')renderChats();
+    else if(t==='scrHome')renderHome();
+    else if(t==='scrContacts')renderContacts();
+    else if(t==='scrCalls')renderCalls();
+  };
 });
 
 /* ================== helpers ================== */
