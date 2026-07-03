@@ -621,6 +621,17 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 .modal .grip{width:40px;height:4px;border-radius:3px;background:var(--line);margin:8px auto 4px}
 .modal h3{font-family:var(--disp);text-align:center;margin:6px 0 14px;font-size:18px}
 
+/* своя модалка подтверждения (вместо браузерного confirm — тот в WebView выдаёт «Веб-страница … говорит») */
+.confirm-back{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:26px}
+.confirm-back.show .confirm-card{transform:scale(1);opacity:1}
+.confirm-card{width:100%;max-width:330px;background:var(--surface);border:1px solid var(--line-soft);border-radius:20px;padding:21px 20px 11px;box-shadow:0 26px 64px -22px rgba(0,0,0,.65);transform:scale(.92);opacity:0;transition:transform .18s cubic-bezier(.34,1.35,.5,1),opacity .15s}
+.confirm-card .cf-title{font-family:var(--disp);font-size:17.5px;font-weight:700;color:var(--text);margin-bottom:8px}
+.confirm-card .cf-msg{font-size:14.5px;line-height:1.45;color:var(--muted);margin-bottom:18px;white-space:pre-line}
+.confirm-card .cf-acts{display:flex;justify-content:flex-end;gap:4px}
+.confirm-card .cf-btn{border:none;background:none;font-size:15px;font-weight:600;color:var(--primary);padding:9px 15px;border-radius:11px;cursor:pointer;font-family:inherit}
+.confirm-card .cf-btn:active{background:var(--raised)}
+.confirm-card .cf-btn.cf-danger{color:#ff5b5b}
+
 /* toast */
 #toast{position:absolute;left:50%;bottom:90px;transform:translateX(-50%) translateY(20px);
   background:var(--raised-2);border:1px solid var(--line);color:var(--text);padding:11px 18px;border-radius:14px;
@@ -1180,7 +1191,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
       <button class="iconbtn fx-call" id="btnAudioCall" title="Аудиозвонок"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92Z"/></svg></button>
       <button class="iconbtn fx-video" id="btnVideoCall" title="Видеозвонок"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m23 7-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></button>
     </div>
-    <div class="e2ee-banner" id="e2eeBanner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> <span id="e2eeText">Шифрование канала · данные на Cloudflare (не в США)</span> · <span id="fingerprint" style="font-family:var(--mono)"></span></div>
+    <div class="e2ee-banner" id="e2eeBanner" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> <span id="e2eeText">Сквозное шифрование (E2E) · сервер не читает</span> · <span id="fingerprint" style="font-family:var(--mono)"></span></div>
     <div class="pinned-bar" id="pinnedBar" style="display:none"></div>
     <div class="conv-search" id="convSearchBar">
       <input id="convSearchInput" placeholder="Поиск по сообщениям чата…" />
@@ -1732,7 +1743,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.9', BUILD_ID='2026-07-02-biometric-lock';
+const APP_VERSION='4.9.10', BUILD_ID='2026-07-02-ui-batch';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -2718,9 +2729,10 @@ function lastSeenText(u){
 function hiddenChats(){try{return JSON.parse(localStorage.getItem('om_hidden_chats')||'{}')||{};}catch(e){return {};}}
 function saveHiddenChats(h){try{localStorage.setItem('om_hidden_chats',JSON.stringify(h));}catch(e){}}
 function isChatHidden(chat){const ts=hiddenChats()[chat.id];if(!ts)return false;const last=(chat.messages&&chat.messages.at(-1)&&chat.messages.at(-1).t)||0;return last<=ts;}
-function deleteChatForMe(chat,label){
+async function deleteChatForMe(chat,label){
   if(!chat)return;
-  if(!confirm('Удалить чат'+(label?' «'+label+'»':'')+' у себя?\nСобеседник свою копию сохранит. Чат вернётся, если придёт новое сообщение.'))return;
+  const _ok=await appConfirm('Собеседник свою копию сохранит. Чат вернётся, если придёт новое сообщение.',{title:'Удалить чат'+(label?' «'+label+'»':'')+'?',okText:'Удалить',danger:true});
+  if(!_ok)return;
   const d=db();const c=d.chats[chat.id];if(c){c.messages=[];}                     // локальную историю чистим (на сервере остаётся)
   const h=hiddenChats();h[chat.id]=Date.now();saveHiddenChats(h);save(d);
   try{renderChats();}catch(e){}try{if(typeof renderHome==='function')renderHome();}catch(e){}
@@ -3348,11 +3360,11 @@ function setGroupAvatarFromFile(file){
     renderGroupInfo(g);renderChats();toast('Фото группы обновлено');
   });
 }
-function removeGroupMember(gid,uid){
+async function removeGroupMember(gid,uid){
   const d=db();const g=d.chats[gid];if(!g)return;
   if(!isGroupAdmin(g)){toast('Удалять участников может только администратор');return;}
   if(uid===g.owner){toast('Нельзя удалить создателя группы');return;}
-  let ok=true;try{ok=window.confirm('Удалить участника из группы?');}catch(e){}
+  const ok=await appConfirm('Удалить участника из группы?',{okText:'Удалить',danger:true});
   if(!ok)return;
   g.members=g.members.filter(x=>x!==uid);save(d);
   emit('group:update',{to:uid,gid,members:g.members,removed:uid,by:me.id});
@@ -3360,10 +3372,10 @@ function removeGroupMember(gid,uid){
   if(current&&current.group&&current.id===gid){current.members=g.members;updateConvStatus();}
   renderGroupInfo(g);renderChats();toast('Участник удалён');
 }
-function leaveGroup(){
+async function leaveGroup(){
   if(!(current&&current.group))return;const d=db();const g=d.chats[current.id];if(!g)return;
   const own=isGroupOwner(g);
-  let ok=true;try{ok=window.confirm(own?('Удалить группу «'+g.name+'» у себя?'):('Выйти из группы «'+g.name+'»?'));}catch(e){}
+  const ok=await appConfirm(own?('Удалить группу «'+g.name+'» у себя?'):('Выйти из группы «'+g.name+'»?'),{okText:own?'Удалить':'Выйти',danger:true});
   if(!ok)return;
   const gid=g.id;
   g.members.filter(x=>x!==me.id).forEach(uidT=>emit('group:leave',{to:uidT,gid,from:me.id}));
@@ -3743,9 +3755,9 @@ function editMessage(m){
   if(cloudOn&&!current.group&&!isIncognito(current.id)){try{cloudSend({id:m.id,chat_key:chatKey(me.id,current.id),from_id:me.id,to_id:current.id,type:'text',text:nt,t:mm.t,edited:1});}catch(e){}}
   toast('Сообщение изменено');
 }
-function deleteMessage(m){
+async function deleteMessage(m){
   if(!current||m.from!==me.id)return;
-  let okk=true;try{okk=window.confirm('Удалить это сообщение у всех?');}catch(e){}if(!okk)return;
+  const okk=await appConfirm('Удалить это сообщение у всех?',{okText:'Удалить',danger:true});if(!okk)return;
   const d=db();const c=d.chats[curChatKey()];if(!c)return;const mm=c.messages.find(x=>x.id===m.id);if(!mm)return;
   mm.deleted=true;mm.text='';delete mm.src;delete mm.audio;save(d);renderMessages();renderChats();
   if(current.group)current.members.filter(x=>x!==me.id).forEach(u=>emit('msg:del',{to:u,gid:current.id,id:m.id}));
@@ -3828,8 +3840,10 @@ async function toggleSecret(peerId){
 }
 function updateE2eeBanner(peerId){
   const t=document.getElementById('e2eeText');if(!t)return;
-  if(peerId&&isSecret(peerId))t.textContent='Сквозное шифрование (E2E) · сервер не читает';
-  else t.textContent='Шифрование канала · данные на Cloudflare (не в США)';
+  const banner=document.getElementById('e2eeBanner');
+  const secret=!!(peerId&&isSecret(peerId));
+  if(banner)banner.style.display=secret?'':'none';   // обычные чаты — без плашки; секретные — показываем E2E-статус
+  if(secret)t.textContent='Сквозное шифрование (E2E) · сервер не читает';
 }
 const TTL_OPTS=[['Выкл',0],['1 час',3600000],['24 часа',86400000],['7 дней',604800000]];
 function sweepExpired(){
@@ -5598,9 +5612,9 @@ $('#btnLogout').onclick=()=>{setOnline(false);sessionStorage.removeItem(SS);loca
 $('#screenToggle').onclick=function(){this.classList.toggle('on');toast(this.classList.contains('on')?'Защита от скриншотов включена':'Защита выключена');};
 $('#rememberToggle').onclick=function(){const on=!this.classList.contains('on');this.classList.toggle('on',on);setRemember(on);
   toast(on?'✅ Вход будет запоминаться — без СМС при следующем запуске':'Вход не запоминается — потребуется подтверждение по СМС при следующем запуске');};
-$('#autosaveToggle').onclick=function(){
+$('#autosaveToggle').onclick=async function(){
   if(this.classList.contains('on')){this.classList.remove('on');setAutosave(false);toast('Автосохранение медиа выключено');return;}
-  let ok=true;try{ok=window.confirm('Сохранять полученные фото, видео, голосовые, видео-кружки и документы в память устройства (галерею/загрузки)?\n\nЭто экономит место на сервере. Включая, вы соглашаетесь на сохранение файлов на вашем устройстве.');}catch(e){ok=true;}
+  const ok=await appConfirm('Сохранять полученные фото, видео, голосовые, видео-кружки и документы в память устройства (галерею/загрузки)?\n\nЭто экономит место на сервере. Включая, вы соглашаетесь на сохранение файлов на вашем устройстве.',{title:'Сохранять медиа на устройство?',okText:'Сохранять'});
   if(!ok)return;
   this.classList.add('on');setAutosave(true);toast('✅ Медиа будут сохраняться на устройство');};
 $('#notifToggle').onclick=async function(){
@@ -5678,7 +5692,7 @@ function buildLegal(body){
   docs.forEach(d=>{const row=el('<div class="setting" style="cursor:pointer"><div class="ic">📄</div><div class="lbl"><div class="t">'+d[0]+'</div><div class="d">Открыть документ</div></div><div style="color:var(--faint)">›</div></div>');row.onclick=()=>openWebview(d[1],d[0],'scrHome',true);body.appendChild(row);});
   body.appendChild(el('<div class="sec-head">Удаление аккаунта</div>'));
   const del=el('<button class="kill sub-btn" style="text-align:center">Удалить аккаунт на сервере</button>');
-  del.onclick=async()=>{if(!confirm('Удалить аккаунт Zemex/ZEMEX на сервере, сеансы, контакты, заявки и сообщения? Действие необратимо.'))return;try{if(cloudOn&&CFG.provider==='worker'&&sessionToken){await jpost(wapi('/account/delete'),{});}Object.keys(localStorage).filter(k=>k.indexOf('om')===0).forEach(k=>localStorage.removeItem(k));sessionStorage.removeItem(SS);forceLogout('Аккаунт удалён');}catch(e){toast('Не удалось удалить аккаунт: '+String(e.message||e));}};
+  del.onclick=async()=>{if(!await appConfirm('Аккаунт на сервере, сеансы, контакты, заявки и сообщения будут удалены безвозвратно.',{title:'Удалить аккаунт Zemex?',okText:'Удалить навсегда',danger:true}))return;try{if(cloudOn&&CFG.provider==='worker'&&sessionToken){await jpost(wapi('/account/delete'),{});}Object.keys(localStorage).filter(k=>k.indexOf('om')===0).forEach(k=>localStorage.removeItem(k));sessionStorage.removeItem(SS);forceLogout('Аккаунт удалён');}catch(e){toast('Не удалось удалить аккаунт: '+String(e.message||e));}};
   body.appendChild(del);
 }
 
@@ -5919,7 +5933,7 @@ $('#rowChatBg').onclick=()=>openSub('Фон чатов',buildChatBg);
 $('#btnTheme').onclick=toggleThemeQuick;
 $('#bgFileInput').onchange=e=>{const f=e.target.files[0]; loadChatBgPhoto(f); e.target.value='';};
 $('#btnLogout').onclick=async()=>{try{if(cloudOn&&CFG.provider==='worker'&&sessionToken)await jpost(wapi('/logout'),{});}catch(e){}forceLogout('Вы вышли из аккаунта');};
-$('#btnClearAll').onclick=()=>{if(confirm('Удалить все данные мессенджера на этом устройстве?')){Object.keys(localStorage).filter(k=>k.indexOf('om')===0).forEach(k=>localStorage.removeItem(k));sessionStorage.removeItem(SS);me=null;current=null;forceLogout('Данные удалены');}};
+$('#btnClearAll').onclick=async()=>{if(await appConfirm('Все чаты, контакты и настройки на этом устройстве будут удалены. Аккаунт в облаке сохранится.',{title:'Удалить все данные?',okText:'Удалить',danger:true})){Object.keys(localStorage).filter(k=>k.indexOf('om')===0).forEach(k=>localStorage.removeItem(k));sessionStorage.removeItem(SS);me=null;current=null;forceLogout('Данные удалены');}};
 
 function buildGif(body){
   body.appendChild(el('<div class="note">GIF ищутся через GIPHY и подгружаются из интернета прямо в поиске внутри чата. По умолчанию уже работает встроенный ключ Zemex — ничего вводить не нужно. При желании можно вписать свой ключ с developers.giphy.com.</div>'));
@@ -6095,20 +6109,41 @@ function fmtDay(t){const d=new Date(t),n=new Date();const days=['Воскрес�
   return d.getDate()+'.'+(d.getMonth()+1).toString().padStart(2,'0')+'.'+d.getFullYear();}
 function fmtDur(s,withH){s=Math.round(s);const m=Math.floor(s/60),sec=s%60;return (withH&&m>=60?Math.floor(m/60)+':'+(m%60).toString().padStart(2,'0'):m)+':'+sec.toString().padStart(2,'0');}
 let toastTO=null;function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');clearTimeout(toastTO);toastTO=setTimeout(()=>el.classList.remove('show'),2600);}
+/* Своя модалка подтверждения (в стиле приложения) вместо браузерного confirm(). Возвращает Promise<bool>. */
+function appConfirm(message,opts){
+  opts=opts||{};
+  if(typeof window!=='undefined'&&window.__OM_AUTOCONFIRM__!=null)return Promise.resolve(!!window.__OM_AUTOCONFIRM__); // тест-хук (в проде не задаётся)
+  return new Promise(resolve=>{
+    const back=document.createElement('div');back.className='confirm-back';
+    const card=document.createElement('div');card.className='confirm-card';
+    card.innerHTML=(opts.title?'<div class="cf-title"></div>':'')+'<div class="cf-msg"></div><div class="cf-acts"><button class="cf-btn cf-cancel"></button><button class="cf-btn cf-ok"></button></div>';
+    if(opts.title)card.querySelector('.cf-title').textContent=opts.title;
+    card.querySelector('.cf-msg').textContent=message||'';
+    const okBtn=card.querySelector('.cf-ok');okBtn.textContent=opts.okText||'OK';if(opts.danger)okBtn.classList.add('cf-danger');
+    card.querySelector('.cf-cancel').textContent=opts.cancelText||'Отмена';
+    back.appendChild(card);document.body.appendChild(back);
+    requestAnimationFrame(()=>back.classList.add('show'));
+    let done=false;const finish=v=>{if(done)return;done=true;try{back.remove();}catch(e){}resolve(v);};
+    okBtn.onclick=()=>finish(true);
+    card.querySelector('.cf-cancel').onclick=()=>finish(false);
+    back.onclick=e=>{if(e.target===back)finish(false);};
+  });
+}
 
 /* ===================== УВЕДОМЛЕНИЯ (когда приложение свёрнуто) ===================== */
 let _swReg=null;
 function notifKey(){return 'om_notif_'+(me?me.id:'x');}
 function notifPref(){try{return localStorage.getItem(notifKey())==='1';}catch(e){return false;}}
 function setNotifPref(on){try{localStorage.setItem(notifKey(),on?'1':'0');}catch(e){}}
-function notifSupported(){return typeof Notification!=='undefined';}
-function notifGranted(){return notifSupported()&&Notification.permission==='granted';}
+function notifSupported(){return !!(typeof window!=='undefined'&&window.__OLESYA_NATIVE__)||typeof Notification!=='undefined';}
+function notifGranted(){ if(typeof window!=='undefined'&&window.__OLESYA_NATIVE__)return true; return typeof Notification!=='undefined'&&Notification.permission==='granted';}
 async function requestNotifPermission(){
   if(!notifSupported())return 'unsupported';
   try{ const p=await Notification.requestPermission(); return p||Notification.permission; }
   catch(e){ try{ return await new Promise(res=>Notification.requestPermission(res)); }catch(_){ return 'denied'; } }
 }
 async function ensureNotif(){ // согласие + системное разрешение
+  if(typeof window!=='undefined'&&window.__OLESYA_NATIVE__){ setNotifPref(true); try{registerExpoPush();}catch(e){} return true; }  // нативные пуши (Expo): разрешение запрошено при запуске
   if(!notifSupported()){toast('Уведомления не поддерживаются в этом браузере');return false;}
   const p=await requestNotifPermission();
   if(p==='granted'){ setNotifPref(true); pushSubscribe(); return true; }
@@ -6153,6 +6188,7 @@ try{ if(window.__OLESYA_PUSH_TOKEN__)registerExpoPush(window.__OLESYA_PUSH_TOKEN
 function appHidden(){ try{return document.hidden || !document.hasFocus();}catch(e){return document.hidden;} }
 function fallbackNotif(title,opts){ try{ const n=new Notification(title,opts); n.onclick=()=>{try{window.focus();}catch(e){} if(opts.data&&opts.data.peer&&me){try{openConv(opts.data.peer);}catch(_){}} n.close();}; }catch(e){} }
 function showNotif(title,body,peer){
+  if(typeof window!=='undefined'&&window.__OLESYA_NATIVE__)return;   // в нативной обёртке баннеры показывает система (Expo), веб-Notification не нужен
   if(!notifPref()||!notifGranted())return;
   const opts={body:body||'',tag:'om-'+(peer||'msg'),renotify:true,data:{peer:peer||null},icon:'apple-touch-icon.png',badge:'apple-touch-icon.png'};
   try{
