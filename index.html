@@ -15,7 +15,8 @@
 <!-- Тема выставляется ДО отрисовки CSS, чтобы не было вспышки чужой темы -->
 <script>(function(){try{
   var p=localStorage.getItem('om_theme')||'auto';
-  var dark = p==='dark' || (p!=='light' && (!window.matchMedia || window.matchMedia('(prefers-color-scheme: dark)').matches));
+  var sysDark = (window.__OM_SYS_DARK__!=null) ? !!window.__OM_SYS_DARK__ : (!window.matchMedia || window.matchMedia('(prefers-color-scheme: dark)').matches);
+  var dark = p==='dark' || (p!=='light' && sysDark);
   var t = dark ? 'dark' : 'light';
   document.documentElement.setAttribute('data-theme', t);
   var m=document.querySelector('meta[name="theme-color"]'); if(m) m.setAttribute('content', t==='light' ? '#FFFFFF' : '#15121E');
@@ -1165,7 +1166,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 
   <section class="screen hidden" id="scrChats">
     <div class="topbar">
-      <button class="iconbtn" data-back="scrHome" title="Главная"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/></svg></button>
+      <button class="iconbtn fx-back" id="btnHome" data-back="scrHome" title="Домой"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/></svg></button>
       <div class="avatar md" id="myAvatarTop" style="cursor:pointer"></div>
       <div class="grow"><div class="title">Чаты</div><div class="sub" id="myStatusTop">в сети</div></div>
       <button class="iconbtn fx-search" id="btnSearch" title="Поиск"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
@@ -1547,7 +1548,9 @@ const SS='om_session';            // this-tab user id (sessionStorage)
 /* ===================== ТЕМЫ (день / ночь / авто) ===================== */
 const THEME_KEY='om_theme';
 function getThemePref(){try{return localStorage.getItem(THEME_KEY)||'auto';}catch(e){return 'auto';}}
-function systemPrefersDark(){return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);}
+function systemPrefersDark(){ if(typeof window!=='undefined'&&window.__OM_SYS_DARK__!=null)return !!window.__OM_SYS_DARK__; return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);}
+// нативная оболочка сообщает системную тему устройства (надёжнее matchMedia в WebView)
+window.olesyaSystemTheme=function(scheme){ try{ window.__OM_SYS_DARK__=(scheme==='dark'); if(getThemePref()==='auto')applyTheme('auto'); }catch(e){} };
 function resolveTheme(pref){pref=pref||getThemePref();return pref==='dark'?'dark':pref==='light'?'light':(systemPrefersDark()?'dark':'light');}
 function applyTheme(pref){
   const t=resolveTheme(pref);
@@ -1762,7 +1765,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.12', BUILD_ID='2026-07-03-back-arrow';
+const APP_VERSION='4.9.13', BUILD_ID='2026-07-03-arrows-home-theme';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -6154,8 +6157,10 @@ window.addEventListener('popstate',()=>{
 });
 /* ================== back buttons ================== */
 const BACK_ARROW_SVG='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/></svg>';
+/* Единая стрелка «назад» на ВСЕХ кнопках назад (и data-back, и именованных), КРОМЕ кнопки «Домой» */
+$$('[data-back]:not(#btnHome), #btnCloseSettings, #subBack, #webBack, #readerClose').forEach(b=>{ b.classList.add('fx-back'); b.innerHTML=BACK_ARROW_SVG; });
 $$('[data-back]').forEach(b=>{
-  b.classList.add('fx-back'); b.innerHTML=BACK_ARROW_SVG;   // единая стрелка «назад» на всех экранах
+  b.classList.add('fx-back');   // единый стиль (цвет/размер) — в т.ч. для «Домой» (иконка остаётся домиком)
   b.onclick=()=>{
     if(!_omPopping && me && history.state && history.state.__omScr){ history.back(); return; } // назад через историю (синхрон с аппаратной кнопкой)
     const t=b.dataset.back;
