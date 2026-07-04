@@ -1766,7 +1766,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.14', BUILD_ID='2026-07-03-typing-fix-tapfx';
+const APP_VERSION='4.9.15', BUILD_ID='2026-07-03-tapfx-audible';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -6188,22 +6188,30 @@ let toastTO=null;function toast(t){const el=$('#toast');el.textContent=t;el.clas
 function tapfxOn(){try{return localStorage.getItem('om_tapfx')!=='0';}catch(e){return true;}}   // по умолчанию включено
 function setTapfx(on){try{localStorage.setItem('om_tapfx',on?'1':'0');}catch(e){}}
 let _tapCtx=null;
+function _tapBeep(){
+  try{
+    const c=_tapCtx, t=c.currentTime, o=c.createOscillator(), g=c.createGain();
+    o.type='triangle'; o.frequency.setValueAtTime(1700,t);
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.28,t+0.004);   // громче: слышно на динамике телефона
+    g.gain.exponentialRampToValueAtTime(0.0001,t+0.07);
+    o.connect(g); g.connect(c.destination);
+    o.start(t); o.stop(t+0.08);
+  }catch(e){}
+}
 function tapClick(){
   try{
     _tapCtx=_tapCtx||new (window.AudioContext||window.webkitAudioContext)();
-    if(_tapCtx.state==='suspended'){try{_tapCtx.resume();}catch(e){}}
-    const t=_tapCtx.currentTime, o=_tapCtx.createOscillator(), g=_tapCtx.createGain();
-    o.type='sine'; o.frequency.setValueAtTime(2100,t);
-    g.gain.setValueAtTime(0.00008,t);
-    g.gain.exponentialRampToValueAtTime(0.05,t+0.002);
-    g.gain.exponentialRampToValueAtTime(0.00008,t+0.045);
-    o.connect(g); g.connect(_tapCtx.destination);
-    o.start(t); o.stop(t+0.055);
+    // WebView создаёт контекст «замороженным» — звук играем только ПОСЛЕ resume, иначе он уходит в никуда
+    if(_tapCtx.state==='suspended'){ _tapCtx.resume().then(_tapBeep).catch(()=>{}); }
+    else _tapBeep();
   }catch(e){}
 }
 const TAPFX_SEL='button,a[href],[role="button"],.iconbtn,.chat-row,.setting,.key,.tabbtn,.act-item,.cf-btn,.home-card,.snet,.sw,.st,.optRow,.sub-btn,.btn';
 document.addEventListener('pointerdown',function(e){
   if(!tapfxOn())return;
+  // размораживаем аудио-контекст на ЛЮБОМ первом касании (жест пользователя) — к первому клику по кнопке он уже готов
+  try{_tapCtx=_tapCtx||new (window.AudioContext||window.webkitAudioContext)();if(_tapCtx.state==='suspended')_tapCtx.resume();}catch(_){}
   const el=e.target&&e.target.closest&&e.target.closest(TAPFX_SEL);
   if(!el||el.disabled)return;
   tapClick(); try{navigator.vibrate&&navigator.vibrate(9);}catch(_){}   // вибрация — в нативе нужен permission VIBRATE
