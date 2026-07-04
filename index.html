@@ -1766,7 +1766,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.15', BUILD_ID='2026-07-03-tapfx-audible';
+const APP_VERSION='4.9.16', BUILD_ID='2026-07-04-tapfx-bio';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -6084,8 +6084,8 @@ function buildLockOptions(body){
     ch.onclick=()=>{const ss=$('#subSheet');if(ss)ss.classList.remove('show');const st=$('#settingsSheet');if(st)st.classList.remove('show');enterPinSetup();};
     body.appendChild(ch);
     if(window.__OLESYA_NATIVE__){
-      const bioBtn=el('<button class="sub-btn" style="text-align:center;margin-top:8px">'+(c.bio?'✅ Face ID / отпечаток — включён':'👆 Включить Face ID / отпечаток')+'</button>');
-      bioBtn.onclick=()=>{const cc=lockCfg();cc.bio=!cc.bio;setLockCfg(cc);buildSubRefresh();toast(cc.bio?'Биометрия включена':'Биометрия выключена');};
+      const bioBtn=el('<button class="sub-btn" style="text-align:center;margin-top:8px">'+(c.bio!==false?'✅ Face ID / отпечаток — включён':'👆 Включить Face ID / отпечаток')+'</button>');
+      bioBtn.onclick=()=>{const cc=lockCfg();cc.bio=(cc.bio===false);setLockCfg(cc);buildSubRefresh();toast(cc.bio!==false?'Биометрия включена':'Биометрия выключена');};
       body.appendChild(bioBtn);
     }
   }
@@ -6104,7 +6104,7 @@ function startPinLock(){pinLockUntil=Date.now()+30000;logSec('⛔ 5 неверн
 document.addEventListener('visibilitychange',()=>{if(!me)return;if(document.hidden){hidAt=Date.now();}else{let c={};try{c=lockCfg();}catch(e){}const thr=(c&&c.autolock!=null)?c.autolock:60000;if(c&&c.pin&&hidAt&&thr>=0&&Date.now()-hidAt>=thr)maybeLock();}});
 function maybeLock(){const c=lockCfg();if(c.pin){pinMode='check';pinBuffer='';$('#lockTitle').textContent='Введите PIN-код';renderPinDots();go('lockScreen');tryBiometricUnlock();}}
 /* Биометрия (Face ID/отпечаток) — только в нативной обёртке, как быстрая замена PIN. */
-function bioAvailable(){try{const c=lockCfg();return !!(c&&c.pin&&c.bio&&window.__OLESYA_NATIVE__&&window.ReactNativeWebView);}catch(e){return false;}}
+function bioAvailable(){try{const c=lockCfg();return !!(c&&c.pin&&c.bio!==false&&window.__OLESYA_NATIVE__&&window.ReactNativeWebView);}catch(e){return false;}}   // биометрия ВКЛЮЧЕНА по умолчанию (пока явно не выключили)
 function tryBiometricUnlock(){
   const btn=$('#lockBio'); if(btn)btn.style.display=bioAvailable()?'':'none';
   if(!bioAvailable())return;
@@ -6187,35 +6187,46 @@ let toastTO=null;function toast(t){const el=$('#toast');el.textContent=t;el.clas
 /* ── Отклик при нажатии (звук + вибрация), как в системе ── */
 function tapfxOn(){try{return localStorage.getItem('om_tapfx')!=='0';}catch(e){return true;}}   // по умолчанию включено
 function setTapfx(on){try{localStorage.setItem('om_tapfx',on?'1':'0');}catch(e){}}
-let _tapCtx=null;
+let _tapCtx=null,_tapPrimed=false;
+function _tapPrime(){ // «прогрев» аудио-выхода Android: первые ~100мс после старта движка глотаются — играем тишину заранее
+  if(_tapPrimed||!_tapCtx||_tapCtx.state!=='running')return;
+  try{const b=_tapCtx.createBuffer(1,1,22050),s=_tapCtx.createBufferSource();s.buffer=b;s.connect(_tapCtx.destination);s.start(0);_tapPrimed=true;}catch(e){}
+}
+function _tapUnlock(){ // создать/разморозить контекст (звать на любом жесте пользователя)
+  try{
+    _tapCtx=_tapCtx||new (window.AudioContext||window.webkitAudioContext)();
+    if(_tapCtx.state==='suspended')_tapCtx.resume().then(_tapPrime).catch(()=>{});
+    else _tapPrime();
+  }catch(e){}
+}
 function _tapBeep(){
   try{
-    const c=_tapCtx, t=c.currentTime, o=c.createOscillator(), g=c.createGain();
-    o.type='triangle'; o.frequency.setValueAtTime(1700,t);
+    const c=_tapCtx, t=c.currentTime+0.02, o=c.createOscillator(), g=c.createGain();
+    o.type='triangle'; o.frequency.setValueAtTime(1600,t);
     g.gain.setValueAtTime(0.0001,t);
-    g.gain.exponentialRampToValueAtTime(0.28,t+0.004);   // громче: слышно на динамике телефона
-    g.gain.exponentialRampToValueAtTime(0.0001,t+0.07);
+    g.gain.exponentialRampToValueAtTime(0.55,t+0.005);   // громче (пик 0.55) и чуть длиннее — уверенно слышно на динамике
+    g.gain.exponentialRampToValueAtTime(0.0001,t+0.09);
     o.connect(g); g.connect(c.destination);
-    o.start(t); o.stop(t+0.08);
+    o.start(t); o.stop(t+0.11);
   }catch(e){}
 }
 function tapClick(){
   try{
     _tapCtx=_tapCtx||new (window.AudioContext||window.webkitAudioContext)();
     // WebView создаёт контекст «замороженным» — звук играем только ПОСЛЕ resume, иначе он уходит в никуда
-    if(_tapCtx.state==='suspended'){ _tapCtx.resume().then(_tapBeep).catch(()=>{}); }
+    if(_tapCtx.state==='suspended'){ _tapCtx.resume().then(()=>{_tapPrime();_tapBeep();}).catch(()=>{}); }
     else _tapBeep();
   }catch(e){}
 }
 const TAPFX_SEL='button,a[href],[role="button"],.iconbtn,.chat-row,.setting,.key,.tabbtn,.act-item,.cf-btn,.home-card,.snet,.sw,.st,.optRow,.sub-btn,.btn';
 document.addEventListener('pointerdown',function(e){
   if(!tapfxOn())return;
-  // размораживаем аудио-контекст на ЛЮБОМ первом касании (жест пользователя) — к первому клику по кнопке он уже готов
-  try{_tapCtx=_tapCtx||new (window.AudioContext||window.webkitAudioContext)();if(_tapCtx.state==='suspended')_tapCtx.resume();}catch(_){}
+  _tapUnlock();   // разморозка+прогрев на ЛЮБОМ касании — к первому клику по кнопке звук уже готов
   const el=e.target&&e.target.closest&&e.target.closest(TAPFX_SEL);
   if(!el||el.disabled)return;
   tapClick(); try{navigator.vibrate&&navigator.vibrate(9);}catch(_){}   // вибрация — в нативе нужен permission VIBRATE
 },{passive:true});
+document.addEventListener('touchend',function(){ if(tapfxOn())_tapUnlock(); },{passive:true});  // фолбэк: часть WebView засчитывает «жест» только на touchend
 /* Своя модалка подтверждения (в стиле приложения) вместо браузерного confirm(). Возвращает Promise<bool>. */
 function appConfirm(message,opts){
   opts=opts||{};
