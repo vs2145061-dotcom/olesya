@@ -1376,6 +1376,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
       <div class="setting"><div class="ic">🔓</div><div class="lbl"><div class="t">Запоминать вход</div><div class="d">Без СМС при следующем запуске на этом устройстве</div></div><div class="switch on" id="rememberToggle"></div></div>
       <div class="setting"><div class="ic">💾</div><div class="lbl"><div class="t">Сохранять медиа на устройство</div><div class="d">Фото, видео, голосовые и документы — в галерею/загрузки (экономит место на сервере)</div></div><div class="switch" id="autosaveToggle"></div></div>
       <div class="setting"><div class="ic">🔔</div><div class="lbl"><div class="t">Уведомления</div><div class="d">Оповещения о сообщениях и звонках, когда приложение свёрнуто</div></div><div class="switch" id="notifToggle"></div></div>
+      <div class="setting"><div class="ic">🔉</div><div class="lbl"><div class="t">Отклик при нажатии</div><div class="d">Звук и вибрация при нажатиях — как в системе</div></div><div class="switch on" id="tapfxToggle"></div></div>
       <div class="sec-head">Оформление</div>
       <div class="setting pro-row" id="rowPro" style="cursor:pointer"><div class="ic">✨</div><div class="lbl"><div class="t">Zemex Pro</div><div class="d" id="stPro">оформить подписку</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowTheme" style="cursor:pointer"><div class="ic">🎨</div><div class="lbl"><div class="t">Тема оформления</div><div class="d" id="stTheme">Авто</div></div><div style="color:var(--faint)">›</div></div>
@@ -1765,7 +1766,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.13', BUILD_ID='2026-07-03-arrows-home-theme';
+const APP_VERSION='4.9.14', BUILD_ID='2026-07-03-typing-fix-tapfx';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -3186,7 +3187,8 @@ function toggleSendBtn(){const has=$('#msgInput').value.trim().length>0;$('#btnS
 /* typing */
 let typingTO=null,typingSent=false;
 function sendTyping(on){if(!current||current.bot||current.group||current.channel)return;if(on===typingSent&&on)return;typingSent=on;emit('typing',{to:current.id,from:me.id,on});
-  if(on){clearTimeout(typingTO);typingTO=setTimeout(()=>{typingSent=false;emit('typing',{to:current.id,from:me.id,on:false});},3000);}}
+  // фикс: к моменту срабатывания таймера чат может быть уже закрыт (current=null) — запоминаем адресата сейчас
+  if(on){const peer=current.id;clearTimeout(typingTO);typingTO=setTimeout(()=>{typingSent=false;if(me)emit('typing',{to:peer,from:me.id,on:false});},3000);}}
 let typingEl=null;
 function showTyping(on){
   if(!current)return;const st=$('#convStatus');
@@ -5664,6 +5666,7 @@ $('#autosaveToggle').onclick=async function(){
   const ok=await appConfirm('Сохранять полученные фото, видео, голосовые, видео-кружки и документы в память устройства (галерею/загрузки)?\n\nЭто экономит место на сервере. Включая, вы соглашаетесь на сохранение файлов на вашем устройстве.',{title:'Сохранять медиа на устройство?',okText:'Сохранять'});
   if(!ok)return;
   this.classList.add('on');setAutosave(true);toast('✅ Медиа будут сохраняться на устройство');};
+{const tf=$('#tapfxToggle'); if(tf){ tf.classList.toggle('on',tapfxOn()); tf.onclick=function(){const on=!this.classList.contains('on');this.classList.toggle('on',on);setTapfx(on);if(on)tapClick();toast(on?'Отклик при нажатии включён':'Отклик при нажатии выключен');}; }}
 $('#notifToggle').onclick=async function(){
   if(this.classList.contains('on')){this.classList.remove('on');setNotifPref(false);toast('Уведомления выключены');return;}
   const ok=await ensureNotif();
@@ -6181,6 +6184,30 @@ function fmtDay(t){const d=new Date(t),n=new Date();const days=['Воскрес�
   return d.getDate()+'.'+(d.getMonth()+1).toString().padStart(2,'0')+'.'+d.getFullYear();}
 function fmtDur(s,withH){s=Math.round(s);const m=Math.floor(s/60),sec=s%60;return (withH&&m>=60?Math.floor(m/60)+':'+(m%60).toString().padStart(2,'0'):m)+':'+sec.toString().padStart(2,'0');}
 let toastTO=null;function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');clearTimeout(toastTO);toastTO=setTimeout(()=>el.classList.remove('show'),2600);}
+/* ── Отклик при нажатии (звук + вибрация), как в системе ── */
+function tapfxOn(){try{return localStorage.getItem('om_tapfx')!=='0';}catch(e){return true;}}   // по умолчанию включено
+function setTapfx(on){try{localStorage.setItem('om_tapfx',on?'1':'0');}catch(e){}}
+let _tapCtx=null;
+function tapClick(){
+  try{
+    _tapCtx=_tapCtx||new (window.AudioContext||window.webkitAudioContext)();
+    if(_tapCtx.state==='suspended'){try{_tapCtx.resume();}catch(e){}}
+    const t=_tapCtx.currentTime, o=_tapCtx.createOscillator(), g=_tapCtx.createGain();
+    o.type='sine'; o.frequency.setValueAtTime(2100,t);
+    g.gain.setValueAtTime(0.00008,t);
+    g.gain.exponentialRampToValueAtTime(0.05,t+0.002);
+    g.gain.exponentialRampToValueAtTime(0.00008,t+0.045);
+    o.connect(g); g.connect(_tapCtx.destination);
+    o.start(t); o.stop(t+0.055);
+  }catch(e){}
+}
+const TAPFX_SEL='button,a[href],[role="button"],.iconbtn,.chat-row,.setting,.key,.tabbtn,.act-item,.cf-btn,.home-card,.snet,.sw,.st,.optRow,.sub-btn,.btn';
+document.addEventListener('pointerdown',function(e){
+  if(!tapfxOn())return;
+  const el=e.target&&e.target.closest&&e.target.closest(TAPFX_SEL);
+  if(!el||el.disabled)return;
+  tapClick(); try{navigator.vibrate&&navigator.vibrate(9);}catch(_){}   // вибрация — в нативе нужен permission VIBRATE
+},{passive:true});
 /* Своя модалка подтверждения (в стиле приложения) вместо браузерного confirm(). Возвращает Promise<bool>. */
 function appConfirm(message,opts){
   opts=opts||{};
