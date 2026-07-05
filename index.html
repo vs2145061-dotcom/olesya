@@ -1767,7 +1767,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.20', BUILD_ID='2026-07-05-blocked-socials';
+const APP_VERSION='4.9.21', BUILD_ID='2026-07-05-haptic-bridge';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -5687,7 +5687,7 @@ $('#autosaveToggle').onclick=async function(){
   if(!ok)return;
   this.classList.add('on');setAutosave(true);toast('✅ Медиа будут сохраняться на устройство');};
 {const ts=$('#tapSndToggle'); if(ts){ ts.classList.toggle('on',tapSoundOn()); ts.onclick=function(){const on=!this.classList.contains('on');this.classList.toggle('on',on);setTapSound(on);if(on){_tapUnlock();tapClick();}toast(on?'Звук при нажатии включён':'Звук при нажатии выключен');}; }}
-{const tv=$('#tapVibToggle'); if(tv){ tv.classList.toggle('on',tapVibeOn()); tv.onclick=function(){const on=!this.classList.contains('on');this.classList.toggle('on',on);setTapVibe(on);if(on){try{navigator.vibrate&&navigator.vibrate(30);}catch(_){}}toast(on?'Виброотклик включён':'Виброотклик выключен');}; }}
+{const tv=$('#tapVibToggle'); if(tv){ tv.classList.toggle('on',tapVibeOn()); tv.onclick=function(){const on=!this.classList.contains('on');this.classList.toggle('on',on);setTapVibe(on);if(on)doVibe(30);toast(on?'Виброотклик включён':'Виброотклик выключен');}; }}
 $('#notifToggle').onclick=async function(){
   if(this.classList.contains('on')){this.classList.remove('on');setNotifPref(false);toast('Уведомления выключены');return;}
   const ok=await ensureNotif();
@@ -6210,6 +6210,13 @@ function tapSoundOn(){try{const v=localStorage.getItem('om_tapsnd');if(v!=null)r
 function setTapSound(on){try{localStorage.setItem('om_tapsnd',on?'1':'0');}catch(e){}}
 function tapVibeOn(){try{const v=localStorage.getItem('om_tapvib');if(v!=null)return v!=='0';return localStorage.getItem('om_tapfx')!=='0';}catch(e){return true;}}
 function setTapVibe(on){try{localStorage.setItem('om_tapvib',on?'1':'0');}catch(e){}}
+/* Вибрация: в Android WebView navigator.vibrate ОТКЛЮЧЁН — просим нативную оболочку (мостик haptic) */
+function doVibe(ms){
+  try{
+    if(window.__OLESYA_NATIVE__&&window.ReactNativeWebView){window.ReactNativeWebView.postMessage(JSON.stringify({type:'haptic',ms:ms||10}));return;}
+    if(navigator.vibrate)navigator.vibrate(ms||10);
+  }catch(e){}
+}
 let _tapCtx=null,_tapPrimed=false;
 function _tapPrime(){ // «прогрев» аудио-выхода Android: первые ~100мс после старта движка глотаются — играем тишину заранее
   if(_tapPrimed||!_tapCtx||_tapCtx.state!=='running')return;
@@ -6260,7 +6267,7 @@ document.addEventListener('pointerdown',function(e){
   const el=e.target&&e.target.closest&&e.target.closest(TAPFX_SEL);
   if(!el||el.disabled)return;
   if(snd)tapClick();
-  if(vib){try{navigator.vibrate&&navigator.vibrate(9);}catch(_){}}   // вибрация — в нативе нужен permission VIBRATE
+  if(vib)doVibe(9);   // через нативный мостик (в WebView navigator.vibrate отключён)
 },{passive:true});
 document.addEventListener('touchend',function(){ if(tapSoundOn())_tapUnlock(); },{passive:true});  // фолбэк: часть WebView засчитывает «жест» только на touchend
 /* Своя модалка подтверждения (в стиле приложения) вместо браузерного confirm(). Возвращает Promise<bool>. */
