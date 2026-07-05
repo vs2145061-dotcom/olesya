@@ -1767,7 +1767,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.18', BUILD_ID='2026-07-04-tapfx-split';
+const APP_VERSION='4.9.19', BUILD_ID='2026-07-05-batch6';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -2303,6 +2303,14 @@ $('#btnSendCode').onclick=async()=>{
     if(useWorkerSms){
       /* ── SMSC.ru через Worker (РФ, без VPN) ── */
       fbConfirmation=null; // помечаем что это НЕ Firebase-поток
+      // ОПТИМИСТИЧНЫЙ ПЕРЕХОД: экран кода показываем СРАЗУ — сервер может держать запрос
+      // до ~12с, пока реально шлёт SMS. Статус на экране обновляем по фактическому ответу.
+      $('#otpPhoneLabel') && ($('#otpPhoneLabel').textContent=phone);
+      resetOtp();go('scrOtp');
+      {const dpw=$('#demoPillWrap');if(dpw)dpw.style.display='none';}
+      {const phf=$('#phoneHelper');if(phf)phf.style.display='none';}
+      {const oh=$('#otpHint');if(oh)oh.textContent='Отправляем код на '+phone+'…';}
+      setTimeout(()=>{const oi=$('#otpInput');if(oi)oi.focus();},300);
       let workerOtpOk=false, workerOtpInfo=null, smscNotConfigured=false;
       try{
         const url=getApiUrl();
@@ -2310,43 +2318,35 @@ $('#btnSendCode').onclick=async()=>{
           headers:{'content-type':'application/json'},body:JSON.stringify({phone}),
           timeout:API_TIMEOUT_MS});
         const data=await resp.json();
-        if(data.error==='rate_limit'){toast('⏳ '+data.message);b.disabled=false;return;}
+        if(data.error==='rate_limit'){const oh=$('#otpHint');if(oh)oh.textContent='⏳ '+(data.message||'Слишком много запросов — подождите.')+' Если прошлый код ещё активен — просто введите его.';startResendCooldown(Math.min(180,data.retry_after||60));b.disabled=false;return;}
         if(data.error==='sms_not_configured'){
           // SMSC не настроен на сервере — пробуем Firebase как резерв
           if(isFirebaseReady()){smscNotConfigured=true;}
-          else{toast('SMS-провайдер не настроен. Обратитесь к администратору.');b.disabled=false;return;}
+          else{toast('SMS-провайдер не настроен. Обратитесь к администратору.');go('scrPhone');b.disabled=false;return;}
         }
         else if(data.ok){workerOtpOk=true;workerOtpInfo=data;}
-        else{toast('Ошибка отправки: '+(data.message||data.error||'неизвестная'));b.disabled=false;return;}
+        else{const oh=$('#otpHint');if(oh)oh.textContent='⚠️ Не удалось отправить: '+(data.message||data.error||'неизвестная ошибка')+'. Нажмите «Отправить повторно».';startResendCooldown(20);b.disabled=false;return;}
       }catch(netErr){
         const isTimeout=netErr&&(netErr.name==='TimeoutError'||netErr.name==='AbortError');
         if(isTimeout){
-          // Реальный таймаут на телефоне: SMS скорее всего ушла — показываем экран и даём повторить (БЕЗ демо)
-          $('#otpPhoneLabel') && ($('#otpPhoneLabel').textContent=phone);
-          resetOtp();go('scrOtp');
-          const dpw=$('#demoPillWrap');if(dpw)dpw.style.display='none';
-          const _phf=$('#phoneHelper');if(_phf)_phf.style.display='none';
+          // Реальный таймаут на телефоне: SMS скорее всего ушла — даём повторить (БЕЗ демо)
           const oh=$('#otpHint');if(oh)oh.textContent='Код отправляется… Если SMS не пришла за минуту — нажмите «Отправить повторно».';
           startResendCooldown(45);
-          setTimeout(()=>{const oi=$('#otpInput');if(oi)oi.focus();},300);
           b.disabled=false;return;
         }
         // Продакшн: не подставляем демо-код при сетевой ошибке.
         // Иначе пользователь может создать локальный аккаунт, который не существует на сервере.
+        go('scrPhone');
         showNetAuthHelp();
         b.disabled=false;return;
       }
       if(workerOtpOk){
-        $('#otpPhoneLabel') && ($('#otpPhoneLabel').textContent=phone);
-        resetOtp();go('scrOtp');
-        const dpw=$('#demoPillWrap');if(dpw)dpw.style.display='none';
-        const _phw=$('#phoneHelper');if(_phw)_phw.style.display='none';
         const oh=$('#otpHint');if(oh)oh.textContent=(workerOtpInfo&&workerOtpInfo.sms==='pending')?'SMS отправляется… Если код не пришёл за минуту — нажмите «Отправить повторно».':'SMS с кодом отправлено на '+phone;
         startResendCooldown(60);
-        setTimeout(()=>{const oi=$('#otpInput');if(oi)oi.focus();},300);
         b.disabled=false;return;
       }
-      // если сюда дошли — SMSC не настроен, проваливаемся в Firebase ниже
+      // если сюда дошли — SMSC не настроен, проваливаемся в Firebase ниже (та ветка сама покажет экран кода)
+      go('scrPhone');
     }
     if(isFirebaseReady()){
       /* ── FIREBASE: для номеров вне РФ (10 000 SMS/мес) ── */
@@ -2959,7 +2959,7 @@ function openConv(peerId){
   markRead(peerId);
   if(current&&current.bot)botWelcomeIfEmpty();
   $('#msgInput').value='';toggleSendBtn();$('#emojiBar').classList.remove('show');$('#gifPanel').classList.remove('show');refreshVoiceDraft();refreshLivePanel();
-  setTimeout(()=>$('#msgs').scrollTop=$('#msgs').scrollHeight,40);
+  pinMsgsBottom(true);   // прилипаем к последнему сообщению (медиа догрузятся — останемся внизу)
 }
 function updateConvStatus(){
   if(current&&current.channel){const s=$('#convStatus');s.classList.remove('typing');s.textContent='@'+current.handle+' · '+(current.subs||0)+' '+plural(current.subs||0,'подписчик','подписчика','подписчиков');return;}
@@ -2968,6 +2968,22 @@ function updateConvStatus(){
 function fpr(seed){let h=0;for(const ch of seed)h=(h*31+ch.charCodeAt(0))>>>0;const hex=h.toString(16).padStart(8,'0').toUpperCase();return hex.match(/.{2}/g).join(' ');}
 
 function getChat(){if(current&&(current.group||current.channel))return db().chats[current.id];return db().chats[chatKey(me.id,current.id)];}
+/* «Прилипание» к последнему сообщению: фото/GIF/кружки догружаются ПОСЛЕ первого скролла и раздувают
+   ленту — низ уезжает. Повторяем прокрутку по таймерам и по факту загрузки каждого медиа,
+   пока пользователь сам не коснулся ленты (тогда не мешаем читать). */
+let _stickBottom=true;
+function pinMsgsBottom(force){
+  const box=$('#msgs');if(!box)return;
+  if(force)_stickBottom=true;
+  const dn=()=>{const b=$('#msgs');if(b&&_stickBottom)b.scrollTop=b.scrollHeight;};
+  box.scrollTop=box.scrollHeight;
+  [80,250,600,1200].forEach(ms=>setTimeout(dn,ms));
+  box.querySelectorAll('img,video').forEach(el=>{
+    if(el.tagName==='IMG'){ if(!el.complete)el.addEventListener('load',dn,{once:true}); }
+    else el.addEventListener('loadedmetadata',dn,{once:true});
+  });
+}
+{const _mb=$('#msgs');if(_mb)_mb.addEventListener('touchstart',()=>{_stickBottom=false;},{passive:true});}
 function renderMessages(){
   const box=$('#msgs');box.innerHTML='';const c=getChat();if(!c)return;
   let lastDay='';
@@ -2977,7 +2993,7 @@ function renderMessages(){
     if(day!==lastDay){lastDay=day;const sep=document.createElement('div');sep.className='daysep';sep.textContent=fmtDay(m.t);box.appendChild(sep);}
     box.appendChild(renderBubble(m));
   });
-  box.scrollTop=box.scrollHeight;
+  pinMsgsBottom();
   renderPinnedBar();
 }
 function renderBubble(m){
@@ -6212,14 +6228,14 @@ function _tapBeep(){
     o.frequency.setValueAtTime(1250,t);
     o.frequency.exponentialRampToValueAtTime(620,t+0.075);
     g.gain.setValueAtTime(0.0001,t);
-    g.gain.exponentialRampToValueAtTime(0.72,t+0.006);   // −20% от максимума по фидбеку
+    g.gain.exponentialRampToValueAtTime(0.65,t+0.006);   // ещё −10% по фидбеку
     g.gain.exponentialRampToValueAtTime(0.0001,t+0.085);
     o.connect(g); g.connect(c.destination);
     o.start(t); o.stop(t+0.1);
     const o2=c.createOscillator(), g2=c.createGain();
     o2.type='triangle'; o2.frequency.setValueAtTime(2400,t);
     g2.gain.setValueAtTime(0.0001,t);
-    g2.gain.exponentialRampToValueAtTime(0.2,t+0.003);
+    g2.gain.exponentialRampToValueAtTime(0.18,t+0.003);
     g2.gain.exponentialRampToValueAtTime(0.0001,t+0.03);
     o2.connect(g2); g2.connect(c.destination);
     o2.start(t); o2.stop(t+0.04);
