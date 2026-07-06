@@ -1767,7 +1767,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.22', BUILD_ID='2026-07-06-haptic-strong';
+const APP_VERSION='4.9.23', BUILD_ID='2026-07-06-haptic-stronger';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -5687,7 +5687,7 @@ $('#autosaveToggle').onclick=async function(){
   if(!ok)return;
   this.classList.add('on');setAutosave(true);toast('✅ Медиа будут сохраняться на устройство');};
 {const ts=$('#tapSndToggle'); if(ts){ ts.classList.toggle('on',tapSoundOn()); ts.onclick=function(){const on=!this.classList.contains('on');this.classList.toggle('on',on);setTapSound(on);if(on){_tapUnlock();tapClick();}toast(on?'Звук при нажатии включён':'Звук при нажатии выключен');}; }}
-{const tv=$('#tapVibToggle'); if(tv){ tv.classList.toggle('on',tapVibeOn()); tv.onclick=function(){const on=!this.classList.contains('on');this.classList.toggle('on',on);setTapVibe(on);if(on)doVibe(70);toast(on?'Виброотклик включён':'Виброотклик выключен');}; }}
+{const tv=$('#tapVibToggle'); if(tv){ tv.classList.toggle('on',tapVibeOn()); tv.onclick=function(){const on=!this.classList.contains('on');this.classList.toggle('on',on);setTapVibe(on);if(on)doVibe(140);toast(on?'Виброотклик включён':'Виброотклик выключен');}; }}
 $('#notifToggle').onclick=async function(){
   if(this.classList.contains('on')){this.classList.remove('on');setNotifPref(false);toast('Уведомления выключены');return;}
   const ok=await ensureNotif();
@@ -6279,7 +6279,7 @@ document.addEventListener('pointerdown',function(e){
   const el=_tapTarget(e.target);
   if(!el)return;
   if(snd)tapClick();
-  if(vib)doVibe(45);   // 45мс → нативка даёт ощутимый импакт (было 9мс = «Light», не чувствовалось)
+  if(vib)doVibe(95);   // сильнее: 95мс → нативка Heavy-импакт + длинный вибро-пульс (масштаб по ms в текущем APK)
 },{passive:true});
 document.addEventListener('touchend',function(){ if(tapSoundOn())_tapUnlock(); },{passive:true});  // фолбэк: часть WebView засчитывает «жест» только на touchend
 /* Своя модалка подтверждения (в стиле приложения) вместо браузерного confirm(). Возвращает Promise<bool>. */
