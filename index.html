@@ -1767,7 +1767,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.21', BUILD_ID='2026-07-05-haptic-bridge';
+const APP_VERSION='4.9.22', BUILD_ID='2026-07-06-haptic-strong';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -5687,7 +5687,7 @@ $('#autosaveToggle').onclick=async function(){
   if(!ok)return;
   this.classList.add('on');setAutosave(true);toast('✅ Медиа будут сохраняться на устройство');};
 {const ts=$('#tapSndToggle'); if(ts){ ts.classList.toggle('on',tapSoundOn()); ts.onclick=function(){const on=!this.classList.contains('on');this.classList.toggle('on',on);setTapSound(on);if(on){_tapUnlock();tapClick();}toast(on?'Звук при нажатии включён':'Звук при нажатии выключен');}; }}
-{const tv=$('#tapVibToggle'); if(tv){ tv.classList.toggle('on',tapVibeOn()); tv.onclick=function(){const on=!this.classList.contains('on');this.classList.toggle('on',on);setTapVibe(on);if(on)doVibe(30);toast(on?'Виброотклик включён':'Виброотклик выключен');}; }}
+{const tv=$('#tapVibToggle'); if(tv){ tv.classList.toggle('on',tapVibeOn()); tv.onclick=function(){const on=!this.classList.contains('on');this.classList.toggle('on',on);setTapVibe(on);if(on)doVibe(70);toast(on?'Виброотклик включён':'Виброотклик выключен');}; }}
 $('#notifToggle').onclick=async function(){
   if(this.classList.contains('on')){this.classList.remove('on');setNotifPref(false);toast('Уведомления выключены');return;}
   const ok=await ensureNotif();
@@ -6260,14 +6260,26 @@ function tapClick(){
   }catch(e){}
 }
 const TAPFX_SEL='button,a[href],[role="button"],.iconbtn,.chat-row,.setting,.key,.tabbtn,.act-item,.cf-btn,.home-card,.snet,.sw,.st,.optRow,.sub-btn,.btn';
+/* Интерактивный ли элемент под пальцем: явный список ИЛИ любой предок с cursor:pointer
+   (чтобы отклик срабатывал ВЕЗДЕ — на пузырях, вложениях, эмодзи, аватарах, пунктах меню и т.п.) */
+function _tapTarget(t){
+  let n=t,d=0;
+  while(n&&n.nodeType===1&&n!==document.body&&d<7){
+    let hit=false;
+    try{ hit=(n.matches&&n.matches(TAPFX_SEL))||getComputedStyle(n).cursor==='pointer'; }catch(e){}
+    if(hit) return n.disabled?null:n;
+    n=n.parentElement; d++;
+  }
+  return null;
+}
 document.addEventListener('pointerdown',function(e){
   const snd=tapSoundOn(), vib=tapVibeOn();
   if(!snd&&!vib)return;
   if(snd)_tapUnlock();   // разморозка+прогрев на ЛЮБОМ касании — к первому клику по кнопке звук уже готов
-  const el=e.target&&e.target.closest&&e.target.closest(TAPFX_SEL);
-  if(!el||el.disabled)return;
+  const el=_tapTarget(e.target);
+  if(!el)return;
   if(snd)tapClick();
-  if(vib)doVibe(9);   // через нативный мостик (в WebView navigator.vibrate отключён)
+  if(vib)doVibe(45);   // 45мс → нативка даёт ощутимый импакт (было 9мс = «Light», не чувствовалось)
 },{passive:true});
 document.addEventListener('touchend',function(){ if(tapSoundOn())_tapUnlock(); },{passive:true});  // фолбэк: часть WebView засчитывает «жест» только на touchend
 /* Своя модалка подтверждения (в стиле приложения) вместо браузерного confirm(). Возвращает Promise<bool>. */
