@@ -1767,7 +1767,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.23', BUILD_ID='2026-07-06-haptic-stronger';
+const APP_VERSION='4.9.24', BUILD_ID='2026-07-06-instant-boot';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -6443,19 +6443,31 @@ async function boot(){
       .catch(()=>{cloudOn=false;console.log('📴 Облако временно недоступно');});
   }
   ensureBot();
-  // Запоминание входа: в рабочем режиме сначала проверяем серверную сессию /me.
-  // Локальный профиль используем только как офлайн-резерв, чтобы не входить в старый/чужой профиль.
+  // Мгновенный вход: если пользователь уже входил ранее, локальный профиль доступен сразу —
+  // открываем приложение БЕЗ ожидания сети, поэтому экран ввода номера не мелькает вовсе.
+  // Если задан PIN — enterApp()→maybeLock() сразу показывает экран ввода PIN, иначе — домашнюю.
+  // Серверную сессию проверяем в ФОНЕ и выкидываем на вход только если токен реально отозван (401/403).
+  let localMe=null;
+  if(rememberEnabled()){ try{localMe=loadMe();}catch(e){} }
+  else { try{const _id=sessionStorage.getItem(SS);localMe=_id?(db().users[_id]||null):null;}catch(e){} }
+  if(localMe){
+    me=localMe;
+    enterApp();refreshLockToggle();
+    try{ if(location.hash.indexOf('#chat=')===0){const pid=decodeURIComponent(location.hash.slice(6)); if(pid&&db().users[pid])setTimeout(()=>openConv(pid),50);} }catch(e){}
+    // фоновая ревалидация серверной сессии — не блокирует показ приложения
+    if(rememberEnabled()&&sessionToken&&isCloudReady()){
+      restoreRememberedSession().then(r=>{
+        if(!r&&sessionRestoreAuthFailed){forceLogout('Сессия истекла — войдите снова');}
+        else if(r){try{paintMe();renderChats();renderHome();refreshSettings();}catch(e){}}
+      }).catch(()=>{});
+    }
+    return;
+  }
+  // Локального профиля нет: если остался только серверный токен — проверим /me синхронно.
   let restored=null;
   if(rememberEnabled()&&sessionToken&&isCloudReady()){restored=await restoreRememberedSession();}
-  if(!restored&&sessionRestoreAuthFailed){me=null;go('scrPhone');refreshLockToggle();return;}
-  if(!restored){
-    if(rememberEnabled()){ me=loadMe(); }
-    else { const _id=sessionStorage.getItem(SS); me=_id?(db().users[_id]||null):null; }
-  }
-  if(me){enterApp();refreshLockToggle();
-    try{ if(location.hash.indexOf('#chat=')===0){const pid=decodeURIComponent(location.hash.slice(6)); if(pid&&db().users[pid])setTimeout(()=>openConv(pid),50);} }catch(e){}
-  }
-  else{go('scrPhone');}
+  if(restored){me=restored;enterApp();refreshLockToggle();return;}
+  go('scrPhone');
 }
 window.__om={translate,detectLang,sha,db,save,bus:handleBus,TAB,getSec,saveSec,trCfgFor,setTrCfg,sessionsMap,cloudCfg,saveCloudCfg,cloudCfgUpdate,refreshSettings,get me(){return me;},forceLogout,startPinLock,gifSearch,sendGif,setGifKey,gifKey,startRec,pauseRecForCall,resumeRec,stopRec,discardDraft,endCall,startVnote,saveToFaves,openFwd,doForward,refreshLivePanel,liveTick,saveSessionToken,apiHeaders,checkApiRoute,isFirebaseReady,initFirebase,applyChatBg,setChatBgPreset,chatBgCfg,setVnoteShape:(s)=>{vnoteShape=s;},get vnoteShape(){return vnoteShape;},openVnoteRecorder,cycleVnoteShape,renderHome,renderContacts,renderCalls,callContact,getBook,getCalls,knownContacts,importDeviceContacts,applyHomeBg,removeHomeBg,autosaveEnabled,setAutosave,rememberEnabled,setRemember,sendDocument,startCall,acceptCall,hasRTC,callInfo:()=>({peer:callPeerId,kind:callKind,pc:!!pc,signaling:pc?pc.signalingState:null}),notifPref,notifGranted,ensureNotif,showNotif,fitViewport,get mediaReady(){return mediaReady;},recInfo:()=>({state:recState,kind:recKind,accum:recAccum,peer:recPeerId,elapsed:recElapsed()}),renderNews,renderSocial,openReader,openWebview,aiAsk,openTgChannel,renderTgFeed,openTgChannels,renderTgChannels,createGroup,openGroup,applyGroupInvite,onIncomingGroupMessage,markReadGroup,groupById,startGroupCall,leaveGroupCall,gcallInfo:()=>(gcall?{gid:gcall.gid,kind:gcall.kind,peers:Object.keys(gcall.peers),incoming:!!gcall.incoming}:null),get current(){return current;},processImportedContacts,getPhonebook,savePhonebook,matchPhonebook,parsePastedContacts,submitPastedContacts,importDeviceContacts,inviteContact,openGroupInfo,renameGroup,addGroupMembers,removeGroupMember,leaveGroup,applyGroupUpdate,applyGroupLeave,applyGroupRead,emitGroupRead,botReply,botReplyRuleBased,botAction,botHelp,botWelcomeIfEmpty,pinMessage,unpinMessage,promoteAdmin,demoteAdmin,isGroupAdmin,parseMentions,appendTextWithMentions,applyChatPin,applyGroupPin,renderPinnedBar,updateMentionPop,aiChat,aiPublic,olesyaRespond,olesyaTranslateOnce,aiCfg,saveAiCfg,aiEnabled,aiWantsWeb,setTranslateTarget,clearTranslateTarget,openLangPicker,langCodeFromName,editMessage,deleteMessage,applyMsgEdit,applyMsgDelete,getChatOpts,setChatOpt,chatTTL,isIncognito,sweepExpired,handleSlash,isSlash,openConvSearch,closeConvSearch,runConvSearch,openConv,transcribeVoice,pushSubscribe,urlB64ToU8,createChannel,openChannel,openChannelsScreen,renderChannelsScreen,onChannelPost,subscribeCurrentChannel,unsubscribeCurrentChannel,postChannelMessage,chIsAdmin,channelCurrent,isPro,proUntil,maxFileMB,setProUntil,redeemProCode,proCheckout,openPro,renderPro,refreshProUI,cloudProStatus,setProAccent,proAccentVal,isSecret,toggleSecret,e2eAvailable,e2eEnsureKeys,e2eEncryptFor,e2eDecryptFrom,e2eSharedKey,updateE2eeBanner,e2ePublishKey,_e2eSetPeerPub:(id,jwk)=>{_e2ePubCache[id]=jwk;},_e2eMyPub:async()=>{const k=await e2eEnsureKeys();return k&&k.pub;},checkForUpdate,openAiImg,closeAiImg,aiGenImage,socialLoginUrl,cloudSyncChats,isBlocked,toggleBlock,reportUser,hidePhoneEnabled,setHidePhone,openPeerActions,olesyaVoiceToggle,speakText,micAllowed,camAllowed,mediaPerm,setMediaPerm,requestMediaPermsOnce,get searchTerm(){return searchTerm;}};
 if('serviceWorker'in navigator&&location.protocol.indexOf('http')===0){
