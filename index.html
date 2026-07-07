@@ -1767,7 +1767,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.25', BUILD_ID='2026-07-07-yos-media';
+const APP_VERSION='4.9.26', BUILD_ID='2026-07-07-heavy-media';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -1957,7 +1957,7 @@ async function cloudUploadMedia(dataUrl){
     try{
       const ps=await jpost(wapi('/media/presign'),{ct,size:blob.size});
       if(ps&&ps.put_url&&ps.url){
-        const ctl=new AbortController(); const tt=setTimeout(()=>ctl.abort(),120000); // большие видео на медленной сети
+        const ctl=new AbortController(); const tt=setTimeout(()=>ctl.abort(),300000); // большие видео на медленной сети
         try{
           const pr=await fetch(ps.put_url,{method:'PUT',headers:{'content-type':ct},body:blob,signal:ctl.signal});
           if(pr.ok)return ps.url;   // абсолютная ссылка на бакет — хранится в сообщении как есть
@@ -3008,6 +3008,10 @@ function renderMessages(){
   const box=$('#msgs');box.innerHTML='';const c=getChat();if(!c)return;
   let lastDay='';
   c.messages.forEach(m=>{
+    if(m.pending){
+      if(_memMedia[m.id])m=Object.assign({},m,_memMedia[m.id]);   // медиа ещё грузится — показываем из памяти
+      else m=Object.assign({},m,{type:'text',text:'📎 Вложение не отправлено — приложение закрылось во время загрузки'});   // осиротело после перезапуска
+    }
     if(m.system){const sn=document.createElement('div');sn.className='sys-note';sn.dataset.mid=m.id;sn.textContent=m.text||'';if(searchTerm)highlightInNode(sn,searchTerm);box.appendChild(sn);return;}
     const day=new Date(m.t).toDateString();
     if(day!==lastDay){lastDay=day;const sep=document.createElement('div');sep.className='daysep';sep.textContent=fmtDay(m.t);box.appendChild(sep);}
@@ -3146,8 +3150,42 @@ function addReaction(m,emoji){
 function applyRemoteReact(p){const d=db();const c=p.gid?d.chats[p.gid]:d.chats[chatKey(me.id,p.from)];if(!c)return;const mm=c.messages.find(x=>x.id===p.msgId);if(mm){mm.reactions=p.reactions;save(d);if(current&&((p.gid&&current.group&&current.id===p.gid)||(!p.gid&&current.id===p.from)))renderMessages();}}
 
 /* ---------- sending ---------- */
+/* Тяжёлое медиа (видео/крупные файлы) НЕЛЬЗЯ класть base64 в localStorage: квота ~5-10 МБ,
+   save() падает («хранилище переполнено») и сообщение исчезает у отправителя.
+   Решение: байты держим в ПАМЯТИ на время выгрузки, в базу сразу пишем лёгкое сообщение
+   (pending=1), после выгрузки в объектное хранилище заменяем на ссылку и передаём собеседнику. */
+const HEAVY_MEDIA_CHARS=1500000;   // ~1.1 МБ бинарных в base64 — дальше localStorage ненадёжен
+const _memMedia={};                // id сообщения -> {src/audio: dataURL} на время выгрузки
+function stashHeavyMedia(m,peerId,isBot){
+  if(!(cloudOn&&isCloudReady()&&CFG.provider==='worker'))return null;
+  if(isBot||peerId===me.id||isIncognito(peerId)||isSecret(peerId))return null;   // e2e/инкогнито/бот — прежнее поведение
+  let heavy=null;
+  for(const f of ['src','audio']){
+    const v=m[f];
+    if(typeof v==='string'&&v.indexOf('data:')===0&&v.length>HEAVY_MEDIA_CHARS){(heavy=heavy||{})[f]=v;delete m[f];}
+  }
+  if(heavy){m.pending=1;_memMedia[m.id]=heavy;}
+  return heavy;
+}
+function startHeavyUpload(m,heavy,chatK,peerId,isBot){
+  (async()=>{
+    const full=Object.assign({},m,heavy);delete full.pending;
+    for(const f of Object.keys(heavy)){
+      let url=null;
+      try{url=await cloudUploadMedia(heavy[f]);}catch(e){}
+      if(url)full[f]=url;   // не вышло — останется base64 (старое поведение: уйдёт в историю как data_url)
+    }
+    try{
+      const d=db();const c=d.chats[chatK];const mm=c&&c.messages.find(x=>x.id===m.id);
+      if(mm){for(const f of Object.keys(heavy))mm[f]=full[f];delete mm.pending;save(d);}
+    }catch(e){}
+    delete _memMedia[m.id];
+    try{await transmitMessage(full,peerId,isBot);}catch(e){}
+    try{if(current&&!current.group&&!current.channel&&current.id===peerId)renderMessages();}catch(e){}
+  })();
+}
 /* Доставка сообщения: по шине (real-time) и в облако (история).
-   Медиа (поля src/audio как data:) сначала выгружаем в R2 и передаём ССЫЛКУ,
+   Медиа (поля src/audio как data:) сначала выгружаем в хранилище и передаём ССЫЛКУ,
    а не base64 — экономит трафик и не упирается в лимиты D1. При неудаче — резерв base64. */
 async function transmitMessage(m,peerId,isBot){
   if(!isBot&&peerId!==me.id&&isSecret(peerId)&&e2eAvailable()){
@@ -3195,10 +3233,12 @@ function pushMessage(obj){
   const d=db();const k=chatKey(me.id,current.id);if(!d.chats[k])d.chats[k]={id:k,members:[me.id,current.id],messages:[]};
   const m=Object.assign({id:mid(),from:me.id,t:Date.now(),readBy:[me.id]},obj);
   const _ttl=chatTTL(current.id);if(_ttl&&m.exp==null)m.exp=Date.now()+_ttl;
+  const heavy=stashHeavyMedia(m,current.id,!!current.bot);   // видео/крупные файлы — мимо localStorage
   d.chats[k].messages.push(m);save(d);
   renderMessages();renderChats();
-  transmitMessage(m,current.id,!!current.bot);
-  autoSaveMedia(m,true); // записанные в приложении голос/кружок — в память устройства
+  if(heavy)startHeavyUpload(m,heavy,k,current.id,!!current.bot);
+  else transmitMessage(m,current.id,!!current.bot);
+  autoSaveMedia(heavy?Object.assign({},m,heavy):m,true); // записанные в приложении голос/кружок — в память устройства
   // bot auto-reply
   if(current.bot)botReply(m);
   return m;
@@ -4540,12 +4580,14 @@ function sendMediaTo(peerId,obj){
   const d=db();const k=chatKey(me.id,peerId);
   if(!d.chats[k])d.chats[k]={id:k,members:[me.id,peerId],messages:[]};
   const m=Object.assign({id:mid(),from:me.id,t:Date.now(),readBy:[me.id]},obj);
+  const peer=userById(peerId);
+  const heavy=stashHeavyMedia(m,peerId,!!(peer&&peer.bot));   // крупные кружки/записи — мимо localStorage
   d.chats[k].messages.push(m);save(d);
   if(current&&current.id===peerId)renderMessages();
   renderChats();
-  const peer=userById(peerId);
-  transmitMessage(m,peerId,!!(peer&&peer.bot));
-  autoSaveMedia(m,true);
+  if(heavy)startHeavyUpload(m,heavy,k,peerId,!!(peer&&peer.bot));
+  else transmitMessage(m,peerId,!!(peer&&peer.bot));
+  autoSaveMedia(heavy?Object.assign({},m,heavy):m,true);
   if(peer&&peer.bot)botReply(m);
 }
 function stopRec(send){
