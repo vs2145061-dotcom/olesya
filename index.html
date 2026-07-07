@@ -1767,7 +1767,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.24', BUILD_ID='2026-07-06-instant-boot';
+const APP_VERSION='4.9.25', BUILD_ID='2026-07-07-yos-media';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -1940,15 +1940,35 @@ async function cloudSend(m){
     const c=sbClient();if(c)await c.from('om_messages').insert(m);
   }catch(e){}
 }
-/* Выгрузить медиа (data: URL) в R2 через Worker → вернуть постоянную ссылку.
-   При неудаче/офлайне вернёт null, и медиа уйдёт как base64 (резерв). */
+/* Выгрузить медиа (data: URL) в хранилище → вернуть постоянную ссылку.
+   Основной путь: Yandex Object Storage — воркер выдаёт подписанную PUT-ссылку (/media/presign),
+   байты идут с телефона ПРЯМО в бакет (мимо шлюза и воркера, без лимитов на размер).
+   Резерв: старый POST /media через воркер (D1, до 1.5 МБ).
+   При неудаче/офлайне вернёт null, и медиа уйдёт как base64 (последний резерв). */
+let _presignDead=false; // сервер ответил media_not_configured — не дёргаем presign до конца сессии
 async function cloudUploadMedia(dataUrl){
   if(!cloudOn||!isCloudReady()||CFG.provider!=='worker')return null;
   if(typeof dataUrl!=='string'||dataUrl.indexOf('data:')!==0)return null;
+  let blob=null;
+  try{ blob=await (await fetch(dataUrl)).blob(); }catch(e){ return null; }
+  const ct=blob.type||'application/octet-stream';
+  // 1) прямая загрузка в объектное хранилище (Яндекс, РФ — работает без VPN)
+  if(!_presignDead){
+    try{
+      const ps=await jpost(wapi('/media/presign'),{ct,size:blob.size});
+      if(ps&&ps.put_url&&ps.url){
+        const ctl=new AbortController(); const tt=setTimeout(()=>ctl.abort(),120000); // большие видео на медленной сети
+        try{
+          const pr=await fetch(ps.put_url,{method:'PUT',headers:{'content-type':ct},body:blob,signal:ctl.signal});
+          if(pr.ok)return ps.url;   // абсолютная ссылка на бакет — хранится в сообщении как есть
+        }finally{clearTimeout(tt);}
+      }
+    }catch(e){ if(String(e&&e.message||'').indexOf('media_not_configured')>=0)_presignDead=true; }
+  }
+  // 2) резерв: старый путь через воркер (D1, мелкие файлы)
   try{
-    const blob=await (await fetch(dataUrl)).blob();
     const r=await fetch(getApiUrl()+'/media',{method:'POST',
-      headers:{'content-type':blob.type||'application/octet-stream','x-session-token':sessionToken||''},
+      headers:{'content-type':ct,'x-session-token':sessionToken||''},
       body:blob});
     if(!r.ok)return null;
     const d=await r.json();
@@ -3148,17 +3168,17 @@ async function transmitMessage(m,peerId,isBot){
     for(const f of ['src','audio']){
       const v=m[f];
       if(typeof v==='string'&&v.indexOf('data:')===0){
-        const url=await cloudUploadMedia(v);   // в R2 → короткая ссылка (быстро, без лимитов)
+        const url=await cloudUploadMedia(v);   // в объектное хранилище → короткая ссылка (быстро, без лимитов)
         if(url){tm[f]=url;dataUrlForCloud=url;}
-        else {                                  // R2 не подключён → остаётся base64
+        else {                                  // хранилище недоступно → остаётся base64
           if(!dataUrlForCloud)dataUrlForCloud=v;
           if(v.length>500000){ leftAsBase64=true; delete tm[f]; }   // крупный base64 НЕ тащим в шину — иначе событие не доходит
         }
       }
     }
-    // Крупное медиа не ушло в R2 — лёгкое уведомление по шине, файл подтянется из истории; предупреждаем один раз
+    // Крупное медиа не ушло в хранилище — лёгкое уведомление по шине, файл подтянется из истории; предупреждаем один раз
     if(leftAsBase64&&!mediaReady&&!_mediaWarned){_mediaWarned=true;
-      toast('⚠️ Крупное медиа без R2-хранилища доходит медленнее. Включите R2 (см. ДЕПЛОЙ-СТАТУС.md) — фото и кружки будут доходить мгновенно.');}
+      toast('⚠️ Хранилище медиа временно недоступно — крупные файлы доходят медленнее.');}
   }
   emit('msg',tm);   // лёгкое событие (без тяжёлого base64) — быстро и надёжно по шине
   if(cloudOn&&!isBot&&peerId!==me.id&&!isIncognito(peerId)){
