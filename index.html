@@ -1561,8 +1561,13 @@ function applyTheme(pref){
   if(m)m.setAttribute('content', t==='light' ? '#FFFFFF' : '#15121E');
   const bt=document.getElementById('btnTheme');
   if(bt)bt.textContent = (t==='light' ? '🌙' : '☀️'); // показываем, КУДА переключит быстрый тап
+  // сообщаем оболочке тему страницы — статус-бар APK красится в тон
+  try{if(window.__OLESYA_NATIVE__&&window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify({type:'theme',dark:t!=='light'}));}catch(e){}
   return t;
 }
+// «Авто»: перепроверяем системную тему при каждом возврате в приложение
+// (смена темы устройства, пока приложение свёрнуто, может не дать событие matchMedia)
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&getThemePref()==='auto'){try{applyTheme('auto');}catch(e){}} });
 function setThemePref(pref){
   try{localStorage.setItem(THEME_KEY,pref);}catch(e){}
   applyTheme(pref);
@@ -1767,7 +1772,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.27', BUILD_ID='2026-07-07-home-first-tap';
+const APP_VERSION='4.9.28', BUILD_ID='2026-07-07-auto-theme';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
