@@ -1767,7 +1767,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.26', BUILD_ID='2026-07-07-heavy-media';
+const APP_VERSION='4.9.27', BUILD_ID='2026-07-07-home-first-tap';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -6230,12 +6230,15 @@ const OM_ROOT_SCREENS=['scrChats','scrHome'];
 function omPushScreen(id){
   if(_omPopping||!me)return;                       // при возврате и до входа историю не трогаем
   if(OM_ROOT_SCREENS.includes(id))return;          // корневые экраны — без записи
+  if(id==='lockScreen')return;                     // экран блокировки в историю НЕ пишем: иначе запись «застревает»
+                                                   // после разблокировки и съедает первое нажатие «Домой»/«Назад»
   try{ if(!(history.state&&history.state.__omScr===id)) history.pushState({__omScr:id},''); }catch(e){}
 }
 window.addEventListener('popstate',()=>{
   if(!me)return;
   const scr=[...document.querySelectorAll('.screen')].find(s=>!s.classList.contains('hidden'));
   if(!scr||OM_ROOT_SCREENS.includes(scr.id))return; // уже на корне — пусть система решает (выход из приложения)
+  if(scr.id==='lockScreen')return;                  // с экрана блокировки «назад» НЕ уводит — PIN обязателен
   const bb=scr.querySelector('[data-back]');
   _omPopping=true;
   try{ if(bb)bb.click(); else { current=null; go('scrChats'); try{renderChats();}catch(e){} } }
@@ -6248,7 +6251,11 @@ $$('[data-back]:not(#btnHome), #btnCloseSettings, #subBack, #webBack, #readerClo
 $$('[data-back]').forEach(b=>{
   b.classList.add('fx-back');   // единый стиль (цвет/размер) — в т.ч. для «Домой» (иконка остаётся домиком)
   b.onclick=()=>{
-    if(!_omPopping && me && history.state && history.state.__omScr){ history.back(); return; } // назад через историю (синхрон с аппаратной кнопкой)
+    // Через историю уходим ТОЛЬКО с подэкранов: на корневых (чаты/главная) запись в history.state —
+    // мусор от прежней навигации, и history.back() съел бы нажатие впустую (кнопка «срабатывала со 2-го раза»).
+    const _scr=b.closest('.screen');
+    const _onSub=_scr&&!OM_ROOT_SCREENS.includes(_scr.id)&&_scr.id!=='lockScreen';
+    if(!_omPopping && me && _onSub && history.state && history.state.__omScr){ history.back(); return; } // синхрон с аппаратной кнопкой
     const t=b.dataset.back;
     if(t==='scrChats'||t==='scrHome'){current=null;}
     go(t);
