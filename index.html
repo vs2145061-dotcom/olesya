@@ -20,6 +20,10 @@
   var t = dark ? 'dark' : 'light';
   document.documentElement.setAttribute('data-theme', t);
   var m=document.querySelector('meta[name="theme-color"]'); if(m) m.setAttribute('content', t==='light' ? '#FFFFFF' : '#15121E');
+  // Уже вошедшим прячем экран ввода номера ДО первой отрисовки (иначе он мелькает, пока грузится JS);
+  // boot() затем сразу откроет PIN или домашнюю. При выходе go('scrPhone') снимает флаг.
+  var rm=localStorage.getItem('om_remember')!=='0';
+  if(rm && localStorage.getItem('om_me')) document.documentElement.setAttribute('data-boot','app');
 }catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -99,6 +103,8 @@ input,textarea{font-family:inherit}
   transform:translateX(0);transition:transform .28s cubic-bezier(.4,0,.2,1),opacity .2s;}
 .screen.hidden{transform:translateX(100%);opacity:0;pointer-events:none}
 .screen.back{transform:translateX(-22%);opacity:.4;pointer-events:none}
+/* Вошедшим экран номера не рисуем вовсе — до решения boot() виден только фон приложения */
+html[data-boot="app"] #scrPhone{display:none}
 
 /* ===== Brand / Auth ===== */
 .center-pad{flex:1;display:flex;flex-direction:column;justify-content:center;padding:34px 30px;gap:6px;overflow-y:auto}
@@ -1772,7 +1778,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.28', BUILD_ID='2026-07-07-auto-theme';
+const APP_VERSION='4.9.29', BUILD_ID='2026-07-07-no-phone-flash';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -2231,7 +2237,7 @@ function handleBus(m){
 /* ================== AUTH FLOW ================== */
 /* ================== AUTH FLOW ================== */
 function showScreen(id){ $$(  '.screen').forEach(s=>{ if(s.id===id){s.classList.remove('hidden','back')} }); }
-function go(id){ $$('.screen').forEach(s=>s.classList.add('hidden')); const el=$('#'+id); if(el)el.classList.remove('hidden'); else {console.error('go(): экран не найден:',id);return;} if(typeof omPushScreen==='function')omPushScreen(id); }
+function go(id){ if(id==='scrPhone'){try{document.documentElement.removeAttribute('data-boot');}catch(e){}} $$('.screen').forEach(s=>s.classList.add('hidden')); const el=$('#'+id); if(el)el.classList.remove('hidden'); else {console.error('go(): экран не найден:',id);return;} if(typeof omPushScreen==='function')omPushScreen(id); }
 
 let pendingPhone='', genCode='', otpFails=0, otpLocked=false, pendingUser=null, pendingMode='', pwFails=0, pwLockUntil=0;
 /* ── Production OTP (используется когда cloudCfg().url задан) ── */
