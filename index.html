@@ -1778,7 +1778,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.29', BUILD_ID='2026-07-07-no-phone-flash';
+const APP_VERSION='4.9.30', BUILD_ID='2026-07-07-tap-on-release';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -6318,14 +6318,14 @@ function _tapBeep(){
     o.frequency.setValueAtTime(1250,t);
     o.frequency.exponentialRampToValueAtTime(620,t+0.075);
     g.gain.setValueAtTime(0.0001,t);
-    g.gain.exponentialRampToValueAtTime(0.65,t+0.006);   // ещё −10% по фидбеку
+    g.gain.exponentialRampToValueAtTime(0.585,t+0.006);   // ещё −10% по фидбеку (было 0.65)
     g.gain.exponentialRampToValueAtTime(0.0001,t+0.085);
     o.connect(g); g.connect(c.destination);
     o.start(t); o.stop(t+0.1);
     const o2=c.createOscillator(), g2=c.createGain();
     o2.type='triangle'; o2.frequency.setValueAtTime(2400,t);
     g2.gain.setValueAtTime(0.0001,t);
-    g2.gain.exponentialRampToValueAtTime(0.18,t+0.003);
+    g2.gain.exponentialRampToValueAtTime(0.162,t+0.003);   // −10% (было 0.18)
     g2.gain.exponentialRampToValueAtTime(0.0001,t+0.03);
     o2.connect(g2); g2.connect(c.destination);
     o2.start(t); o2.stop(t+0.04);
@@ -6352,15 +6352,29 @@ function _tapTarget(t){
   }
   return null;
 }
+/* Звук — только на завершённое НАЖАТИЕ (палец отпущен там же, где коснулся, без долгого удержания),
+   как делает сама Android. Раньше «капля» играла на pointerdown — т.е. и при мотании ленты,
+   и при любом касании интерактивного элемента. Виброотклик остаётся мгновенным (на касание). */
+let _tapDn=null;
 document.addEventListener('pointerdown',function(e){
   const snd=tapSoundOn(), vib=tapVibeOn();
-  if(!snd&&!vib)return;
+  if(!snd&&!vib){_tapDn=null;return;}
   if(snd)_tapUnlock();   // разморозка+прогрев на ЛЮБОМ касании — к первому клику по кнопке звук уже готов
   const el=_tapTarget(e.target);
-  if(!el)return;
-  if(snd)tapClick();
+  if(!el){_tapDn=null;return;}
   if(vib)doVibe(95);   // сильнее: 95мс → нативка Heavy-импакт + длинный вибро-пульс (масштаб по ms в текущем APK)
+  _tapDn=snd?{x:e.clientX||0,y:e.clientY||0,t:Date.now(),id:e.pointerId}:null;
 },{passive:true});
+document.addEventListener('pointerup',function(e){
+  const d=_tapDn;_tapDn=null;
+  if(!d||!tapSoundOn())return;
+  if(d.id!==undefined&&e.pointerId!==undefined&&e.pointerId!==d.id)return;
+  const dx=(e.clientX||0)-d.x, dy=(e.clientY||0)-d.y;
+  if(dx*dx+dy*dy>100)return;        // сдвиг >10px — это прокрутка/свайп, не нажатие
+  if(Date.now()-d.t>600)return;     // долгое удержание (выделение/контекстные действия) — без звука
+  tapClick();
+},{passive:true});
+document.addEventListener('pointercancel',function(){_tapDn=null;},{passive:true});
 document.addEventListener('touchend',function(){ if(tapSoundOn())_tapUnlock(); },{passive:true});  // фолбэк: часть WebView засчитывает «жест» только на touchend
 /* Своя модалка подтверждения (в стиле приложения) вместо браузерного confirm(). Возвращает Promise<bool>. */
 function appConfirm(message,opts){
