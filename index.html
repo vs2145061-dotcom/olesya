@@ -1778,7 +1778,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.31', BUILD_ID='2026-07-15-legal-links-gif';
+const APP_VERSION='4.9.32', BUILD_ID='2026-07-16-app-domain';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -5850,13 +5850,13 @@ function qrMatrixSimple(text, size){
 }
 function qrSvg(text){const n=29, cell=5, pad=3, mat=qrMatrixSimple(text,n);let r='<svg viewBox="0 0 '+((n+pad*2)*cell)+' '+((n+pad*2)*cell)+'" xmlns="http://www.w3.org/2000/svg" style="width:220px;height:220px;background:#fff;border-radius:18px;padding:10px"><rect width="100%" height="100%" fill="#fff" rx="18"/>';for(let y=0;y<n;y++)for(let x=0;x<n;x++)if(mat[y][x])r+='<rect x="'+((x+pad)*cell)+'" y="'+((y+pad)*cell)+'" width="'+cell+'" height="'+cell+'" fill="#111"/>';return r+'</svg>';}
 async function buildIdentityQR(body){
-  body.appendChild(el('<div class="note">Никнейм и ссылка нужны, чтобы приглашать пользователей без диктовки номера телефона. Ссылка работает через zemex.pro/olesya.</div>'));
+  body.appendChild(el('<div class="note">Никнейм и ссылка нужны, чтобы приглашать пользователей без диктовки номера телефона. Ссылка работает через app.zemex.pro.</div>'));
   const cur=(me&&me.username)||localStorage.getItem('om_username')||'';
   const inp=el('<input class="input sub-input" placeholder="username латиницей, например vitaliy" />');inp.value=cur;body.appendChild(inp);
   const status=el('<div class="note"></div>');body.appendChild(status);
   const saveBtn=el('<button class="btn sub-btn">Сохранить никнейм</button>');body.appendChild(saveBtn);
   const box=el('<div style="text-align:center;padding:14px"></div>');body.appendChild(box);
-  function link(){const u=(inp.value||cur||'').trim().replace(/^@/,'').toLowerCase();return u?'https://zemex.pro/olesya/?u='+encodeURIComponent(u):'https://zemex.pro/olesya/';}
+  function link(){const u=(inp.value||cur||'').trim().replace(/^@/,'').toLowerCase();return u?'https://app.zemex.pro/?u='+encodeURIComponent(u):'https://app.zemex.pro/';}
   function renderLink(){const l=link();box.innerHTML=qrSvg(l)+'<div class="note" style="word-break:break-all">'+esc(l)+'</div>';const cp=el('<button class="btn sub-btn">Скопировать ссылку</button>');cp.onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(l);toast('Ссылка скопирована');};box.appendChild(cp);}
   saveBtn.onclick=async()=>{const username=inp.value.trim().replace(/^@/,'').toLowerCase();if(!username){toast('Введите никнейм');return;}try{const r=await jpost(wapi('/username/set'),{username});if(r.user){const d=db();d.users[me.id]=Object.assign(d.users[me.id]||{},r.user);me=d.users[me.id];save(d);localStorage.setItem('om_username',username);}status.textContent='✅ Никнейм сохранён: @'+username;renderLink();refreshSettings();}catch(e){status.textContent='❌ '+String(e.message||e);}};
   const inv=el('<button class="btn sub-btn">Создать одноразовую ссылку-приглашение</button>');inv.onclick=async()=>{try{const r=await jpost(wapi('/invite/create'),{});inp.value=(me.username||inp.value||'');box.innerHTML=qrSvg(r.link)+'<div class="note" style="word-break:break-all">'+esc(r.link)+'</div>';navigator.clipboard&&navigator.clipboard.writeText(r.link);toast('Приглашение создано и скопировано');}catch(e){toast('Не удалось создать приглашение');}};body.appendChild(inv);
