@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Политика конфиденциальности — Olesya Messenger</title>
+<title>Политика конфиденциальности — Zemex</title>
 <style>
   :root{--bg:#0E1014;--card:#171A21;--fg:#E7E9EE;--muted:#9AA3B2;--accent:#6C7BFF;--line:#252A34}
   *{box-sizing:border-box}
@@ -27,17 +27,17 @@
 <div class="wrap">
 
 <h1>Политика конфиденциальности</h1>
-<div class="upd">Приложение «Olesya Messenger» · Дата вступления в силу: 24 июня 2026 г.</div>
+<div class="upd">Мессенджер «Zemex» · Дата вступления в силу: 15 июля 2026 г.</div>
 
 <div class="card">
-Эта политика описывает, какие данные собирает мессенджер «Olesya Messenger» (далее — «Приложение»),
+Эта политика описывает, какие данные собирает мессенджер «Zemex» (далее — «Приложение»),
 зачем и как они используются, кому передаются и как вы можете ими управлять. Используя Приложение,
 вы соглашаетесь с условиями этой политики.
 </div>
 
 <h2>1. Кто обрабатывает данные</h2>
-<p>Оператор Приложения — частный владелец проекта «Olesya Messenger». Контакт для вопросов о
-конфиденциальности и запросов на удаление данных: <a href="mailto:vs2145061@gmail.com">vs2145061@gmail.com</a>.</p>
+<p>Оператор Приложения — частный владелец проекта «Zemex». Контакт для вопросов о
+конфиденциальности и запросов на удаление данных: <a href="mailto:privacy@zemex.pro">privacy@zemex.pro</a>.</p>
 
 <h2>2. Какие данные мы собираем</h2>
 <table>
@@ -59,18 +59,22 @@
 <h2>4. Кому передаются данные (обработчики)</h2>
 <table>
   <tr><th>Сервис</th><th>Что обрабатывает</th><th>Назначение</th></tr>
-  <tr><td>Google Firebase (Phone Auth)</td><td>Номер телефона</td><td>Отправка и проверка SMS-кода входа</td></tr>
-  <tr><td>Cloudflare (Workers, D1, R2)</td><td>Профиль, переписка, медиа, сессии</td><td>Серверная часть: хранение и доставка сообщений</td></tr>
-  <tr><td>SMSC.ru</td><td>Номер телефона</td><td>Доставка SMS-кода для номеров +7 (как альтернатива Firebase)</td></tr>
-  <tr><td>Anthropic (Claude API)</td><td>Текст сообщения, который вы переводите</td><td>Автоперевод сообщений — только когда вы пользуетесь переводчиком</td></tr>
+  <tr><td>SMSC.ru</td><td>Номер телефона</td><td>Доставка SMS-кода для входа</td></tr>
+  <tr><td>Cloudflare (Workers, D1)</td><td>Профиль, переписка, сессии</td><td>Серверная часть: хранение и доставка сообщений</td></tr>
+  <tr><td>Yandex Cloud (API Gateway, Object Storage)</td><td>Сетевые запросы к API, медиафайлы</td><td>Доступ к серверу в сетях РФ без VPN; хранение фото, видео и голосовых</td></tr>
+  <tr><td>Google Firebase (Cloud Messaging)</td><td>Push-токен устройства</td><td>Доставка push-уведомлений о сообщениях и звонках</td></tr>
+  <tr><td>Anthropic (Claude API) и Cloudflare Workers AI</td><td>Текст, голос или изображение, отправленные ИИ-функции</td><td>ИИ-ассистент «Олеся»: ответы, перевод, резюме переписки, расшифровка голосовых, генерация картинок — только когда вы пользуетесь этими функциями</td></tr>
   <tr><td>GIPHY</td><td>Поисковый запрос GIF</td><td>Поиск GIF-анимаций (если функция используется)</td></tr>
 </table>
 <p>Мы <b>не продаём</b> ваши данные и не передаём их третьим лицам для рекламы.</p>
 
 <h2>5. Где хранятся данные</h2>
-<p>Серверные данные хранятся в инфраструктуре Cloudflare (база данных D1 в регионе Западная Европа,
-медиа — в хранилище R2). Передача данных между приложением и сервером защищена протоколом HTTPS.
-Токены сессий подписываются криптографически (HMAC-SHA256).</p>
+<p>Серверные данные (профиль, переписка, сессии) хранятся в инфраструктуре Cloudflare (база данных D1).
+Медиафайлы (фото, видео, голосовые) хранятся в Yandex Object Storage (дата-центр в России). Сетевые
+запросы маршрутизируются через Yandex API Gateway, чтобы приложение работало в сетях РФ без VPN.
+Передача данных между приложением и сервером защищена протоколом HTTPS. Секретные чаты дополнительно
+защищены сквозным шифрованием (end-to-end): их содержимое недоступно серверу. Токены сессий
+подписываются криптографически (HMAC-SHA256).</p>
 
 <h2>6. Сколько хранятся данные</h2>
 <ul>
@@ -81,8 +85,9 @@
 </ul>
 
 <h2>7. Ваши права</h2>
-<p>Вы можете запросить удаление учётной записи и связанных данных, написав на
-<a href="mailto:vs2145061@gmail.com">vs2145061@gmail.com</a>. Мы удалим данные в разумный срок,
+<p>Вы можете удалить учётную запись и связанные данные прямо в приложении
+(Настройки → Документы и приватность) либо запросить удаление, написав на
+<a href="mailto:privacy@zemex.pro">privacy@zemex.pro</a>. Мы удалим данные в разумный срок,
 за исключением сведений, которые обязаны хранить по закону.</p>
 
 <h2>8. Дети</h2>
@@ -96,13 +101,17 @@
 <hr>
 
 <h2 id="en">Privacy Policy (English summary)</h2>
-<p class="muted">Olesya Messenger collects your phone number (for SMS login via Google Firebase / SMSC.ru),
-profile (name, avatar, colour) and your messages (text, photos, voice, video notes), which are stored on
-Cloudflare (Workers, D1 database, R2 storage) to deliver and sync your chats. Message text is sent to
-Anthropic's Claude API only when you use the in-app translator. Camera, microphone and gallery access are
-used only for the related in-app actions. We do not sell your data or share it for advertising. To request
-account and data deletion, contact <a href="mailto:vs2145061@gmail.com">vs2145061@gmail.com</a>.
-Effective date: 24 June 2026.</p>
+<p class="muted">Zemex collects your phone number (for SMS login via SMSC.ru), profile (name, avatar,
+colour) and your messages (text, photos, voice, video notes), which are stored on Cloudflare (Workers, D1
+database), with media files stored in Yandex Object Storage (data centre in Russia). API requests are routed
+through Yandex API Gateway so the app works without a VPN. Push notifications are delivered via Google
+Firebase Cloud Messaging. AI features (the “Олеся” assistant, translation, chat summaries, voice
+transcription, image generation) send the relevant content to Anthropic's Claude API and/or Cloudflare
+Workers AI only when you use them. Secret chats are end-to-end encrypted and cannot be read by the server.
+Camera, microphone and gallery access are used only for the related in-app actions. We do not sell your data
+or share it for advertising. To request account and data deletion, contact
+<a href="mailto:privacy@zemex.pro">privacy@zemex.pro</a> or delete your account in the app. Effective date:
+15 July 2026.</p>
 
 </div>
 </body>
