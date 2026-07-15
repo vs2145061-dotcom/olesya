@@ -1778,7 +1778,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.30', BUILD_ID='2026-07-07-tap-on-release';
+const APP_VERSION='4.9.31', BUILD_ID='2026-07-15-legal-links-gif';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -4341,15 +4341,15 @@ async function gifSearch(q){
   const grid=$('#gifGrid');const my=++gifReq;
   grid.innerHTML='<div class="gif-empty">Загрузка…</div>';
   const trending=!(q&&q.trim());
-  const url='https://api.giphy.com/v1/gifs/'+(trending?'trending':'search')+'?api_key='+encodeURIComponent(gifKey())+(trending?'':('&q='+encodeURIComponent(q.trim())))+'&limit=24&rating=pg-13&bundle=fixed_width_small';
+  const url='https://api.giphy.com/v1/gifs/'+(trending?'trending':'search')+'?api_key='+encodeURIComponent(gifKey())+(trending?'':('&q='+encodeURIComponent(q.trim())))+'&limit=24&rating=pg-13';
   try{
     const r=await Promise.race([fetch(url),new Promise((_,rj)=>setTimeout(()=>rj(0),8000))]);
     if(!r.ok)throw 0;const d=await r.json();if(my!==gifReq)return;
     const items=(d&&d.data)||[];
     grid.innerHTML='';
     items.forEach(g=>{const im=g.images||{};
-      const thumb=((im.fixed_width_small||im.fixed_width||im.preview_gif||{}).url)||'';
-      const full=((im.downsized_medium||im.fixed_width||im.original||{}).url)||thumb;
+      const thumb=((im.fixed_width||im.fixed_width_downsampled||im.fixed_width_small||{}).url)||'';
+      const full=((im.downsized_medium||im.downsized_large||im.downsized||im.original||{}).url)||thumb;
       if(!thumb)return;
       const el2=document.createElement('img');el2.loading='lazy';el2.src=thumb;el2.alt=g.title||'gif';
       el2.onclick=()=>sendGif(full);grid.appendChild(el2);});
@@ -5831,8 +5831,7 @@ function buildNetworkDiagnostics(body){
   try{const cached=JSON.parse(localStorage.getItem('om_last_netcheck')||'null'); if(Array.isArray(cached))render(cached);}catch(e){}
 }
 function buildLegal(body){
-  body.appendChild(el('<div class="note">Документы добавлены в web-папку сборки. Перед публичным запуском их нужно проверить юристом и заменить реквизиты/оператора на ваши официальные данные.</div>'));
-  const docs=[['Пользовательское соглашение','terms.html'],['Политика конфиденциальности','privacy.html'],['Согласие на обработку персональных данных','personal-data-consent.html'],['Удаление аккаунта и данных','delete-account.html']];
+  const docs=[['Пользовательское соглашение','terms.html'],['Политика конфиденциальности','privacy.html'],['Удаление аккаунта и данных','delete-account.html']];
   docs.forEach(d=>{const row=el('<div class="setting" style="cursor:pointer"><div class="ic">📄</div><div class="lbl"><div class="t">'+d[0]+'</div><div class="d">Открыть документ</div></div><div style="color:var(--faint)">›</div></div>');row.onclick=()=>openWebview(d[1],d[0],'scrHome',true);body.appendChild(row);});
   body.appendChild(el('<div class="sec-head">Удаление аккаунта</div>'));
   const del=el('<button class="kill sub-btn" style="text-align:center">Удалить аккаунт на сервере</button>');
