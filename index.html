@@ -1002,7 +1002,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
       <p class="tagline" style="margin-bottom:6px">Введите 6-значный код</p>
       <input id="otpInput" class="otp-bigfield" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" aria-label="Код подтверждения" />
       <button class="btn" id="btnVerifyOtp">Подтвердить</button>
-      <div style="text-align:center;font-size:13px;color:var(--faint)" id="otpHint">SMS с кодом отправлено на указанный номер</div>
+      <div style="text-align:center;font-size:13px;color:var(--faint)" id="otpHint">Отправляем код на указанный номер…</div>
       <div id="demoPillWrap" style="display:none;text-align:center"><span class="demo-pill">Демо-режим: <code id="demoCode">000000</code> <button class="link" id="btnFillOtp" style="margin-left:8px">подставить</button></span></div>
       <div class="helper" style="margin-top:24px">Не пришёл код? <button class="link" id="btnResend" disabled>Повторить через <span id="resendCount">60</span> с</button></div>
     </div>
@@ -1778,7 +1778,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.32', BUILD_ID='2026-07-16-app-domain';
+const APP_VERSION='4.9.34', BUILD_ID='2026-07-16-otp-router';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -2372,7 +2372,7 @@ $('#btnSendCode').onclick=async()=>{
         b.disabled=false;return;
       }
       if(workerOtpOk){
-        const oh=$('#otpHint');if(oh)oh.textContent=(workerOtpInfo&&workerOtpInfo.sms==='pending')?'SMS отправляется… Если код не пришёл за минуту — нажмите «Отправить повторно».':'SMS с кодом отправлено на '+phone;
+        const oh=$('#otpHint');if(oh)oh.textContent=(workerOtpInfo&&workerOtpInfo.channel==='call')?((workerOtpInfo.delivery==='pending')?'Звонок с кодом поступит через минуту — ответьте, робот продиктует код.':'Вам поступит звонок — робот продиктует код. Введите его ниже.'):(workerOtpInfo&&workerOtpInfo.channel==='push')?'Код отправлен в приложение — посмотрите уведомления.':(workerOtpInfo&&(workerOtpInfo.delivery==='pending'||workerOtpInfo.sms==='pending'))?'Код отправляется… Если не пришёл за минуту — нажмите «Отправить повторно».':(workerOtpInfo&&workerOtpInfo.channel==='sms')?'SMS с кодом отправлено на '+phone:'Код отправлен на '+phone;
         startResendCooldown(60);
         b.disabled=false;return;
       }
@@ -2416,7 +2416,7 @@ $('#btnSendCode').onclick=async()=>{
       resetOtp();go('scrOtp');
       const dpw=$('#demoPillWrap');if(dpw)dpw.style.display='none';
       const _ph3=$('#phoneHelper');if(_ph3)_ph3.style.display='none';
-      const oh=$('#otpHint');if(oh)oh.textContent=(workerOtpInfo&&workerOtpInfo.sms==='pending')?'SMS отправляется… Если код не пришёл за минуту — нажмите «Отправить повторно».':'SMS с кодом отправлено на '+phone;
+      const oh=$('#otpHint');if(oh)oh.textContent=(workerOtpInfo&&workerOtpInfo.channel==='call')?((workerOtpInfo.delivery==='pending')?'Звонок с кодом поступит через минуту — ответьте, робот продиктует код.':'Вам поступит звонок — робот продиктует код. Введите его ниже.'):(workerOtpInfo&&workerOtpInfo.channel==='push')?'Код отправлен в приложение — посмотрите уведомления.':(workerOtpInfo&&(workerOtpInfo.delivery==='pending'||workerOtpInfo.sms==='pending'))?'Код отправляется… Если не пришёл за минуту — нажмите «Отправить повторно».':(workerOtpInfo&&workerOtpInfo.channel==='sms')?'SMS с кодом отправлено на '+phone:'Код отправлен на '+phone;
       startResendCooldown(60);
       setTimeout(()=>{const oi=$('#otpInput');if(oi)oi.focus();},300);
       b.disabled=false;return;}
@@ -2583,11 +2583,11 @@ $('#btnResend').onclick=async()=>{
     const url=getApiUrl();
     const b=$('#btnResend');b.disabled=true;
     try{
-      const resp=await apiFetch(url+'/otp/send',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({phone:pendingPhone}),timeout:API_TIMEOUT_MS});
+      const resp=await apiFetch(url+'/otp/send',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({phone:pendingPhone,resend:true}),timeout:API_TIMEOUT_MS});
       const data=await resp.json();
       if(data.error==='rate_limit'){toast('⏳ '+data.message);b.disabled=false;return;}
       if(!data.ok){toast('Ошибка: '+(data.message||data.error));b.disabled=false;return;}
-      startResendCooldown(60);resetOtp();otpInput.focus();toast(data.sms==='pending'?'SMS отправляется…':'Новый код отправлен на '+pendingPhone);
+      startResendCooldown(60);resetOtp();otpInput.focus();toast(data.channel==='call'?'Вам поступит звонок с кодом':(data.delivery==='pending'||data.sms==='pending')?'Код отправляется…':'Новый код отправлен на '+pendingPhone);
     }catch(e){
       const isTimeout=e&&(e.name==='TimeoutError'||e.name==='AbortError');
       if(isTimeout){ startResendCooldown(45); toast('Код отправляется… если SMS не пришла — повторите.'); }
@@ -6450,6 +6450,8 @@ function registerExpoPush(token){
 }
 window.olesyaNativePush=registerExpoPush;
 window.olesyaOpenChat=function(peer){ try{window.focus();}catch(e){} if(peer&&me){try{openConv(peer);}catch(e){}} };
+/* OTP-код из push-уведомления (нативка зовёт это при получении push с data.type==='otp') — авто-подставляем на экране кода. */
+window.olesyaOtpCode=function(code){ try{ const oi=document.getElementById('otpInput'); const scr=document.getElementById('scrOtp'); if(oi&&scr&&!scr.classList.contains('hidden')){ oi.value=String(code||'').replace(/\D/g,'').slice(0,6); const oh=document.getElementById('otpHint'); if(oh)oh.textContent='Код получен из уведомления'; try{oi.dispatchEvent(new Event('input',{bubbles:true}));}catch(e){} try{oi.focus();}catch(e){} } }catch(e){} };
 try{ if(window.__OLESYA_PUSH_TOKEN__)registerExpoPush(window.__OLESYA_PUSH_TOKEN__); }catch(e){}
 function appHidden(){ try{return document.hidden || !document.hasFocus();}catch(e){return document.hidden;} }
 function fallbackNotif(title,opts){ try{ const n=new Notification(title,opts); n.onclick=()=>{try{window.focus();}catch(e){} if(opts.data&&opts.data.peer&&me){try{openConv(opts.data.peer);}catch(_){}} n.close();}; }catch(e){} }
