@@ -1778,7 +1778,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.35', BUILD_ID='2026-07-17-flashcall';
+const APP_VERSION='4.9.36', BUILD_ID='2026-07-18-otp-len-fix';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -2298,7 +2298,7 @@ function localMode(){return !isCloudReady();}
 
 const otpInput=$('#otpInput');
 function resetOtp(){otpInput.value='';otpInput.disabled=false;otpFails=0;otpLocked=false;}
-function checkOtp(){if(otpLocked)return;if(otpInput.value.length===6){verifyOtp(otpInput.value);}}
+function checkOtp(){if(otpLocked)return;const L=(otpInput&&otpInput.maxLength>0)?otpInput.maxLength:6;if(otpInput.value.length===L){verifyOtp(otpInput.value);}}
 otpInput.addEventListener('input',()=>{otpInput.value=otpInput.value.replace(/\D/g,'').slice(0,6);checkOtp();});
 otpInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();verifyOtp(otpInput.value);}});
 $('#btnVerifyOtp').onclick=()=>verifyOtp(otpInput.value);
@@ -2454,7 +2454,7 @@ $('#btnSendCode').onclick=async()=>{
 
 async function verifyOtp(raw){
   const code=raw.replace(/\D/g,'').slice(0,6);
-  if(code.length!==6){toast('Введите 6 цифр');return;}
+  {const L=(otpInput&&otpInput.maxLength>0)?otpInput.maxLength:6; if(code.length!==L){toast('Введите '+L+' цифр');return;}}
   if(otpLocked)return;
   if(isFirebaseReady()&&fbConfirmation){
     /* ── Firebase verify ── */
