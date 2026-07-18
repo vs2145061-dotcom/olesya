@@ -1778,7 +1778,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.34', BUILD_ID='2026-07-16-otp-router';
+const APP_VERSION='4.9.35', BUILD_ID='2026-07-17-flashcall';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -2372,7 +2372,7 @@ $('#btnSendCode').onclick=async()=>{
         b.disabled=false;return;
       }
       if(workerOtpOk){
-        const oh=$('#otpHint');if(oh)oh.textContent=(workerOtpInfo&&workerOtpInfo.channel==='call')?((workerOtpInfo.delivery==='pending')?'Звонок с кодом поступит через минуту — ответьте, робот продиктует код.':'Вам поступит звонок — робот продиктует код. Введите его ниже.'):(workerOtpInfo&&workerOtpInfo.channel==='push')?'Код отправлен в приложение — посмотрите уведомления.':(workerOtpInfo&&(workerOtpInfo.delivery==='pending'||workerOtpInfo.sms==='pending'))?'Код отправляется… Если не пришёл за минуту — нажмите «Отправить повторно».':(workerOtpInfo&&workerOtpInfo.channel==='sms')?'SMS с кодом отправлено на '+phone:'Код отправлен на '+phone;
+        otpChannelUI(workerOtpInfo,phone);
         startResendCooldown(60);
         b.disabled=false;return;
       }
@@ -2416,7 +2416,7 @@ $('#btnSendCode').onclick=async()=>{
       resetOtp();go('scrOtp');
       const dpw=$('#demoPillWrap');if(dpw)dpw.style.display='none';
       const _ph3=$('#phoneHelper');if(_ph3)_ph3.style.display='none';
-      const oh=$('#otpHint');if(oh)oh.textContent=(workerOtpInfo&&workerOtpInfo.channel==='call')?((workerOtpInfo.delivery==='pending')?'Звонок с кодом поступит через минуту — ответьте, робот продиктует код.':'Вам поступит звонок — робот продиктует код. Введите его ниже.'):(workerOtpInfo&&workerOtpInfo.channel==='push')?'Код отправлен в приложение — посмотрите уведомления.':(workerOtpInfo&&(workerOtpInfo.delivery==='pending'||workerOtpInfo.sms==='pending'))?'Код отправляется… Если не пришёл за минуту — нажмите «Отправить повторно».':(workerOtpInfo&&workerOtpInfo.channel==='sms')?'SMS с кодом отправлено на '+phone:'Код отправлен на '+phone;
+      otpChannelUI(workerOtpInfo,phone);
       startResendCooldown(60);
       setTimeout(()=>{const oi=$('#otpInput');if(oi)oi.focus();},300);
       b.disabled=false;return;}
@@ -2564,6 +2564,19 @@ async function verifyOtp(raw){
   }
 }
 
+/* Экран кода под канал: flash-call → 4 цифры «последние цифры номера»; push/SMS → 6 цифр. Обновляет подсказку, подпись и длину поля. */
+function otpChannelUI(info,phone){
+  const ch=info&&info.channel; const pend=info&&(info.delivery==='pending'||info.sms==='pending');
+  const oh=document.getElementById('otpHint'); const tag=document.querySelector('#scrOtp .tagline'); const oi=document.getElementById('otpInput');
+  let msg='Код отправлен на '+phone, tagText='Введите код', len=6;
+  if(ch==='flashcall'){ msg='Вам позвонят — введите последние 4 цифры номера, который позвонил. Отвечать не нужно.'; tagText='Последние 4 цифры номера'; len=4; }
+  else if(ch==='push'){ msg='Код отправлен в приложение — посмотрите уведомления.'; tagText='Введите 6-значный код'; len=6; }
+  else if(pend){ msg='Код отправляется… Если не пришёл за минуту — нажмите «Отправить повторно».'; tagText='Введите код'; len=6; }
+  else if(ch==='sms'){ msg='SMS с кодом отправлено на '+phone; tagText='Введите код из SMS'; len=6; }
+  if(oh)oh.textContent=msg;
+  if(tag)tag.textContent=tagText;
+  if(oi){ oi.maxLength=len; oi.setAttribute('maxlength',String(len)); oi.placeholder='0'.repeat(len); }
+}
 $('#btnResend').onclick=async()=>{
   const isRussian=/^\+7\d{10}$/.test(pendingPhone||'');
   const useWorkerSms=isRussian && isCloudReady();   // РФ-номера: всегда SMSC (как и первая отправка) — без смены провайдера
@@ -2587,7 +2600,7 @@ $('#btnResend').onclick=async()=>{
       const data=await resp.json();
       if(data.error==='rate_limit'){toast('⏳ '+data.message);b.disabled=false;return;}
       if(!data.ok){toast('Ошибка: '+(data.message||data.error));b.disabled=false;return;}
-      startResendCooldown(60);resetOtp();otpInput.focus();toast(data.channel==='call'?'Вам поступит звонок с кодом':(data.delivery==='pending'||data.sms==='pending')?'Код отправляется…':'Новый код отправлен на '+pendingPhone);
+      startResendCooldown(60);resetOtp();otpInput.focus();otpChannelUI(data,pendingPhone);toast(data.channel==='flashcall'?'Новый звонок с кодом поступит':(data.delivery==='pending'||data.sms==='pending')?'Код отправляется…':'Новый код отправлен');
     }catch(e){
       const isTimeout=e&&(e.name==='TimeoutError'||e.name==='AbortError');
       if(isTimeout){ startResendCooldown(45); toast('Код отправляется… если SMS не пришла — повторите.'); }
