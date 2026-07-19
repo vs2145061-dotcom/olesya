@@ -1778,7 +1778,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.37', BUILD_ID='2026-07-19-otp-limit-msg';
+const APP_VERSION='4.9.38', BUILD_ID='2026-07-19-signup-unstick';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -2644,12 +2644,18 @@ function buildAvatarPicker(){
   if(nm&&!nm._avBound){nm._avBound=1;nm.addEventListener('input',upd);}
   upd();
 }
+// Ни один системный запрос разрешений не должен блокировать регистрацию. В Android-WebView
+// диалог камеры/уведомлений иногда не отвечает вовсе — обещание не завершается НИКОГДА, и
+// try/catch тут бесполезен (ловить нечего). Снаружи это выглядело как «нажимаю — ничего не
+// происходит». Ограничиваем ожидание: не ответили за 6 секунд — идём дальше без разрешения.
+const permWait=(p,ms)=>Promise.race([Promise.resolve(p).catch(()=>null),new Promise(r=>setTimeout(()=>r(null),ms))]);
 $('#btnFinish').onclick=async()=>{
+ try{
   const name=$('#setupName').value.trim();
   if(name.length<2){toast('Введите имя');return;}
   // Согласие на уведомления — во время регистрации (в рамках действия пользователя)
-  if(notifSupported()&&Notification.permission==='default'){ try{ const p=await requestNotifPermission(); setNotifPref(p==='granted'); }catch(e){} }
-  try{ await requestMediaPermsOnce(); }catch(e){}   // разовый запрос микрофона/камеры при регистрации (дальше не спрашиваем)
+  if(notifSupported()&&Notification.permission==='default'){ const p=await permWait(requestNotifPermission(),6000); if(p)setNotifPref(p==='granted'); }
+  await permWait(requestMediaPermsOnce(),6000);   // разовый запрос микрофона/камеры (дальше не спрашиваем)
   const d=db();const id=uid();
   // Пароль нужен только если блок виден (не Firebase-путь)
   const pwVisible=$('#setupPwBlock').style.display!=='none';
@@ -2680,6 +2686,13 @@ $('#btnFinish').onclick=async()=>{
         toast('Номер уже зарегистрирован — войдите через SMS заново');
         saveSessionToken('');go('scrPhone');return;
       }
+      // Временная сессия на регистрацию живёт 30 минут. Если человек задумался над именем
+      // дольше — сервер отвечает «не авторизован». Объясняем по-человечески, а не кодом ошибки.
+      if(/unauthorized|http_401/i.test(String(e&&e.message||''))){
+        b.disabled=false;saveSessionToken('');
+        toast('Время на создание профиля истекло — войдите по номеру заново');
+        go('scrPhone');return;
+      }
       b.disabled=false;toast('Ошибка сервера: '+(e&&e.message||e));return;}
     b.disabled=false;
     me={id,name,phone:pendingPhone,avatar:chosenGlyph,color:chosenColor,cloud:true,online:true,lastSeen:Date.now()};
@@ -2689,6 +2702,12 @@ $('#btnFinish').onclick=async()=>{
   }
   me={id,name,phone:pendingPhone,avatar:chosenGlyph,color:chosenColor,online:true,lastSeen:Date.now()};
   d.users[id]=me;save(d);sessionStorage.setItem(SS,id);emit('directory',{});enterApp();
+ }catch(e){
+  // Молчаливый сбой недопустим: раньше любое исключение здесь просто «ничего не делало»,
+  // и человек оставался на экране ввода имени без единой подсказки.
+  const b=$('#btnFinish'); if(b)b.disabled=false;
+  toast('Не удалось создать профиль: '+(e&&e.message||e));
+ }
 };
 
 /* ================== APP ENTRY ================== */
