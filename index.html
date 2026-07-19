@@ -1778,7 +1778,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.38', BUILD_ID='2026-07-19-signup-unstick';
+const APP_VERSION='4.9.39', BUILD_ID='2026-07-19-signup-notif-fix';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -2653,8 +2653,12 @@ $('#btnFinish').onclick=async()=>{
  try{
   const name=$('#setupName').value.trim();
   if(name.length<2){toast('Введите имя');return;}
-  // Согласие на уведомления — во время регистрации (в рамках действия пользователя)
-  if(notifSupported()&&Notification.permission==='default'){ const p=await permWait(requestNotifPermission(),6000); if(p)setNotifPref(p==='granted'); }
+  // Согласие на уведомления — во время регистрации (в рамках действия пользователя).
+  // ВАЖНО: проверяем именно `typeof Notification`, а НЕ notifSupported() — в APK-обёртке
+  // notifSupported() отвечает «да» по флагу __OLESYA_NATIVE__, но самого объекта Notification
+  // в Android-WebView НЕТ, и обращение к Notification.permission роняло всю регистрацию
+  // («Notification is not defined»). В обёртке уведомления и так идут через Expo.
+  if(typeof Notification!=='undefined'&&Notification.permission==='default'){ const p=await permWait(requestNotifPermission(),6000); if(p)setNotifPref(p==='granted'); }
   await permWait(requestMediaPermsOnce(),6000);   // разовый запрос микрофона/камеры (дальше не спрашиваем)
   const d=db();const id=uid();
   // Пароль нужен только если блок виден (не Firebase-путь)
