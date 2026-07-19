@@ -270,6 +270,8 @@ h1.brandname{font-family:var(--brand);font-weight:400;font-size:52px;line-height
 .tick{display:inline-flex}
 .tick svg{width:15px;height:11px}
 .tick.read{color:#bfe3ff}
+.tick.pending{opacity:.75}
+.tick.pending svg{width:12px;height:12px}
 .bubble img.att{max-width:240px;border-radius:12px;margin:-2px 0 4px;display:block}
 .bubble img.gif{max-width:240px;border-radius:12px;margin:-2px 0 4px;display:block}
 .gif-tag{position:absolute;left:7px;top:6px;background:rgba(0,0,0,.6);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;font-family:var(--mono);letter-spacing:.5px}
@@ -838,6 +840,25 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 #scrHome.homebg .hc-book{background:linear-gradient(150deg, rgba(108,123,255,.52), rgba(197,108,255,.5))}
 #scrHome.homebg .hc-fav{background:linear-gradient(150deg, rgba(224,115,74,.52), rgba(245,181,68,.5))}
 
+/* Второстепенные карточки (Новости, Соцсети, Каналы) собственной заливки НЕ имели —
+   сквозь них просвечивал фон страницы, а текст у всех карточек жёстко белый.
+   В тёмной теме белое на тёмном читалось, в светлой пропадало полностью (контраст 1.0).
+   Даём им поверхность и цвет текста из темы: вид «спокойных» карточек сохраняется,
+   а читаемость появляется в обеих темах. */
+.hc-news,.hc-social,.hc-channels{background:var(--surface);color:var(--text)}
+.hc-news .hc-d,.hc-social .hc-d,.hc-channels .hc-d{color:var(--muted);opacity:1}
+:root[data-theme="light"] .hc-news,
+:root[data-theme="light"] .hc-social,
+:root[data-theme="light"] .hc-channels{border-color:var(--line);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 12px 26px -18px rgba(50,45,110,.45)}
+/* Верхний глянцевый блик на светлой поверхности делаем мягче, иначе карточка выцветает */
+:root[data-theme="light"] .hc-news::before,
+:root[data-theme="light"] .hc-social::before,
+:root[data-theme="light"] .hc-channels::before{background:linear-gradient(rgba(255,255,255,.5),rgba(255,255,255,0))}
+/* С обоями на лицевой все плитки полупрозрачные поверх затемнения — текст снова светлый */
+#scrHome.homebg .hc-news,#scrHome.homebg .hc-social,#scrHome.homebg .hc-channels{background:rgba(18,14,32,.42);color:#fff}
+#scrHome.homebg .hc-news .hc-d,#scrHome.homebg .hc-social .hc-d,#scrHome.homebg .hc-channels .hc-d{color:rgba(255,255,255,.85)}
+
 /* ===================== КОНТАКТЫ / ЗВОНКИ ===================== */
 .cn-hint{padding:8px 18px 2px;color:var(--faint);font-size:12.5px;line-height:1.4}
 .cn-row{display:flex;align-items:center;gap:13px;padding:10px 16px;transition:background .12s}
@@ -999,8 +1020,11 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
   <section class="screen hidden" id="scrOtp">
     <div class="topbar"><button class="iconbtn" data-back="scrPhone">←</button><div><div class="title" style="font-size:17px">Подтверждение</div><div class="sub" id="otpPhoneLabel"></div></div></div>
     <div class="center-pad" style="justify-content:flex-start;padding-top:40px">
-      <p class="tagline" style="margin-bottom:6px">Введите 6-значный код</p>
-      <input id="otpInput" class="otp-bigfield" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" aria-label="Код подтверждения" />
+      <!-- Подпись и число цифр НЕ зашиваем: канал (звонок/push/SMS) выясняется по ответу сервера.
+           Раньше здесь стояло «Введите 6-значный код» и шесть нулей — и при звонке экран
+           заметно перескакивал с 6 на 4 цифры. Начальное состояние нейтральное. -->
+      <p class="tagline" style="margin-bottom:6px">Ожидаем код</p>
+      <input id="otpInput" class="otp-bigfield" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="" aria-label="Код подтверждения" />
       <button class="btn" id="btnVerifyOtp">Подтвердить</button>
       <div style="text-align:center;font-size:13px;color:var(--faint)" id="otpHint">Отправляем код на указанный номер…</div>
       <div id="demoPillWrap" style="display:none;text-align:center"><span class="demo-pill">Демо-режим: <code id="demoCode">000000</code> <button class="link" id="btnFillOtp" style="margin-left:8px">подставить</button></span></div>
@@ -1030,7 +1054,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
   <!-- ============ ЛИЦЕВАЯ СТРАНИЦА (хаб) ============ -->
   <section class="screen hidden" id="scrHome">
     <div class="topbar" style="border-bottom-color:transparent">
-      <div class="orb brand o-brand" style="width:42px;height:42px;font-size:19px"><span>O</span></div>
+      <div class="orb brand o-brand" style="width:42px;height:42px;font-size:19px"><span>Z</span></div>
       <div class="grow"><div class="title brandmark" style="font-size:27px;line-height:1.05">Zemex</div><div class="sub" style="letter-spacing:3px;text-transform:uppercase;font-size:10px">Messenger</div></div>
       <button class="iconbtn" id="btnHomeBgRemove" title="Убрать фон" style="display:none;font-size:18px">✕</button>
       <button class="iconbtn fx-bg" id="btnHomeBg" title="Фон страницы"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button>
@@ -1778,7 +1802,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.40', BUILD_ID='2026-07-19-app-prompt';
+const APP_VERSION='4.9.41', BUILD_ID='2026-07-19-delivery';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -1829,6 +1853,12 @@ function showNetAuthHelp(shortText){
   toast(msg);
   const oh=$('#otpHint'); if(oh) oh.textContent=msg;
   const ph=$('#phoneHelper'); if(ph){ph.style.display='block'; ph.textContent='Диагностика: откройте /network-diagnostic.html или Настройки → Диагностика сети. Основной API: api.zemex.pro, резерв: backup-api.zemex.pro.';}
+}
+/* Ограничитель времени для запросов, которые идут мимо apiFetch (там таймаут уже есть).
+   Без него зависшая сеть = вечное ожидание без единой подсказки на экране. */
+function timeoutSignal(ms){
+  try{ return ('AbortSignal' in window && AbortSignal.timeout) ? AbortSignal.timeout(ms) : undefined; }
+  catch(e){ return undefined; }
 }
 async function apiFetch(url,opts){
   opts=Object.assign({},opts||{});
@@ -1945,11 +1975,15 @@ async function cloudRegister(row){
   if(CFG.provider==='worker'){await jpost(wapi('/register'),row);return;}
   const c=sbClient();if(c){const {error}=await c.from('om_users').insert(row);if(error)throw new Error(/dupl/i.test(error.message)?'taken':error.message);}}
 /* (cloudLogin удалена — эндпоинта /login в воркере нет; облачный вход идёт через Firebase/OTP) */
+/* Возвращает true, только если сервер ДЕЙСТВИТЕЛЬНО принял сообщение.
+   Раньше функция молчала при любой ошибке — сообщение исчезало, и никто об этом не узнавал. */
 async function cloudSend(m){
   try{
-    if(CFG.provider==='worker'){await jpost(wapi('/send'),m);return;}
-    const c=sbClient();if(c)await c.from('om_messages').insert(m);
-  }catch(e){}
+    if(CFG.provider==='worker'){await jpost(wapi('/send'),m);return true;}
+    const c=sbClient();
+    if(c){const {error}=await c.from('om_messages').insert(m);return !error;}
+    return false;
+  }catch(e){return false;}
 }
 /* Выгрузить медиа (data: URL) в хранилище → вернуть постоянную ссылку.
    Основной путь: Yandex Object Storage — воркер выдаёт подписанную PUT-ссылку (/media/presign),
@@ -1980,7 +2014,7 @@ async function cloudUploadMedia(dataUrl){
   try{
     const r=await fetch(getApiUrl()+'/media',{method:'POST',
       headers:{'content-type':ct,'x-session-token':sessionToken||''},
-      body:blob});
+      body:blob,signal:timeoutSignal(120000)});
     if(!r.ok)return null;
     const d=await r.json();
     return (d&&d.url)?(getApiUrl()+d.url):null;
@@ -2027,6 +2061,7 @@ async function cloudLoadHistory(peerId,lookbackMs){
     const rows=(r&&r.messages)||[];if(!rows.length)return;
     const d=db();if(!d.chats[k])d.chats[k]={id:k,members:[me.id,peerId],messages:[]};
     const byId=new Map(d.chats[k].messages.map(x=>[x.id,x]));let added=false;
+    const _newIn=[];   // что пришло от собеседника — подтвердим ему доставку
     for(const row of rows){
       const isVoice=row.type==='voice';
       const ex=byId.get(row.id);
@@ -2045,7 +2080,7 @@ async function cloudLoadHistory(peerId,lookbackMs){
         d.chats[k].messages.push(Object.assign({id:row.id,from:row.from_id,to:row.to_id,t:row.t,readBy:[row.from_id],e2e:1},
           dec?{type:dec.mtype||'text',text:dec.text||'',src:dec.src,audio:dec.audio,dur:dec.dur,orig:dec.orig,origLang:dec.origLang}
              :{type:'text',text:'🔒 Зашифрованное сообщение (не удалось расшифровать)',undecrypted:1}));
-        added=true;continue;
+        added=true;if(row.from_id!==me.id)_newIn.push(row.id);continue;
       }
       d.chats[k].messages.push({id:row.id,from:row.from_id,to:row.to_id,type:row.type||'text',
         text:row.text||'',
@@ -2054,9 +2089,11 @@ async function cloudLoadHistory(peerId,lookbackMs){
         dur:(row.dur!=null?row.dur:undefined),
         orig:row.orig||undefined,origLang:row.orig_lang||undefined,t:row.t,
         readBy:[row.from_id]});added=true;
+      if(row.from_id!==me.id)_newIn.push(row.id);
     }
     if(added){d.chats[k].messages.sort((a,b)=>a.t-b.t);save(d);
       if(current&&current.id===peerId)renderMessages();renderChats();}
+    if(_newIn.length)emitDelivered(peerId,_newIn);   // подтверждаем доставку тому, кто писал
   }catch(e){}
 }
 
@@ -2155,11 +2192,27 @@ function mediaPerm(){try{return Object.assign({mic:true,cam:true},JSON.parse(loc
 function setMediaPerm(p){try{localStorage.setItem('om_media_perm_'+(me?me.id:'x'),JSON.stringify(p));}catch(e){}}
 function micAllowed(){return mediaPerm().mic!==false;}
 function camAllowed(){return mediaPerm().cam!==false;}
+/* Запрос камеры/микрофона, который НЕ МОЖЕТ подвесить экран навсегда.
+   В Android-WebView системный диалог доступа иногда не отвечает вовсе: обещание не
+   завершается никогда, и try/catch бесполезен — ошибки нет, ловить нечего. Здесь
+   молчание дольше срока превращается в обычный отказ, а его вызывающий код уже умеет
+   показать («Микрофон недоступен» и т.п.). Отсутствие самого API — не ошибка, вернём null,
+   чтобы не менять поведение там, где это уже проверяется отдельно. */
+async function getMediaWithTimeout(constraints,ms){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)return null;
+  let timer=null;
+  try{
+    return await Promise.race([
+      navigator.mediaDevices.getUserMedia(constraints),
+      new Promise((_,rej)=>{timer=setTimeout(()=>rej(new Error('media_timeout')),ms||12000);})
+    ]);
+  }finally{ if(timer)clearTimeout(timer); }
+}
 async function requestMediaPermsOnce(){
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)return;
   // один системный запрос (браузер/ОС запомнит) — пробуем аудио+видео, при отказе хотя бы аудио
-  try{ const s=await navigator.mediaDevices.getUserMedia({audio:true,video:true}); s.getTracks().forEach(t=>t.stop()); return; }catch(e){}
-  try{ const s=await navigator.mediaDevices.getUserMedia({audio:true}); s.getTracks().forEach(t=>t.stop()); }catch(e){}
+  try{ const s=await getMediaWithTimeout({audio:true,video:true},10000); if(s){s.getTracks().forEach(t=>t.stop()); return;} }catch(e){}
+  try{ const s=await getMediaWithTimeout({audio:true},10000); if(s)s.getTracks().forEach(t=>t.stop()); }catch(e){}
 }
 function isContact(id){if(!me)return false;return !!db().chats[chatKey(me.id,id)];}
 function logSec(text){if(!me)return;let a;try{a=JSON.parse(localStorage.getItem('om_log_'+me.id))||[]}catch(e){a=[]}a.unshift({t:Date.now(),text});a=a.slice(0,150);localStorage.setItem('om_log_'+me.id,JSON.stringify(a));}
@@ -2203,6 +2256,7 @@ function handleBus(m){
     case 'msg': if(me&&m.payload.to===me.id){onIncomingMessage(m.payload);} break;
     case 'typing': if(me&&m.payload.to===me.id&&current&&current.id===m.payload.from){showTyping(m.payload.on);} break;
     case 'read': if(me&&m.payload.to===me.id){markMyReadByPeer(m.payload.from);} break;
+    case 'delivered': if(me&&m.payload&&m.payload.to===me.id){markMyDeliveredByPeer(m.payload);} break;
     case 'react': if(me&&m.payload.to===me.id){applyRemoteReact(m.payload);} break;
     case 'presence': refreshIfPresence(); break;
     case 'call:invite': if(me&&m.payload.to===me.id)showIncomingCall(m.payload); break;
@@ -2289,7 +2343,7 @@ function resetRecaptcha(){
 async function exchangeFirebaseToken(idToken){
   if(!isCloudReady())return null;
   const r=await fetch(getApiUrl()+'/auth/firebase',{method:'POST',
-    headers:{'Content-Type':'application/json'},body:JSON.stringify({idToken})});
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({idToken}),signal:timeoutSignal(API_TIMEOUT_MS)});
   if(!r.ok)return null;
   return (await r.json());
 }
@@ -2299,7 +2353,8 @@ function localMode(){return !isCloudReady();}
 const otpInput=$('#otpInput');
 function resetOtp(){otpInput.value='';otpInput.disabled=false;otpFails=0;otpLocked=false;}
 function checkOtp(){if(otpLocked)return;const L=(otpInput&&otpInput.maxLength>0)?otpInput.maxLength:6;if(otpInput.value.length===L){verifyOtp(otpInput.value);}}
-otpInput.addEventListener('input',()=>{otpInput.value=otpInput.value.replace(/\D/g,'').slice(0,6);checkOtp();});
+// Обрезаем по фактической длине кода (4 у звонка, 6 у push/SMS), а не по зашитой шестёрке.
+otpInput.addEventListener('input',()=>{const L=(otpInput.maxLength>0)?otpInput.maxLength:6;otpInput.value=otpInput.value.replace(/\D/g,'').slice(0,L);checkOtp();});
 otpInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();verifyOtp(otpInput.value);}});
 $('#btnVerifyOtp').onclick=()=>verifyOtp(otpInput.value);
 $('#btnFillOtp').onclick=()=>{if(genCode){otpInput.value=genCode;otpInput.focus();checkOtp();}};
@@ -2340,7 +2395,7 @@ $('#btnSendCode').onclick=async()=>{
       resetOtp();go('scrOtp');
       {const dpw=$('#demoPillWrap');if(dpw)dpw.style.display='none';}
       {const phf=$('#phoneHelper');if(phf)phf.style.display='none';}
-      {const oh=$('#otpHint');if(oh)oh.textContent='Отправляем код на '+phone+'…';}
+      otpChannelUI(null,phone);   // канал ещё неизвестен — нейтральный вид без числа цифр
       setTimeout(()=>{const oi=$('#otpInput');if(oi)oi.focus();},300);
       let workerOtpOk=false, workerOtpInfo=null, smscNotConfigured=false;
       try{
@@ -2394,6 +2449,7 @@ $('#btnSendCode').onclick=async()=>{
       resetOtp();go('scrOtp');
       const dpw=$('#demoPillWrap');if(dpw)dpw.style.display='none';
       const _ph2=$('#phoneHelper');if(_ph2)_ph2.style.display='none';
+      otpChannelUI({channel:'sms'},phone);   // Firebase шлёт обычное SMS — 6 цифр
       const oh=$('#otpHint');if(oh)oh.textContent='SMS отправлено на '+phone+' через Firebase';
       startResendCooldown(60);
       setTimeout(()=>{const oi=$('#otpInput');if(oi)oi.focus();},300);
@@ -2432,6 +2488,7 @@ $('#btnSendCode').onclick=async()=>{
       resetOtp();go('scrOtp');
       const dc=$('#demoCode');if(dc)dc.textContent=genCode;
       const dpw=$('#demoPillWrap');if(dpw)dpw.style.display='block';
+      otpChannelUI({channel:'sms'},phone);   // демо-код шестизначный
       const oh=$('#otpHint');if(oh)oh.textContent='Демо-режим: используйте код ниже';
       const _ph=$('#phoneHelper');if(_ph)_ph.style.display='';
       startResendCooldown(30);
@@ -2573,6 +2630,14 @@ async function verifyOtp(raw){
 function otpChannelUI(info,phone){
   const ch=info&&info.channel; const pend=info&&(info.delivery==='pending'||info.sms==='pending');
   const oh=document.getElementById('otpHint'); const tag=document.querySelector('#scrOtp .tagline'); const oi=document.getElementById('otpInput');
+  // Канал ещё неизвестен (запрос к серверу в пути). Молчим про количество цифр: раньше
+  // экран успевал сказать «Введите 6-значный код», а после ответа про звонок менялся на 4.
+  if(!info){
+    if(oh)oh.textContent='Отправляем код на '+phone+'…';
+    if(tag)tag.textContent='Ожидаем код';
+    if(oi){ oi.maxLength=6; oi.setAttribute('maxlength','6'); oi.placeholder=''; }
+    return;
+  }
   let msg='Код отправлен на '+phone, tagText='Введите код', len=6;
   if(ch==='flashcall'){ msg='Вам позвонят — введите последние 4 цифры номера, который позвонил. Отвечать не нужно.'; tagText='Последние 4 цифры номера'; len=4; }
   else if(ch==='push'){ msg='Код отправлен в приложение — посмотрите уведомления.'; tagText='Введите 6-значный код'; len=6; }
@@ -2720,6 +2785,7 @@ function enterApp(){
   try{sessionStorage.setItem(SS,me.id);}catch(e){}
   {const d=db();if(!d.users[me.id]){d.users[me.id]=me;save(d);}}
   loadBusSeq();
+  startOutboxWatch();   // досылка сообщений, не ушедших из-за связи
   ensureBot();
   setOnline(true);
   registerSession();
@@ -3103,10 +3169,20 @@ function renderBubble(m){
     const rc=document.createElement('span');rc.className='b-readcnt'+(total>0&&readers>=total?' done':'');
     rc.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" width="13" height="13" style="vertical-align:-2px">'+((readers>0)?'<path d="m1 13 4 4L15 7"/><path d="m9 13 4 4L23 7"/>':'<path d="m4 12 5 5L20 6"/>')+'</svg> '+readers+'/'+Math.max(total,1);
     meta.appendChild(rc);
-  } else if(mine){const tk=document.createElement('span');tk.className='tick'+((m.readBy&&m.readBy.length>1)?' read':'');
-    tk.innerHTML=(m.readBy&&m.readBy.length>1)
-      ?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m1 13 4 4L15 7"/><path d="m9 13 4 4L23 7"/></svg>'
-      :'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m4 12 5 5L20 6"/></svg>';
+  } else if(mine){
+    // Четыре состояния: часики (не ушло) → одна галочка (сервер принял) →
+    // две серые (дошло до собеседника) → две голубые (прочитано).
+    const isRead=!!(m.readBy&&m.readBy.length>1);
+    const st=isRead?3:(m.st||0);
+    const tk=document.createElement('span');
+    tk.className='tick'+(isRead?' read':(st===0?' pending':''));
+    const ONE='<path d="m4 12 5 5L20 6"/>';
+    const TWO='<path d="m1 13 4 4L15 7"/><path d="m9 13 4 4L23 7"/>';
+    const CLOCK='<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>';
+    tk.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">'
+      +(st===0?CLOCK:(st>=2?TWO:ONE))+'</svg>';
+    tk.title=st===0?'Не отправлено — уйдёт, когда появится связь'
+            :(st===1?'Отправлено':(st===2?'Доставлено':'Прочитано'));
     meta.appendChild(tk);}
   b.appendChild(meta);
   // reactions
@@ -3152,7 +3228,7 @@ async function transcribeVoice(m,host,btn){
   if(btn)btn.remove();host.textContent='🎧 Расшифровываю…';
   try{
     const blob=await (await fetch(src)).blob();
-    const r=await fetch(getApiUrl()+'/ai/transcribe',{method:'POST',headers:{'content-type':blob.type||'audio/webm','x-session-token':sessionToken||''},body:blob});
+    const r=await fetch(getApiUrl()+'/ai/transcribe',{method:'POST',headers:{'content-type':blob.type||'audio/webm','x-session-token':sessionToken||''},body:blob,signal:timeoutSignal(60000)});
     if(r.ok){const d=await r.json();const t=(d&&d.text)||'';host.textContent=t?('📝 '+t):'Не удалось распознать речь';
       if(t){try{const dd=db();const c=getChat();const mm=c&&c.messages.find(x=>x.id===m.id);if(mm){mm.transcript=t;save(dd);}}catch(e){}}}
     else host.textContent='Не удалось расшифровать (сервис занят)';
@@ -3245,8 +3321,11 @@ async function transmitMessage(m,peerId,isBot){
     if(enc){
       emit('msg',{id:m.id,from:me.id,to:peerId,t:m.t,type:m.type,e2e:1,enc});
       if(cloudOn&&isCloudReady()){
-        try{await cloudSend({id:m.id,chat_key:chatKey(me.id,peerId),from_id:me.id,to_id:peerId,type:'e2e',text:JSON.stringify(enc),data_url:null,dur:null,orig:null,orig_lang:null,t:m.t});}catch(e){}
-      }
+        const _p={id:m.id,chat_key:chatKey(me.id,peerId),from_id:me.id,to_id:peerId,type:'e2e',text:JSON.stringify(enc),data_url:null,dur:null,orig:null,orig_lang:null,t:m.t};
+        const ok=await cloudSend(_p);
+        if(ok)setMsgStatus(peerId,m.id,1);
+        else { outboxAdd(peerId,_p); if(outboxCount()===1)toast('Нет связи — сообщение отправится само'); }
+      } else setMsgStatus(peerId,m.id,1);   // без сервера идём только по шине — часики не оставляем
       return;
     }
     toast('🔒 Не удалось зашифровать (нет ключа собеседника). Сообщение не отправлено.');
@@ -3272,18 +3351,28 @@ async function transmitMessage(m,peerId,isBot){
   }
   emit('msg',tm);   // лёгкое событие (без тяжёлого base64) — быстро и надёжно по шине
   if(cloudOn&&!isBot&&peerId!==me.id&&!isIncognito(peerId)){
-    await cloudSend({id:m.id,chat_key:chatKey(me.id,peerId),from_id:me.id,to_id:peerId,
+    const _p={id:m.id,chat_key:chatKey(me.id,peerId),from_id:me.id,to_id:peerId,
       type:m.type||'text',text:m.text||null,data_url:dataUrlForCloud,
-      dur:(m.dur!=null?m.dur:null),orig:m.orig||null,orig_lang:m.origLang||null,t:m.t});
-    // крупное медиа сняли с шины → сигналим получателю подтянуть его из истории (после сохранения в облаке)
-    if(leftAsBase64){ emit('media:pull',{to:peerId,from:me.id}); }
+      dur:(m.dur!=null?m.dur:null),orig:m.orig||null,orig_lang:m.origLang||null,t:m.t};
+    const ok=await cloudSend(_p);
+    if(ok){
+      setMsgStatus(peerId,m.id,1);
+      // крупное медиа сняли с шины → сигналим получателю подтянуть его из истории (после сохранения в облаке)
+      if(leftAsBase64){ emit('media:pull',{to:peerId,from:me.id}); }
+    }else{
+      // Сервер не принял — кладём в очередь и досылаем сами, когда связь вернётся.
+      outboxAdd(peerId,_p);
+      if(outboxCount()===1)toast('Нет связи — сообщение отправится само');
+    }
+  }else{
+    setMsgStatus(peerId,m.id,1);   // бот, «Избранное» и инкогнито через сервер не идут
   }
 }
 function pushMessage(obj){
   if(current&&current.channel)return postChannelMessage(obj);
   if(current&&current.group)return pushGroupMessage(obj);
   const d=db();const k=chatKey(me.id,current.id);if(!d.chats[k])d.chats[k]={id:k,members:[me.id,current.id],messages:[]};
-  const m=Object.assign({id:mid(),from:me.id,t:Date.now(),readBy:[me.id]},obj);
+  const m=Object.assign({id:mid(),from:me.id,t:Date.now(),readBy:[me.id],st:0},obj);   // st:0 — пока не подтверждено сервером
   const _ttl=chatTTL(current.id);if(_ttl&&m.exp==null)m.exp=Date.now()+_ttl;
   const heavy=stashHeavyMedia(m,current.id,!!current.bot);   // видео/крупные файлы — мимо localStorage
   d.chats[k].messages.push(m);save(d);
@@ -3342,6 +3431,7 @@ async function onIncomingMessage(p){
   if(!d.chats[k])d.chats[k]={id:k,members:[me.id,peerId],messages:[]};
   if(d.chats[k].messages.some(m=>m.id===p.id))return;
   d.chats[k].messages.push(Object.assign({},p,{readBy:[peerId]}));save(d);
+  emitDelivered(peerId,[p.id]);   // сообщаем отправителю: дошло (у него станет две галочки)
   autoSaveMedia(p,false); // согласованное сохранение входящих медиа в память устройства
   if(appHidden())showNotif((d.users[peerId].name||'Сообщение'), previewText(p), peerId); // системное уведомление, когда приложение свёрнуто
   if(current&&current.id===peerId){showTyping(false);renderMessages();markRead(peerId);}
@@ -3357,6 +3447,69 @@ function markMyReadByPeer(peerId){
   const d=db();const c=d.chats[chatKey(me.id,peerId)];if(!c)return;let changed=false;
   c.messages.forEach(m=>{if(m.from===me.id&&!(m.readBy||[]).includes(peerId)){m.readBy=[...(m.readBy||[]),peerId];changed=true;}});
   if(changed){save(d);if(current&&current.id===peerId)renderMessages();}
+}
+
+/* ============ СОСТОЯНИЕ ОТПРАВКИ И ОЧЕРЕДЬ ДОСЫЛКИ ============
+   Раньше сбой отправки проглатывался молча: сообщение оставалось только у отправителя,
+   собеседник его не получал, а на экране оно выглядело как обычное отправленное.
+   Теперь у каждого своего сообщения есть состояние:
+     st=0 — в очереди (на сервер НЕ ушло)   → часики
+     st=1 — отправлено (сервер принял)      → одна галочка
+     st=2 — доставлено (получатель скачал)  → две серые
+     прочитано (readBy содержит собеседника)→ две голубые
+   Неотправленное лежит в очереди и досылается само, когда сеть вернётся. */
+function setMsgStatus(peerId,id,st){
+  const d=db();const c=d.chats[chatKey(me.id,peerId)];if(!c)return;
+  const m=(c.messages||[]).find(x=>x.id===id);if(!m)return;
+  if((m.st||0)>=st)return;                     // состояние только растёт, назад не откатываем
+  m.st=st;save(d);
+  if(current&&!current.group&&current.id===peerId)renderMessages();
+  renderChats();
+}
+function outboxKey(){return 'om_outbox_'+(me?me.id:'x');}
+function outboxAll(){try{return JSON.parse(localStorage.getItem(outboxKey()))||[];}catch(e){return [];}}
+function outboxSave(a){try{localStorage.setItem(outboxKey(),JSON.stringify(a.slice(-100)));}catch(e){}}
+function outboxAdd(peerId,payload){
+  const a=outboxAll();
+  if(a.some(x=>x.payload&&x.payload.id===payload.id))return;
+  a.push({peerId,payload,tries:0,t:Date.now()});outboxSave(a);
+}
+function outboxDrop(id){outboxSave(outboxAll().filter(x=>!(x.payload&&x.payload.id===id)));}
+function outboxCount(){return outboxAll().length;}
+let _flushing=false;
+async function outboxFlush(){
+  if(_flushing||!me||!cloudOn||!isCloudReady())return;
+  const list=outboxAll();if(!list.length)return;
+  _flushing=true;
+  try{
+    for(const item of list){
+      if(!item||!item.payload)  { outboxDrop(item&&item.payload&&item.payload.id); continue; }
+      // Сообщения старше 3 суток не досылаем — собеседнику они уже не нужны, а очередь не должна расти вечно
+      if(Date.now()-(item.t||0)>3*24*60*60*1000){ outboxDrop(item.payload.id); continue; }
+      const ok=await cloudSend(item.payload);
+      if(ok){ outboxDrop(item.payload.id); setMsgStatus(item.peerId,item.payload.id,1); }
+      else break;                              // сеть всё ещё лежит — остальные пробуем позже
+    }
+  }finally{ _flushing=false; }
+}
+function startOutboxWatch(){
+  if(window._omOutboxTimer)return;
+  window._omOutboxTimer=setInterval(outboxFlush,20000);
+  try{ window.addEventListener('online',()=>{setTimeout(outboxFlush,800);}); }catch(e){}
+  setTimeout(outboxFlush,3000);                // догнать хвост сразу после запуска
+}
+/* Получатель подтверждает доставку: сообщения дошли до его устройства. */
+function emitDelivered(peerId,ids){
+  if(!peerId||!me||peerId===me.id||!ids||!ids.length)return;
+  emit('delivered',{to:peerId,from:me.id,ids:ids.slice(0,200)});
+}
+function markMyDeliveredByPeer(p){
+  const d=db();const c=d.chats[chatKey(me.id,p.from)];if(!c)return;let changed=false;
+  const set=new Set(p.ids||[]);
+  (c.messages||[]).forEach(m=>{
+    if(m.from===me.id&&(m.st||0)<2&&(set.size?set.has(m.id):true)){m.st=2;changed=true;}
+  });
+  if(changed){save(d);if(current&&!current.group&&current.id===p.from)renderMessages();}
 }
 
 /* ================== ГРУППОВЫЕ ЧАТЫ ================== */
@@ -4555,7 +4708,7 @@ function startMediaRec(kind){
   recMime='';
   if(navigator.mediaDevices&&window.MediaRecorder){
     const cs=(kind==='video')?{audio:true,video:{width:{ideal:360},height:{ideal:360},frameRate:{ideal:24},facingMode:'user'}}:{audio:true};
-    navigator.mediaDevices.getUserMedia(cs).then(s=>{
+    getMediaWithTimeout(cs,12000).then(s=>{
       // запись могли отменить, пока ждали доступ к камере/микрофону — освобождаем поток
       if(recState!=='recording'){try{s.getTracks().forEach(t=>t.stop());}catch(e){}return;}
       recStream=s;
@@ -4692,7 +4845,7 @@ async function olesyaVoiceToggle(){
   if(!navigator.mediaDevices||!window.MediaRecorder){ toast('Голос недоступен в этом браузере'); return; }
   if(!(cloudOn&&isCloudReady()&&CFG.provider==='worker')){ toast('Голосовой помощник работает при подключённом сервере'); return; }
   try{
-    _ovStream=await navigator.mediaDevices.getUserMedia({audio:true});
+    _ovStream=await getMediaWithTimeout({audio:true},12000);
     const mime=pickAudioMime(); _ovChunks=[];
     _ovRec=new MediaRecorder(_ovStream,mime?{mimeType:mime}:undefined);
     _ovRec.ondataavailable=e=>{ if(e.data&&e.data.size)_ovChunks.push(e.data); };
@@ -4709,7 +4862,7 @@ async function onOlesyaVoiceStop(){
   if(blob.size<900){ toast('Ничего не услышала — попробуйте ещё раз'); return; }
   toast('🎧 Распознаю…');
   let text='';
-  try{ const r=await fetch(getApiUrl()+'/ai/transcribe',{method:'POST',headers:{'content-type':blob.type||'audio/webm','x-session-token':sessionToken||''},body:blob}); const d=await r.json(); text=(d&&(d.text||d.transcript)||'').trim(); }catch(e){}
+  try{ const r=await fetch(getApiUrl()+'/ai/transcribe',{method:'POST',headers:{'content-type':blob.type||'audio/webm','x-session-token':sessionToken||''},body:blob,signal:timeoutSignal(60000)}); const d=await r.json(); text=(d&&(d.text||d.transcript)||'').trim(); }catch(e){}
   if(!text){ toast('Не удалось распознать речь — попробуйте чётче'); return; }
   if(!(current&&current.bot)){ try{ openConv(BOT.id); }catch(e){} }
   _olesyaSpeak=true;   // следующий ответ Олеси будет озвучен (см. botPush)
@@ -4775,7 +4928,7 @@ async function setupPeer(isCaller,kind){
   // получаем локальные медиа (звук всегда; видео — только для видеозвонка)
   try{
     if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){
-      localStream=await navigator.mediaDevices.getUserMedia({audio:true,video:(kind==='video'&&camAllowed())});
+      localStream=await getMediaWithTimeout({audio:true,video:(kind==='video'&&camAllowed())},15000);
       if(kind==='video'){const lv=$('#localVideo');if(lv){try{lv.srcObject=localStream;if(lv.play)lv.play().catch(()=>{});}catch(e){}}}
     }
   }catch(e){ toast(kind==='video'?'Камера/микрофон недоступны':'Микрофон недоступен'); }
@@ -4885,7 +5038,7 @@ function endCall(remote){
   if(remote)toast('Звонок завершён');
 }
 function initLocalVideo(){
-  if(navigator.mediaDevices){navigator.mediaDevices.getUserMedia({video:true,audio:true}).then(s=>{localStream=s;$('#localVideo').srcObject=s;}).catch(()=>{toast('Камера недоступна — звук активен');});}
+  if(navigator.mediaDevices){getMediaWithTimeout({video:true,audio:true},15000).then(s=>{if(!s)return;localStream=s;$('#localVideo').srcObject=s;}).catch(()=>{toast('Камера недоступна — звук активен');});}
 }
 function renderCallActions(incoming,active,opt){
   try{const cs=document.getElementById('callScreen');if(cs)cs.classList.toggle('video',callKind==='video');}catch(e){}
@@ -4925,7 +5078,7 @@ function gcCleanup(){
   gcall=null;stopCallPoll();gcResetUI();
 }
 async function gcGetLocal(kind){
-  try{ if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){ return await navigator.mediaDevices.getUserMedia({audio:true,video:kind==='video'}); } }
+  try{ if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){ return await getMediaWithTimeout({audio:true,video:kind==='video'},15000); } }
   catch(e){ toast(kind==='video'?'Камера/микрофон недоступны':'Микрофон недоступен'); }
   return null;
 }
@@ -6640,7 +6793,7 @@ async function boot(){
   if(restored){me=restored;enterApp();refreshLockToggle();return;}
   go('scrPhone');
 }
-window.__om={translate,detectLang,sha,db,save,bus:handleBus,TAB,getSec,saveSec,trCfgFor,setTrCfg,sessionsMap,cloudCfg,saveCloudCfg,cloudCfgUpdate,refreshSettings,get me(){return me;},forceLogout,startPinLock,gifSearch,sendGif,setGifKey,gifKey,startRec,pauseRecForCall,resumeRec,stopRec,discardDraft,endCall,startVnote,saveToFaves,openFwd,doForward,refreshLivePanel,liveTick,saveSessionToken,apiHeaders,checkApiRoute,isFirebaseReady,initFirebase,applyChatBg,setChatBgPreset,chatBgCfg,setVnoteShape:(s)=>{vnoteShape=s;},get vnoteShape(){return vnoteShape;},openVnoteRecorder,cycleVnoteShape,renderHome,renderContacts,renderCalls,callContact,getBook,getCalls,knownContacts,importDeviceContacts,applyHomeBg,removeHomeBg,autosaveEnabled,setAutosave,rememberEnabled,setRemember,sendDocument,startCall,acceptCall,hasRTC,callInfo:()=>({peer:callPeerId,kind:callKind,pc:!!pc,signaling:pc?pc.signalingState:null}),notifPref,notifGranted,ensureNotif,showNotif,fitViewport,get mediaReady(){return mediaReady;},recInfo:()=>({state:recState,kind:recKind,accum:recAccum,peer:recPeerId,elapsed:recElapsed()}),renderNews,renderSocial,openReader,openWebview,aiAsk,openTgChannel,renderTgFeed,openTgChannels,renderTgChannels,createGroup,openGroup,applyGroupInvite,onIncomingGroupMessage,markReadGroup,groupById,startGroupCall,leaveGroupCall,gcallInfo:()=>(gcall?{gid:gcall.gid,kind:gcall.kind,peers:Object.keys(gcall.peers),incoming:!!gcall.incoming}:null),get current(){return current;},processImportedContacts,getPhonebook,savePhonebook,matchPhonebook,parsePastedContacts,submitPastedContacts,importDeviceContacts,inviteContact,openGroupInfo,renameGroup,addGroupMembers,removeGroupMember,leaveGroup,applyGroupUpdate,applyGroupLeave,applyGroupRead,emitGroupRead,botReply,botReplyRuleBased,botAction,botHelp,botWelcomeIfEmpty,pinMessage,unpinMessage,promoteAdmin,demoteAdmin,isGroupAdmin,parseMentions,appendTextWithMentions,applyChatPin,applyGroupPin,renderPinnedBar,updateMentionPop,aiChat,aiPublic,olesyaRespond,olesyaTranslateOnce,aiCfg,saveAiCfg,aiEnabled,aiWantsWeb,setTranslateTarget,clearTranslateTarget,openLangPicker,langCodeFromName,editMessage,deleteMessage,applyMsgEdit,applyMsgDelete,getChatOpts,setChatOpt,chatTTL,isIncognito,sweepExpired,handleSlash,isSlash,openConvSearch,closeConvSearch,runConvSearch,openConv,transcribeVoice,pushSubscribe,urlB64ToU8,createChannel,openChannel,openChannelsScreen,renderChannelsScreen,onChannelPost,subscribeCurrentChannel,unsubscribeCurrentChannel,postChannelMessage,chIsAdmin,channelCurrent,isPro,proUntil,maxFileMB,setProUntil,redeemProCode,proCheckout,openPro,renderPro,refreshProUI,cloudProStatus,setProAccent,proAccentVal,isSecret,toggleSecret,e2eAvailable,e2eEnsureKeys,e2eEncryptFor,e2eDecryptFrom,e2eSharedKey,updateE2eeBanner,e2ePublishKey,_e2eSetPeerPub:(id,jwk)=>{_e2ePubCache[id]=jwk;},_e2eMyPub:async()=>{const k=await e2eEnsureKeys();return k&&k.pub;},checkForUpdate,openAiImg,closeAiImg,aiGenImage,socialLoginUrl,cloudSyncChats,isBlocked,toggleBlock,reportUser,hidePhoneEnabled,setHidePhone,openPeerActions,olesyaVoiceToggle,speakText,micAllowed,camAllowed,mediaPerm,setMediaPerm,requestMediaPermsOnce,get searchTerm(){return searchTerm;}};
+window.__om={translate,detectLang,sha,db,save,bus:handleBus,TAB,outboxAll,outboxCount,outboxFlush,setMsgStatus,getSec,saveSec,trCfgFor,setTrCfg,sessionsMap,cloudCfg,saveCloudCfg,cloudCfgUpdate,refreshSettings,get me(){return me;},forceLogout,startPinLock,gifSearch,sendGif,setGifKey,gifKey,startRec,pauseRecForCall,resumeRec,stopRec,discardDraft,endCall,startVnote,saveToFaves,openFwd,doForward,refreshLivePanel,liveTick,saveSessionToken,apiHeaders,checkApiRoute,isFirebaseReady,initFirebase,applyChatBg,setChatBgPreset,chatBgCfg,setVnoteShape:(s)=>{vnoteShape=s;},get vnoteShape(){return vnoteShape;},openVnoteRecorder,cycleVnoteShape,renderHome,renderContacts,renderCalls,callContact,getBook,getCalls,knownContacts,importDeviceContacts,applyHomeBg,removeHomeBg,autosaveEnabled,setAutosave,rememberEnabled,setRemember,sendDocument,startCall,acceptCall,hasRTC,callInfo:()=>({peer:callPeerId,kind:callKind,pc:!!pc,signaling:pc?pc.signalingState:null}),notifPref,notifGranted,ensureNotif,showNotif,fitViewport,get mediaReady(){return mediaReady;},recInfo:()=>({state:recState,kind:recKind,accum:recAccum,peer:recPeerId,elapsed:recElapsed()}),renderNews,renderSocial,openReader,openWebview,aiAsk,openTgChannel,renderTgFeed,openTgChannels,renderTgChannels,createGroup,openGroup,applyGroupInvite,onIncomingGroupMessage,markReadGroup,groupById,startGroupCall,leaveGroupCall,gcallInfo:()=>(gcall?{gid:gcall.gid,kind:gcall.kind,peers:Object.keys(gcall.peers),incoming:!!gcall.incoming}:null),get current(){return current;},processImportedContacts,getPhonebook,savePhonebook,matchPhonebook,parsePastedContacts,submitPastedContacts,importDeviceContacts,inviteContact,openGroupInfo,renameGroup,addGroupMembers,removeGroupMember,leaveGroup,applyGroupUpdate,applyGroupLeave,applyGroupRead,emitGroupRead,botReply,botReplyRuleBased,botAction,botHelp,botWelcomeIfEmpty,pinMessage,unpinMessage,promoteAdmin,demoteAdmin,isGroupAdmin,parseMentions,appendTextWithMentions,applyChatPin,applyGroupPin,renderPinnedBar,updateMentionPop,aiChat,aiPublic,olesyaRespond,olesyaTranslateOnce,aiCfg,saveAiCfg,aiEnabled,aiWantsWeb,setTranslateTarget,clearTranslateTarget,openLangPicker,langCodeFromName,editMessage,deleteMessage,applyMsgEdit,applyMsgDelete,getChatOpts,setChatOpt,chatTTL,isIncognito,sweepExpired,handleSlash,isSlash,openConvSearch,closeConvSearch,runConvSearch,openConv,transcribeVoice,pushSubscribe,urlB64ToU8,createChannel,openChannel,openChannelsScreen,renderChannelsScreen,onChannelPost,subscribeCurrentChannel,unsubscribeCurrentChannel,postChannelMessage,chIsAdmin,channelCurrent,isPro,proUntil,maxFileMB,setProUntil,redeemProCode,proCheckout,openPro,renderPro,refreshProUI,cloudProStatus,setProAccent,proAccentVal,isSecret,toggleSecret,e2eAvailable,e2eEnsureKeys,e2eEncryptFor,e2eDecryptFrom,e2eSharedKey,updateE2eeBanner,e2ePublishKey,_e2eSetPeerPub:(id,jwk)=>{_e2ePubCache[id]=jwk;},_e2eMyPub:async()=>{const k=await e2eEnsureKeys();return k&&k.pub;},checkForUpdate,openAiImg,closeAiImg,aiGenImage,socialLoginUrl,cloudSyncChats,isBlocked,toggleBlock,reportUser,hidePhoneEnabled,setHidePhone,openPeerActions,olesyaVoiceToggle,speakText,micAllowed,camAllowed,mediaPerm,setMediaPerm,requestMediaPermsOnce,get searchTerm(){return searchTerm;}};
 if('serviceWorker'in navigator&&location.protocol.indexOf('http')===0){
   window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js?v='+encodeURIComponent(APP_VERSION),{updateViaCache:'none'}).then(r=>{_swReg=r;try{r.update();}catch(e){}}).catch(()=>{});});
   navigator.serviceWorker.addEventListener('message',e=>{ if(e.data&&e.data.type==='open-chat'&&e.data.peer&&me){ try{window.focus();}catch(_){ } try{openConv(e.data.peer);}catch(_){ } } });
