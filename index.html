@@ -1778,7 +1778,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.36', BUILD_ID='2026-07-18-otp-len-fix';
+const APP_VERSION='4.9.37', BUILD_ID='2026-07-19-otp-limit-msg';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -2356,7 +2356,12 @@ $('#btnSendCode').onclick=async()=>{
           else{toast('SMS-провайдер не настроен. Обратитесь к администратору.');go('scrPhone');b.disabled=false;return;}
         }
         else if(data.ok){workerOtpOk=true;workerOtpInfo=data;}
-        else{const oh=$('#otpHint');if(oh)oh.textContent='⚠️ Не удалось отправить: '+(data.message||data.error||'неизвестная ошибка')+'. Нажмите «Отправить повторно».';startResendCooldown(20);b.disabled=false;return;}
+        else{const oh=$('#otpHint');
+          // При лимите НЕ зовём жать «Отправить повторно» — это бессмысленно и путает
+          // (раньше выходило «Попробуйте завтра. Нажмите Отправить повторно»). Ждём по retry_after.
+          const rl=/^rate_limit/.test(String(data.error||''))||data.error==='service_busy';
+          if(oh)oh.textContent=(rl?'⏳ ':'⚠️ Не удалось отправить: ')+(data.message||data.error||'неизвестная ошибка')+(rl?'':' Нажмите «Отправить повторно».');
+          startResendCooldown(rl?Math.min(600,data.retry_after||300):20);b.disabled=false;return;}
       }catch(netErr){
         const isTimeout=netErr&&(netErr.name==='TimeoutError'||netErr.name==='AbortError');
         if(isTimeout){
