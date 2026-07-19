@@ -1778,7 +1778,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.39', BUILD_ID='2026-07-19-signup-notif-fix';
+const APP_VERSION='4.9.40', BUILD_ID='2026-07-19-app-prompt';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -2146,7 +2146,7 @@ function buildPeerActions(body){
   bl.onclick=()=>{const nowBlocked=toggleBlock(peer);toast(nowBlocked?'Пользователь заблокирован':'Разблокирован');buildSubRefresh();try{renderChats();}catch(e){}};
   body.appendChild(bl);
   const rp=el('<button class="kill sub-btn" style="text-align:center;margin-top:8px">⚠️ Пожаловаться</button>');
-  rp.onclick=async()=>{const reason=window.prompt('Причина жалобы (необязательно):','спам / оскорбления / мошенничество');if(reason===null)return;rp.disabled=true;const ok=await reportUser(peer,reason||'');rp.disabled=false;toast(ok?'Жалоба отправлена на модерацию':'Не удалось отправить — проверьте связь');};
+  rp.onclick=async()=>{const reason=await appPrompt('Что не так? Это увидит только модерация.','',{title:'Пожаловаться',placeholder:'спам / оскорбления / мошенничество',okText:'Отправить',multiline:true,maxLength:600});if(reason===null)return;rp.disabled=true;const ok=await reportUser(peer,reason||'');rp.disabled=false;toast(ok?'Жалоба отправлена на модерацию':'Не удалось отправить — проверьте связь');};
   body.appendChild(rp);
   body.appendChild(el('<div class="note" style="margin-top:10px">🚫 Блокировка скрывает сообщения и звонки этого пользователя у вас. ⚠️ Жалоба уходит на модерацию (анонимно для собеседника).</div>'));
 }
@@ -3518,10 +3518,10 @@ function groupUpdateBroadcast(gid,patch){
   const g=db().chats[gid];if(!g)return;
   g.members.filter(x=>x!==me.id).forEach(uidT=>emit('group:update',Object.assign({to:uidT,gid,by:me.id},patch)));
 }
-function renameGroup(){
+async function renameGroup(){
   if(!(current&&current.group))return;const d=db();const g=d.chats[current.id];if(!g)return;
   if(!isGroupAdmin(g)){toast('Переименовать может только администратор');return;}
-  let nm=null;try{nm=window.prompt('Название группы:',g.name);}catch(e){return;}
+  let nm=await appPrompt('',g.name,{title:'Название группы',okText:'Сохранить',maxLength:60});
   if(nm===null)return;nm=nm.trim();if(!nm)return;
   g.name=nm;save(d);groupUpdateBroadcast(g.id,{name:nm});
   current.name=nm;$('#convName').textContent=nm;
@@ -3921,9 +3921,9 @@ function focusHit(){const r=_searchHits[_searchIdx];if(!r)return;r.scrollIntoVie
 function searchNav(d){if(!_searchHits.length)return;_searchIdx=(_searchIdx+d+_searchHits.length)%_searchHits.length;focusHit();}
 
 /* ----- редактирование / удаление ----- */
-function editMessage(m){
+async function editMessage(m){
   if(!current||m.from!==me.id||m.deleted)return;
-  let nt=null;try{nt=window.prompt('Изменить сообщение:',m.text||'');}catch(e){return;}
+  let nt=await appPrompt('',m.text||'',{title:'Изменить сообщение',okText:'Сохранить',multiline:true});
   if(nt===null)return;nt=nt.trim();if(!nt||nt===m.text)return;
   const d=db();const c=d.chats[curChatKey()];if(!c)return;const mm=c.messages.find(x=>x.id===m.id);if(!mm)return;
   mm.text=nt;mm.edited=true;save(d);renderMessages();
@@ -5367,9 +5367,9 @@ function importDeviceContacts(){
   //    Универсальный путь: ручная вставка номеров (всегда работает) + установка приложения.
   openPasteContacts();
 }
-function renameContact(uid){
+async function renameContact(uid){
   const u=userById(uid);if(!u)return;
-  let nm=null;try{nm=window.prompt('Имя контакта:',contactDisplayName(u));}catch(e){return;}
+  let nm=await appPrompt('',contactDisplayName(u),{title:'Имя контакта',okText:'Сохранить',maxLength:60});
   if(nm===null)return;bookSet(uid,{name:(nm.trim()||u.name)});renderContacts();toast('Контакт обновлён');
 }
 function renderContacts(){
@@ -5674,9 +5674,9 @@ function renderSocial(){
   });
   wrap.appendChild(list);
 }
-function connectSocial(s){
+async function connectSocial(s){
   const cfg=loadSocialCfg();const cur=cfg.links[s.id]||'';
-  let v=window.prompt('Ссылка на вашу страницу в «'+s.name+'»\nНапример: '+s.base+'username', cur||s.base);
+  let v=await appPrompt('Например: '+s.base+'username', cur||s.base,{title:'Ваша страница в «'+s.name+'»',okText:'Сохранить'});
   if(v===null)return;v=String(v).trim();
   if(v&&!/^https?:\/\//i.test(v)){v=s.base+v.replace(/^@/,'');}
   if(v){cfg.links[s.id]=v;}else{delete cfg.links[s.id];}
@@ -5701,9 +5701,9 @@ function renderTgChannels(){
   });
   if(!(cfg.tgChannels||[]).length){box.appendChild(el('<div class="news-empty" style="padding:24px 16px"><div class="ne-ic">📣</div>Добавьте публичные Telegram-каналы — их посты будут показываться здесь, в стиле Zemex.</div>'));}
 }
-function addTgChannel(){
+async function addTgChannel(){
   const cfg=loadSocialCfg();
-  let v=window.prompt('Публичный Telegram-канал (каналов можно несколько — добавляйте по одному):\nнапример  @meduzalive  или  t.me/rian_ru','@');
+  let v=await appPrompt('Каналов можно несколько — добавляйте по одному.\nНапример: @meduzalive или t.me/rian_ru','@',{title:'Публичный Telegram-канал',okText:'Добавить'});
   if(v===null)return;v=tgChannelNameClient(v);if(!v)return;
   if(!cfg.tgChannels.includes(v))cfg.tgChannels.push(v);
   saveSocialCfg();renderTgChannels();openTgChannel(v);
@@ -6434,6 +6434,41 @@ function appConfirm(message,opts){
     okBtn.onclick=()=>finish(true);
     card.querySelector('.cf-cancel').onclick=()=>finish(false);
     back.onclick=e=>{if(e.target===back)finish(false);};
+  });
+}
+
+/* Своё окно ввода вместо браузерного window.prompt(). Тот же вид, что у appConfirm.
+   Браузерное окно в приложении выглядит как чужое — сразу видно «это не приложение, а сайт».
+   Возвращает Promise<string|null>: null = отмена (как у prompt, чтобы вызовы не переписывать). */
+function appPrompt(message,defValue,opts){
+  opts=opts||{};
+  return new Promise(resolve=>{
+    const back=document.createElement('div');back.className='confirm-back';
+    const card=document.createElement('div');card.className='confirm-card';
+    card.innerHTML=(opts.title?'<div class="cf-title"></div>':'')
+      +(message?'<div class="cf-msg"></div>':'')
+      +(opts.multiline?'<textarea class="input cf-input" rows="3" style="resize:none"></textarea>':'<input class="input cf-input" type="text">')
+      +'<div class="cf-acts" style="margin-top:16px"><button class="cf-btn cf-cancel"></button><button class="cf-btn cf-ok"></button></div>';
+    if(opts.title)card.querySelector('.cf-title').textContent=opts.title;
+    if(message)card.querySelector('.cf-msg').textContent=message;
+    const inp=card.querySelector('.cf-input');
+    inp.value=defValue==null?'':String(defValue);
+    if(opts.placeholder)inp.placeholder=opts.placeholder;
+    if(opts.maxLength)inp.maxLength=opts.maxLength;
+    const okBtn=card.querySelector('.cf-ok');okBtn.textContent=opts.okText||'Готово';
+    card.querySelector('.cf-cancel').textContent=opts.cancelText||'Отмена';
+    back.appendChild(card);document.body.appendChild(back);
+    requestAnimationFrame(()=>{back.classList.add('show');try{inp.focus();if(!opts.multiline)inp.select();}catch(e){}});
+    let done=false;
+    const finish=v=>{if(done)return;done=true;try{back.remove();}catch(e){}resolve(v);};
+    okBtn.onclick=()=>finish(inp.value);
+    card.querySelector('.cf-cancel').onclick=()=>finish(null);
+    back.onclick=e=>{if(e.target===back)finish(null);};
+    // Enter — подтвердить (в многострочном поле Enter переносит строку), Esc — отмена
+    inp.addEventListener('keydown',e=>{
+      if(e.key==='Enter'&&!opts.multiline){e.preventDefault();finish(inp.value);}
+      else if(e.key==='Escape'){e.preventDefault();finish(null);}
+    });
   });
 }
 
