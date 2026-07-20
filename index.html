@@ -1803,7 +1803,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.42', BUILD_ID='2026-07-20-backnav';
+const APP_VERSION='4.9.43', BUILD_ID='2026-07-20-native-tapsound';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -6239,7 +6239,10 @@ function buildTapSound(body){
     setTapVolKey(v[0]); tapPreview(); buildSubRefresh(); refreshTapSoundLabel();
   })));
   body.appendChild(wv);
-  body.appendChild(el('<div class="note" style="margin-top:12px">Звук приложения Android всегда относит к «Мультимедиа», поэтому системный ползунок громкости мультимедиа тоже на него влияет — это ограничение самого телефона, обойти его из приложения нельзя. Настройка выше задаёт уровень внутри Zemex, одинаковый на всех устройствах.</div>'));
+  {const native=!!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView&&window.__OLESYA_TAPSOUND__);
+   body.appendChild(el('<div class="note" style="margin-top:12px">'+(native
+     ?'Громкость одинакова на всех устройствах и не зависит от ползунка «Мультимедиа» — звук идёт через системный канал.'
+     :'В браузере звук идёт через канал «Мультимедиа», поэтому его громкость следует за системным ползунком мультимедиа. В установленном приложении такой зависимости нет.')+'</div>'));}
 }
 function buildChatBg(body){
   body.appendChild(el('<div class="note">Выберите фон для всех чатов. Можно взять один из 7 готовых стилей или загрузить своё фото.</div>'));
@@ -6615,6 +6618,19 @@ const TAP_VOLS=[['low','Тихо',0.5],['mid','Обычно',0.85],['high','Гр
 function tapVolKey(){try{return localStorage.getItem('om_tapsnd_vol')||'mid';}catch(e){return 'mid';}}
 function setTapVolKey(k){try{localStorage.setItem('om_tapsnd_vol',k);}catch(e){}}
 function tapVol(){const f=TAP_VOLS.find(v=>v[0]===tapVolKey());return f?f[2]:0.85;}
+/* В нативной оболочке звук проигрывает САМА оболочка через системный аудио-канал —
+   тогда он НЕ зависит от ползунка громкости «Мультимедиа». В браузере / на iPhone
+   играем веб-звуком (там зависимость от мультимедиа остаётся — так устроена платформа).
+   Возвращает true, если запрос ушёл оболочке (веб-звук тогда не нужен). */
+function _tapNative(name){
+  // ВАЖНО: только если оболочка ЯВНО заявила поддержку (window.__OLESYA_TAPSOUND__).
+  // Иначе на старых APK без нативного обработчика веб-звук заглушился бы, а нативного нет —
+  // и звук пропал бы совсем. Флаг ставит новая оболочка, старые его не ставят → там играет веб-звук.
+  if(!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView&&window.__OLESYA_TAPSOUND__))return false;
+  const n=name||tapSoundName();
+  if(n!=='none'){ try{ window.ReactNativeWebView.postMessage(JSON.stringify({type:'tapsound',name:n,vol:tapVol()})); }catch(e){} }
+  return true;   // «none» оболочке слать нечего, но и веб-звук глушим
+}
 /* Один тон: тип волны, частота от/до, пиковая громкость, длительность */
 function _tapTone(c,t,type,f0,f1,peak,dur){
   const o=c.createOscillator(), g=c.createGain();
@@ -6641,6 +6657,7 @@ function _tapBeep(name){
 }
 /* Проиграть конкретный звук для примерки в настройках */
 function tapPreview(name){
+  if(_tapNative(name))return;   // в приложении — нативный звук
   try{
     _tapCtx=_tapCtx||new (window.AudioContext||window.webkitAudioContext)();
     if(_tapCtx.state==='suspended'){ _tapCtx.resume().then(()=>{_tapPrime();_tapBeep(name);}).catch(()=>{}); }
@@ -6648,6 +6665,7 @@ function tapPreview(name){
   }catch(e){}
 }
 function tapClick(){
+  if(_tapNative())return;       // в приложении — нативный звук (мимо канала «Мультимедиа»)
   try{
     _tapCtx=_tapCtx||new (window.AudioContext||window.webkitAudioContext)();
     // WebView создаёт контекст «замороженным» — звук играем только ПОСЛЕ resume, иначе он уходит в никуда
