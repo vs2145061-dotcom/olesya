@@ -1407,6 +1407,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
       <div class="setting"><div class="ic">💾</div><div class="lbl"><div class="t">Сохранять медиа на устройство</div><div class="d">Фото, видео, голосовые и документы — в галерею/загрузки (экономит место на сервере)</div></div><div class="switch" id="autosaveToggle"></div></div>
       <div class="setting"><div class="ic">🔔</div><div class="lbl"><div class="t">Уведомления</div><div class="d">Оповещения о сообщениях и звонках, когда приложение свёрнуто</div></div><div class="switch" id="notifToggle"></div></div>
       <div class="setting"><div class="ic">🔉</div><div class="lbl"><div class="t">Звук при нажатии</div><div class="d">Короткий звук при нажатиях на кнопки</div></div><div class="switch on" id="tapSndToggle"></div></div>
+      <div class="setting" id="rowTapSound" style="cursor:pointer"><div class="ic">🎵</div><div class="lbl"><div class="t">Какой звук</div><div class="d" id="stTapSound">Капля</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting"><div class="ic">📳</div><div class="lbl"><div class="t">Виброотклик</div><div class="d">Лёгкая вибрация при нажатиях</div></div><div class="switch on" id="tapVibToggle"></div></div>
       <div class="sec-head">Оформление</div>
       <div class="setting pro-row" id="rowPro" style="cursor:pointer"><div class="ic">✨</div><div class="lbl"><div class="t">Zemex Pro</div><div class="d" id="stPro">оформить подписку</div></div><div style="color:var(--faint)">›</div></div>
@@ -1802,7 +1803,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.41', BUILD_ID='2026-07-19-delivery';
+const APP_VERSION='4.9.42', BUILD_ID='2026-07-20-backnav';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -3173,7 +3174,10 @@ function renderBubble(m){
     // Четыре состояния: часики (не ушло) → одна галочка (сервер принял) →
     // две серые (дошло до собеседника) → две голубые (прочитано).
     const isRead=!!(m.readBy&&m.readBy.length>1);
-    const st=isRead?3:(m.st||0);
+    // У сообщений, написанных ДО появления состояний, поля st нет вовсе. Считать их
+    // «в очереди» нельзя: они давно доставлены, в очередь досылки не попадают, и часики
+    // висели бы на них вечно. Нет поля — значит старое, показываем как отправленное.
+    const st=isRead?3:(m.st===undefined?1:m.st);
     const tk=document.createElement('span');
     tk.className='tick'+(isRead?' read':(st===0?' pending':''));
     const ONE='<path d="m4 12 5 5L20 6"/>';
@@ -4784,7 +4788,7 @@ function sendMediaTo(peerId,obj){
   if(typeof ensureChat==='function'){try{ensureChat(peerId);}catch(e){}}
   const d=db();const k=chatKey(me.id,peerId);
   if(!d.chats[k])d.chats[k]={id:k,members:[me.id,peerId],messages:[]};
-  const m=Object.assign({id:mid(),from:me.id,t:Date.now(),readBy:[me.id]},obj);
+  const m=Object.assign({id:mid(),from:me.id,t:Date.now(),readBy:[me.id],st:0},obj);   // как и в pushMessage
   const peer=userById(peerId);
   const heavy=stashHeavyMedia(m,peerId,!!(peer&&peer.bot));   // крупные кружки/записи — мимо localStorage
   d.chats[k].messages.push(m);save(d);
@@ -5977,6 +5981,7 @@ function refreshSettings(){if(!me)return;
   const s=getSec();const sc=$('#stCalls');if(sc)sc.textContent=s.callsFrom==='contacts'?'Только контакты':'Все';
   const sb2=$('#stBlocked');if(sb2)sb2.textContent=String(s.blocked.length);
   const swhp=$('#swHidePhone');if(swhp)swhp.classList.toggle('on',!!s.hidePhone);
+  refreshTapSoundLabel();
   const swm=$('#swMic');if(swm)swm.classList.toggle('on',micAllowed());
   const swc=$('#swCam');if(swc)swc.classList.toggle('on',camAllowed());
   const lw=$('#stLockWhen');if(lw)lw.textContent=lockWhenLabel();
@@ -6211,6 +6216,31 @@ function buildTheme(body){
   [['auto','🌗 Авто · как в системе'],['light','☀️ Светлая (день)'],['dark','🌙 Тёмная (ночь)']]
     .forEach(o=>w.appendChild(optRow(o[1],cur===o[0],()=>{setThemePref(o[0]);buildSubRefresh();})));
   body.appendChild(w);}
+/* Подпись в строке настроек. Обновляем напрямую, а не через refreshSettings():
+   тот выходит сразу, если пользователь ещё не вошёл, и не вызывается при смене громкости. */
+function refreshTapSoundLabel(){
+  const sts=$('#stTapSound'); if(!sts)return;
+  const v=TAP_VOLS.find(x=>x[0]===tapVolKey());
+  sts.textContent=tapSoundTitle()+' · '+(v?v[1].toLowerCase():'обычно');
+}
+function buildTapSound(body){
+  body.appendChild(el('<div class="note">Выберите звук — он проигрывается сразу, можно примерить. Громкость задаётся отдельно.</div>'));
+  const cur=tapSoundName();
+  const w=el('<div></div>');
+  TAP_SOUNDS.forEach(s=>w.appendChild(optRow(s[1]+' <span style="color:var(--faint)">· '+s[2]+'</span>',cur===s[0],()=>{
+    setTapSoundName(s[0]); if(!tapSoundOn()&&s[0]!=='none'){setTapSound(true);const ts=$('#tapSndToggle');if(ts)ts.classList.add('on');}
+    tapPreview(s[0]); buildSubRefresh(); refreshTapSoundLabel();
+  })));
+  body.appendChild(w);
+  body.appendChild(el('<div class="sec-head">Громкость</div>'));
+  const curV=tapVolKey();
+  const wv=el('<div></div>');
+  TAP_VOLS.forEach(v=>wv.appendChild(optRow(v[1],curV===v[0],()=>{
+    setTapVolKey(v[0]); tapPreview(); buildSubRefresh(); refreshTapSoundLabel();
+  })));
+  body.appendChild(wv);
+  body.appendChild(el('<div class="note" style="margin-top:12px">Звук приложения Android всегда относит к «Мультимедиа», поэтому системный ползунок громкости мультимедиа тоже на него влияет — это ограничение самого телефона, обойти его из приложения нельзя. Настройка выше задаёт уровень внутри Zemex, одинаковый на всех устройствах.</div>'));
+}
 function buildChatBg(body){
   body.appendChild(el('<div class="note">Выберите фон для всех чатов. Можно взять один из 7 готовых стилей или загрузить своё фото.</div>'));
   const cfg=chatBgCfg();
@@ -6266,6 +6296,7 @@ $('#rowBlocked').onclick=()=>openSub('Заблокированные',buildBlock
 {const _rl=$('#rowLockOpts');if(_rl)_rl.onclick=()=>openSub('Блокировка приложения',buildLockOptions);}
 $('#rowLang').onclick=()=>openSub('Мой язык',buildLang);
 $('#rowTheme').onclick=()=>openSub('Внешний вид',buildTheme);
+{const r=$('#rowTapSound'); if(r)r.onclick=()=>openSub('Звук нажатия',buildTapSound);}
 $('#rowChatBg').onclick=()=>openSub('Фон чатов',buildChatBg);
 $('#btnTheme').onclick=toggleThemeQuick;
 $('#bgFileInput').onchange=e=>{const f=e.target.files[0]; loadChatBgPhoto(f); e.target.value='';};
@@ -6428,21 +6459,84 @@ $('#searchInput').addEventListener('input',renderChats);
 function refreshIfPresence(){if($('#scrChats')&&!$('#scrChats').classList.contains('hidden'))renderChats();if(current){const u=userById(current.id);if(u){current=u;updateConvStatus();const dot=$('#convAvatar .dot');if(dot)dot.classList.toggle('on',u.online);}}}
 setInterval(()=>{if(me){const d=db();if(d.users[me.id]){d.users[me.id].lastSeen=Date.now();save(d);}refreshIfPresence();}},15000);
 
-/* ===== История экранов: аппаратная/жестовая/браузерная «назад» закрывает подэкран, а не выходит из приложения ===== */
-let _omPopping=false;
+/* ===== История экранов И ШТОРОК: аппаратная/жестовая «назад» закрывает верхний слой
+   (диалог → шторка → подэкран), а не выходит из приложения.
+   Полноэкранные .screen писались в историю и раньше; шторки/модалки — нет, поэтому «назад»
+   поверх них сворачивал приложение. Теперь и они добавляют запись в историю (через слежение
+   за классом .show), и «назад» закрывает именно их. ===== */
+let _omPopping=false;      // идёт наша обработка «назад» — историю повторно не трогаем
+let _omSelfBack=0;         // сколько history.back() мы вызвали сами (их popstate игнорируем)
 const OM_ROOT_SCREENS=['scrChats','scrHome'];
+const _omMicro=(window.queueMicrotask||function(f){Promise.resolve().then(f);});
+// Шторки/модалки снизу вверх по «глубине»: subSheet всегда поверх настроек и т.п.
+const OM_OVERLAYS=['settingsSheet','groupSheet','readerSheet','fwdSheet','newChatModal',
+  'newGroupModal','newChannelModal','pasteSheet','langSheet','aiImgSheet','vnShapeSheet',
+  'vnoteOverlay','subSheet'];
+const _omShown=new Set();
 function omPushScreen(id){
   if(_omPopping||!me)return;                       // при возврате и до входа историю не трогаем
   if(OM_ROOT_SCREENS.includes(id))return;          // корневые экраны — без записи
   if(id==='lockScreen')return;                     // экран блокировки в историю НЕ пишем: иначе запись «застревает»
-                                                   // после разблокировки и съедает первое нажатие «Домой»/«Назад»
   try{ if(!(history.state&&history.state.__omScr===id)) history.pushState({__omScr:id},''); }catch(e){}
 }
+/* Закрыть шторку её же штатной кнопкой/уборкой, а не просто снять класс */
+function _omCloseOverlay(id){
+  const q=s=>document.querySelector(s);
+  switch(id){
+    case 'settingsSheet': { const b=q('#btnCloseSettings'); if(b){b.click();return;} break; }
+    case 'subSheet':      { const b=q('#subBack'); if(b){b.click();return;} break; }
+    case 'readerSheet':   { const b=q('#readerClose'); if(b){b.click();return;} break; }
+    case 'fwdSheet':        if(typeof closeFwd==='function'){closeFwd();return;} break;
+    case 'newChatModal':    if(typeof closeModal==='function'){closeModal();return;} break;
+    case 'newGroupModal':   if(typeof closeGroupModal==='function'){closeGroupModal();return;} break;
+    case 'newChannelModal': if(typeof closeChannelModal==='function'){closeChannelModal();return;} break;
+    case 'groupSheet':      if(typeof closeGroupInfo==='function'){closeGroupInfo();return;} break;
+    case 'pasteSheet':      if(typeof closePasteContacts==='function'){closePasteContacts();return;} break;
+    case 'aiImgSheet':      if(typeof closeAiImg==='function'){closeAiImg();return;} break;
+    case 'vnShapeSheet':    if(typeof closeVnoteShapePicker==='function'){closeVnoteShapePicker();return;} break;
+  }
+  const e=document.getElementById(id); if(e)e.classList.remove('show');
+}
+function _omTopOverlay(){
+  const dlg=[...document.querySelectorAll('.confirm-back')].pop();   // диалоги appConfirm/appPrompt — самые верхние
+  if(dlg&&dlg.isConnected)return {dlg:dlg};
+  for(let i=OM_OVERLAYS.length-1;i>=0;i--){ const e=document.getElementById(OM_OVERLAYS[i]); if(e&&e.classList.contains('show'))return {id:OM_OVERLAYS[i]}; }
+  return null;
+}
+/* Слежение за открытием/закрытием: держим историю в синхроне. Открылась шторка → запись в
+   историю; закрыли сами (тап по крестику/фону) → «съедаем» эту запись через тихий history.back(). */
+function _omWatchOverlay(id){
+  const e=document.getElementById(id); if(!e)return;
+  new MutationObserver(()=>{
+    const shown=e.classList.contains('show');
+    if(shown&&!_omShown.has(id)){ _omShown.add(id); if(me&&!_omPopping){ try{history.pushState({__omOv:id},'');}catch(_){} } }
+    else if(!shown&&_omShown.has(id)){ _omShown.delete(id); if(!_omPopping){ _omSelfBack++; try{history.back();}catch(_){ _omSelfBack--; } } }
+  }).observe(e,{attributes:true,attributeFilter:['class']});
+}
+function _omWatchDialogs(){   // диалоги добавляются/удаляются как узлы, а не классом
+  new MutationObserver(muts=>{ muts.forEach(m=>{
+    m.addedNodes.forEach(n=>{ if(n.nodeType===1&&n.classList&&n.classList.contains('confirm-back')&&me&&!_omPopping){ try{history.pushState({__omDlg:1},'');}catch(_){} } });
+    m.removedNodes.forEach(n=>{ if(n.nodeType===1&&n.classList&&n.classList.contains('confirm-back')&&!_omPopping){ _omSelfBack++; try{history.back();}catch(_){ _omSelfBack--; } } });
+  }); }).observe(document.body,{childList:true});
+}
+try{ OM_OVERLAYS.forEach(_omWatchOverlay); _omWatchDialogs(); }catch(e){}
 window.addEventListener('popstate',()=>{
+  if(_omSelfBack>0){ _omSelfBack--; return; }        // это наш собственный «назад» для уборки записи
   if(!me)return;
+  // 1) верхний слой — диалог или шторка
+  const top=_omTopOverlay();
+  if(top){
+    _omPopping=true;
+    try{
+      if(top.dlg){ const c=top.dlg.querySelector('.cf-cancel'); if(c)c.click(); else top.dlg.remove(); }
+      else { _omShown.delete(top.id); _omCloseOverlay(top.id); }
+    }finally{ _omMicro(function(){ _omPopping=false; }); }   // сброс ПОСЛЕ реакции наблюдателя
+    return;
+  }
+  // 2) подэкран (не корневой)
   const scr=[...document.querySelectorAll('.screen')].find(s=>!s.classList.contains('hidden'));
-  if(!scr||OM_ROOT_SCREENS.includes(scr.id))return; // уже на корне — пусть система решает (выход из приложения)
-  if(scr.id==='lockScreen')return;                  // с экрана блокировки «назад» НЕ уводит — PIN обязателен
+  if(!scr||OM_ROOT_SCREENS.includes(scr.id))return; // корень — пусть система выходит из приложения
+  if(scr.id==='lockScreen')return;                  // с блокировки «назад» НЕ уводит — PIN обязателен
   const bb=scr.querySelector('[data-back]');
   _omPopping=true;
   try{ if(bb)bb.click(); else { current=null; go('scrChats'); try{renderChats();}catch(e){} } }
@@ -6502,26 +6596,55 @@ function _tapUnlock(){ // создать/разморозить контекст
     else _tapPrime();
   }catch(e){}
 }
-function _tapBeep(){
+/* ── Звуки нажатия ──────────────────────────────────────────────────────────
+   ВАЖНО про громкость: Android отдаёт ВЕСЬ звук веб-страницы в канал «Мультимедиа»,
+   поэтому системный ползунок мультимедиа влияет на него всегда — из веб-части это
+   не обойти. Что мы можем и делаем: держать свой уровень умеренным и одинаковым
+   на всех устройствах и дать выбрать громкость внутри приложения. */
+const TAP_SOUNDS=[
+  ['drop','Капля','мягкий ниспадающий тон'],
+  ['click','Клик','сухой короткий щелчок'],
+  ['bubble','Пузырёк','короткий восходящий'],
+  ['soft','Мягкий','приглушённый, почти незаметный'],
+  ['none','Без звука','останется только вибрация']
+];
+function tapSoundName(){try{return localStorage.getItem('om_tapsnd_name')||'drop';}catch(e){return 'drop';}}
+function setTapSoundName(n){try{localStorage.setItem('om_tapsnd_name',n);}catch(e){}}
+function tapSoundTitle(){const f=TAP_SOUNDS.find(s=>s[0]===tapSoundName());return f?f[1]:'Капля';}
+const TAP_VOLS=[['low','Тихо',0.5],['mid','Обычно',0.85],['high','Громче',1.3]];
+function tapVolKey(){try{return localStorage.getItem('om_tapsnd_vol')||'mid';}catch(e){return 'mid';}}
+function setTapVolKey(k){try{localStorage.setItem('om_tapsnd_vol',k);}catch(e){}}
+function tapVol(){const f=TAP_VOLS.find(v=>v[0]===tapVolKey());return f?f[2]:0.85;}
+/* Один тон: тип волны, частота от/до, пиковая громкость, длительность */
+function _tapTone(c,t,type,f0,f1,peak,dur){
+  const o=c.createOscillator(), g=c.createGain();
+  o.type=type;
+  o.frequency.setValueAtTime(f0,t);
+  if(f1&&f1!==f0)o.frequency.exponentialRampToValueAtTime(f1,t+dur);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002,peak*tapVol()),t+Math.min(0.006,dur/3));
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g); g.connect(c.destination);
+  o.start(t); o.stop(t+dur+0.02);
+}
+function _tapBeep(name){
   try{
-    const c=_tapCtx, t=c.currentTime+0.02;
-    // фирменный звук Zemex — мягкая «капля»: ниспадающий тон + короткий верхний «тик» для чёткости
-    const o=c.createOscillator(), g=c.createGain();
-    o.type='sine';
-    o.frequency.setValueAtTime(1250,t);
-    o.frequency.exponentialRampToValueAtTime(620,t+0.075);
-    g.gain.setValueAtTime(0.0001,t);
-    g.gain.exponentialRampToValueAtTime(0.585,t+0.006);   // ещё −10% по фидбеку (было 0.65)
-    g.gain.exponentialRampToValueAtTime(0.0001,t+0.085);
-    o.connect(g); g.connect(c.destination);
-    o.start(t); o.stop(t+0.1);
-    const o2=c.createOscillator(), g2=c.createGain();
-    o2.type='triangle'; o2.frequency.setValueAtTime(2400,t);
-    g2.gain.setValueAtTime(0.0001,t);
-    g2.gain.exponentialRampToValueAtTime(0.162,t+0.003);   // −10% (было 0.18)
-    g2.gain.exponentialRampToValueAtTime(0.0001,t+0.03);
-    o2.connect(g2); g2.connect(c.destination);
-    o2.start(t); o2.stop(t+0.04);
+    const c=_tapCtx, t=c.currentTime+0.02, n=name||tapSoundName();
+    if(n==='none')return;
+    if(n==='click'){ _tapTone(c,t,'square',1800,1500,0.10,0.022); _tapTone(c,t,'sine',700,520,0.15,0.035); return; }
+    if(n==='bubble'){ _tapTone(c,t,'sine',480,1150,0.28,0.075); return; }
+    if(n==='soft'){ _tapTone(c,t,'sine',520,380,0.18,0.10); return; }
+    // «Капля» — прежний фирменный звук, но тише: было 0.585, стало умереннее
+    _tapTone(c,t,'sine',1250,620,0.40,0.085);
+    _tapTone(c,t,'triangle',2400,2400,0.11,0.03);
+  }catch(e){}
+}
+/* Проиграть конкретный звук для примерки в настройках */
+function tapPreview(name){
+  try{
+    _tapCtx=_tapCtx||new (window.AudioContext||window.webkitAudioContext)();
+    if(_tapCtx.state==='suspended'){ _tapCtx.resume().then(()=>{_tapPrime();_tapBeep(name);}).catch(()=>{}); }
+    else _tapBeep(name);
   }catch(e){}
 }
 function tapClick(){
