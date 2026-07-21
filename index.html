@@ -909,6 +909,14 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 .o-book {background:radial-gradient(120% 120% at 32% 24%, #C98BFF, #6C7BFF 72%)}
 .o-fav  {background:radial-gradient(120% 120% at 32% 24%, #FFD27A, #F0883E 72%)}
 .o-brand{background:radial-gradient(120% 120% at 32% 24%, #8A6CFF, #5A41FF 72%)}
+/* Подсказка iOS: добавить на экран «Домой» (чтобы открывалось как приложение, без адресной строки Safari) */
+.a2hs-banner{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:11000;
+  background:var(--surface);border:1px solid var(--line-soft);border-radius:16px;padding:13px 14px;display:flex;gap:10px;align-items:flex-start;
+  box-shadow:0 20px 48px -18px rgba(0,0,0,.6);transform:translateY(140%);opacity:0;transition:transform .28s,opacity .28s}
+.a2hs-banner.show{transform:translateY(0);opacity:1}
+.a2hs-banner .a2hs-txt{flex:1;font-size:13.5px;line-height:1.5;color:var(--text)}
+.a2hs-banner .a2hs-txt b{color:var(--primary)}
+.a2hs-banner .a2hs-x{flex:0 0 auto;background:var(--raised);border:none;color:var(--muted);width:26px;height:26px;border-radius:8px;font-size:14px;cursor:pointer}
 
 /* Карточки хаба — глянцевые объёмные «кнопки» */
 .home-card{border:1px solid rgba(255,255,255,.18);
@@ -1805,7 +1813,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.44', BUILD_ID='2026-07-20-back-to-home';
+const APP_VERSION='4.9.45', BUILD_ID='2026-07-21-home+ioskbd+a2hs';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -6428,7 +6436,22 @@ let pinBuffer='',pinMode='check',pinFirst='',pinFails=0,pinLockUntil=0,pinLockIn
 function enterPinSetup(){pinMode='set1';pinBuffer='';$('#lockTitle').textContent='Придумайте PIN-код';renderPinDots();go('lockScreen');}
 function startPinLock(){pinLockUntil=Date.now()+30000;logSec('⛔ 5 неверных PIN — блокировка ввода на 30 секунд');clearInterval(pinLockInt);
   const upd=()=>{const left=Math.ceil((pinLockUntil-Date.now())/1000);if(left<=0){clearInterval(pinLockInt);$('#lockTitle').textContent='Введите PIN-код';pinFails=0;}else{$('#lockTitle').textContent='Слишком много попыток · '+left+' с';}};upd();pinLockInt=setInterval(upd,1000);}
-document.addEventListener('visibilitychange',()=>{if(!me)return;if(document.hidden){hidAt=Date.now();}else{let c={};try{c=lockCfg();}catch(e){}const thr=(c&&c.autolock!=null)?c.autolock:60000;if(c&&c.pin&&hidAt&&thr>=0&&Date.now()-hidAt>=thr)maybeLock();}});
+function _omInCall(){ try{ if(typeof callPeerId!=='undefined'&&callPeerId)return true; if(typeof gcall!=='undefined'&&gcall)return true; const g=document.getElementById('gcallScreen'); if(g&&!g.classList.contains('hidden'))return true; }catch(e){} return false; }
+document.addEventListener('visibilitychange',()=>{
+  if(!me)return;
+  if(document.hidden){hidAt=Date.now();return;}
+  // Вернулись из фона.
+  let c={};try{c=lockCfg();}catch(e){}
+  const thr=(c&&c.autolock!=null)?c.autolock:60000;
+  if(c&&c.pin&&hidAt&&thr>=0&&Date.now()-hidAt>=thr){ maybeLock(); return; }   // покажем PIN → после ввода Главная
+  // Без блокировки приложение при возврате из фона открывается на ГЛАВНОЙ, а не на последнем
+  // экране (например, на списке чатов). НЕ трогаем: активный звонок, экран блокировки и
+  // открытую переписку (там логично остаться), и саму Главную.
+  if(hidAt && !_omInCall()){
+    const vis=[...document.querySelectorAll('.screen')].find(s=>!s.classList.contains('hidden'));
+    if(vis && vis.id!=='lockScreen' && vis.id!=='scrHome' && vis.id!=='scrConv'){ current=null; try{go('scrHome');renderHome();}catch(e){} }
+  }
+});
 function maybeLock(){const c=lockCfg();if(c.pin){pinMode='check';pinBuffer='';$('#lockTitle').textContent='Введите PIN-код';renderPinDots();go('lockScreen');tryBiometricUnlock();}}
 /* Биометрия (Face ID/отпечаток) — только в нативной обёртке, как быстрая замена PIN. */
 function bioAvailable(){try{const c=lockCfg();return !!(c&&c.pin&&c.bio!==false&&window.__OLESYA_NATIVE__&&window.ReactNativeWebView);}catch(e){return false;}}   // биометрия ВКЛЮЧЕНА по умолчанию (пока явно не выключили)
@@ -6437,7 +6460,7 @@ function tryBiometricUnlock(){
   if(!bioAvailable())return;
   try{ window.ReactNativeWebView.postMessage(JSON.stringify({type:'biometric-unlock'})); }catch(e){}
 }
-window.olesyaBiometricResult=function(ok){ if(pinMode!=='check')return; if(ok){pinFails=0;pinBuffer='';go('scrChats');} };
+window.olesyaBiometricResult=function(ok){ if(pinMode!=='check')return; if(ok){pinFails=0;pinBuffer='';current=null;go('scrHome');} };  // после разблокировки — Главная, а не чаты
 {const _lb=$('#lockBio'); if(_lb)_lb.onclick=()=>tryBiometricUnlock();}
 function renderPinDots(){const w=$('#pinDots');w.innerHTML='';for(let i=0;i<4;i++){const d=document.createElement('div');d.className='pd'+(i<pinBuffer.length?' f':'');w.appendChild(d);}}
 (function buildKeypad(){const k=$('#keypad');['1','2','3','4','5','6','7','8','9','','0','⌫'].forEach(d=>{const b=document.createElement('button');b.className='key'+(d===''||d==='⌫'?' fn':'');b.textContent=d;if(d==='')b.style.visibility='hidden';b.onclick=()=>pinPress(d);k.appendChild(b);});})();
@@ -6454,7 +6477,7 @@ function handlePin(){
     else{toast('PIN не совпал, попробуйте снова');pinMode='set1';pinBuffer='';$('#lockTitle').textContent='Придумайте PIN-код';renderPinDots();}
   }else{
     const c=lockCfg();
-    if(pinBuffer===c.pin){pinFails=0;go('scrChats');}
+    if(pinBuffer===c.pin){pinFails=0;current=null;go('scrHome');}   // после разблокировки — Главная, а не чаты
     else{pinFails++;pinBuffer='';renderPinDots();$('#pinDots').animate([{transform:'translateX(-8px)'},{transform:'translateX(8px)'},{transform:'translateX(0)'}],{duration:300});
       if(pinFails>=5){startPinLock();}else{toast('Неверный PIN ('+pinFails+'/5)');}}
   }
@@ -6854,8 +6877,20 @@ function fitViewport(){
   // клавиатурой). На экранах входа/регистрации это давало резкий скачок страницы вверх —
   // там оставляем обычную высоту, браузер сам аккуратно подкрутит к полю ввода.
   const conv = $('#scrConv') && !$('#scrConv').classList.contains('hidden');
-  if(conv && mobile && window.visualViewport){ ph.style.height=Math.round(window.visualViewport.height)+'px'; }
-  else { ph.style.height=''; }
+  if(conv && mobile && window.visualViewport){
+    const vv=window.visualViewport;
+    ph.style.height=Math.round(vv.height)+'px';
+    // iOS/Safari при открытии клавиатуры НЕ ужимает страницу, а прокручивает её вверх —
+    // появляется visualViewport.offsetTop, и между полем ввода и клавиатурой зияет «дыра».
+    // Компенсируем сдвигом приложения на этот offset и не даём странице уехать.
+    // На Android (нативная оболочка сама ресайзит) offsetTop=0 → transform пустой, поведение прежнее.
+    const off=Math.round(vv.offsetTop||0);
+    ph.style.transform = off ? ('translateY('+off+'px)') : '';
+    if(off){ try{ window.scrollTo(0,0); }catch(e){} }
+  } else {
+    ph.style.height='';
+    ph.style.transform='';
+  }
 }
 if(window.visualViewport){
   window.visualViewport.addEventListener('resize',fitViewport);
@@ -6867,6 +6902,23 @@ window.addEventListener('orientationchange',()=>setTimeout(fitViewport,250));
   ['#msgInput','#contactsSearch','#searchInput','#contactSearch','#gifQuery'].forEach(sel=>{const el=$(sel);if(el)el.addEventListener('focus',onFocus);});
 })();
 
+/* Подсказка «на экран Домой» для iOS-Safari. Адресную строку Safari скрыть из кода нельзя —
+   вид приложения без неё даёт ТОЛЬКО запуск с иконки на экране «Домой» (там работает display:standalone).
+   Показываем разовую ненавязчивую плашку тем, кто открыл сайт в Safari (не с иконки). */
+function isStandaloneApp(){ try{ return (window.navigator.standalone===true) || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || !!window.__OLESYA_NATIVE__; }catch(e){ return false; } }
+function isIOSDevice(){ return /iPhone|iPad|iPod/i.test(navigator.userAgent||'') || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }
+function maybeShowIosInstallHint(){
+  try{
+    if(!isIOSDevice() || isStandaloneApp()) return;      // не iOS, или уже запущено как приложение
+    if(localStorage.getItem('om_a2hs_ios')==='1') return; // уже закрывали
+    if(document.querySelector('.a2hs-banner')) return;
+    const b=document.createElement('div'); b.className='a2hs-banner';
+    b.innerHTML='<div class="a2hs-txt">Чтобы мессенджер Zemex открывался как приложение — добавьте его на экран «Домой»: внизу Safari нажмите <b>«Поделиться»</b>, затем <b>«На экран Домой»</b>.</div><button class="a2hs-x" aria-label="Закрыть">✕</button>';
+    document.body.appendChild(b);
+    requestAnimationFrame(()=>b.classList.add('show'));
+    b.querySelector('.a2hs-x').onclick=()=>{ try{localStorage.setItem('om_a2hs_ios','1');}catch(e){} b.classList.remove('show'); setTimeout(()=>{try{b.remove();}catch(e){}},300); };
+  }catch(e){}
+}
 /* ================== boot ================== */
 
 let sessionRestoreAuthFailed=false;
@@ -6908,6 +6960,7 @@ async function checkForUpdate(silent){
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'){ const _s=document.getElementById('scrPhone'); if(!me || (_s&&!_s.classList.contains('hidden'))) checkForUpdate(true); } });
 async function boot(){
   checkForUpdate();
+  setTimeout(maybeShowIosInstallHint, 1200);   // подсказка iOS «на экран Домой» (если открыт в Safari, не с иконки)
   // cloudOn проверяется асинхронно — до ответа сервера работаем локально, но сессию восстанавливаем через /me.
   cloudOn=false;
   if(CFG.provider==='supabase'){try{loadSupabaseSDK();}catch(e){}}
