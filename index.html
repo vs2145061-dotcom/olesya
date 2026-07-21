@@ -300,7 +300,9 @@ h1.brandname{font-family:var(--brand);font-weight:400;font-size:52px;line-height
 .composer{display:flex;flex-direction:column;gap:8px;padding:9px 12px 10px;border-top:1px solid var(--line-soft);background:var(--surface)}
 .composer .ta-row{display:flex;align-items:flex-end;gap:8px}
 .composer .ta{flex:1;min-width:0;background:var(--raised);border:1.5px solid var(--line);border-radius:22px;padding:12px 16px;
-  color:var(--text);font-size:16px;outline:none;resize:none;max-height:130px;min-height:46px;line-height:1.45;transition:border-color .15s,box-shadow .15s}
+  color:var(--text);font-size:16px;outline:none;resize:none;overflow-y:auto;max-height:40vh;min-height:46px;line-height:1.45;
+  scrollbar-width:none;-ms-overflow-style:none;transition:border-color .15s,box-shadow .15s}
+.composer .ta::-webkit-scrollbar{width:0;height:0;display:none}   /* поле растёт под текст, видимой полосы прокрутки нет */
 .composer .ta::placeholder{color:var(--faint)}
 .composer .ta:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(108,123,255,.14)}
 .tool-row{display:flex;align-items:center;gap:9px;padding:0 2px;overflow-x:auto;scrollbar-width:none}
@@ -1803,7 +1805,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.43', BUILD_ID='2026-07-20-native-tapsound';
+const APP_VERSION='4.9.44', BUILD_ID='2026-07-20-back-to-home';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -3403,7 +3405,11 @@ $('#msgInput').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e
 $('#msgInput').addEventListener('input',()=>{autoSize();toggleSendBtn();sendTyping($('#msgInput').value.length>0);updateMentionPop();});
 $('#msgInput').addEventListener('keyup',e=>{if(e.key&&e.key.length===1||e.key==='Backspace'||e.key==='ArrowLeft'||e.key==='ArrowRight')updateMentionPop();});
 $('#msgInput').addEventListener('blur',()=>setTimeout(()=>{const p=$('#mentionPop');if(p)p.classList.remove('show');},180));
-function autoSize(){const t=$('#msgInput');t.style.height='auto';t.style.height=Math.min(t.scrollHeight,120)+'px';}
+function autoSize(){const t=$('#msgInput');t.style.height='auto';
+  // Поле растёт под размер текста (как в других мессенджерах). +3px компенсируют рамку 1.5px
+  // сверху/снизу (box-sizing:border-box) — иначе одна строка давала бы «лишние» 3px прокрутки.
+  // Потолок высоты задаёт CSS (max-height:40vh); за ним прокрутка идёт БЕЗ видимой полосы.
+  t.style.height=(t.scrollHeight+3)+'px';}
 function toggleSendBtn(){const has=$('#msgInput').value.trim().length>0;$('#btnSend').style.display=has?'grid':'none';$('#btnMic').style.display=has?'none':'grid';}
 
 /* typing */
@@ -6469,7 +6475,11 @@ setInterval(()=>{if(me){const d=db();if(d.users[me.id]){d.users[me.id].lastSeen=
    за классом .show), и «назад» закрывает именно их. ===== */
 let _omPopping=false;      // идёт наша обработка «назад» — историю повторно не трогаем
 let _omSelfBack=0;         // сколько history.back() мы вызвали сами (их popstate игнорируем)
-const OM_ROOT_SCREENS=['scrChats','scrHome'];
+// Корень только один — Главная (карточки). Приложение открывается на ней (enterApp→go('scrHome')),
+// и «назад» выходит из приложения ТОЛЬКО с неё. Экран «Чаты» — подэкран Главной (у него и своя
+// кнопка «Домой» ведёт на scrHome), поэтому системная «назад» с чатов должна вести на Главную,
+// а не закрывать приложение. Раньше scrChats ошибочно был в корнях → выход с него.
+const OM_ROOT_SCREENS=['scrHome'];
 const _omMicro=(window.queueMicrotask||function(f){Promise.resolve().then(f);});
 // Шторки/модалки снизу вверх по «глубине»: subSheet всегда поверх настроек и т.п.
 const OM_OVERLAYS=['settingsSheet','groupSheet','readerSheet','fwdSheet','newChatModal',
