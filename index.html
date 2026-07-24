@@ -1817,7 +1817,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.47', BUILD_ID='2026-07-24-video-call-ui';
+const APP_VERSION='4.9.48', BUILD_ID='2026-07-24-gif+ioskbd-revert';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -3373,6 +3373,10 @@ async function transmitMessage(m,peerId,isBot){
         }
       }
     }
+    // GIF/стикер и любое медиа-ССЫЛКОЙ (http/https): dataUrlForCloud остаётся null (это не data:),
+    // и на сервер уходил data_url=null → при получении из ИСТОРИИ (собеседник был офлайн) картинки
+    // не было, только заглушка «GIF». Сохраняем саму ссылку как data_url, чтобы история её несла.
+    if(!dataUrlForCloud){ const _rv=tm.src||tm.audio; if(typeof _rv==='string' && /^https?:\/\//i.test(_rv)) dataUrlForCloud=_rv; }
     // Крупное медиа не ушло в хранилище — лёгкое уведомление по шине, файл подтянется из истории; предупреждаем один раз
     if(leftAsBase64&&!mediaReady&&!_mediaWarned){_mediaWarned=true;
       toast('⚠️ Хранилище медиа временно недоступно — крупные файлы доходят медленнее.');}
@@ -6893,15 +6897,11 @@ function fitViewport(){
   // там оставляем обычную высоту, браузер сам аккуратно подкрутит к полю ввода.
   const conv = $('#scrConv') && !$('#scrConv').classList.contains('hidden');
   if(conv && mobile && window.visualViewport){
-    const vv=window.visualViewport;
-    ph.style.height=Math.round(vv.height)+'px';
-    // iOS/Safari при открытии клавиатуры НЕ ужимает страницу, а прокручивает её вверх —
-    // появляется visualViewport.offsetTop, и между полем ввода и клавиатурой зияет «дыра».
-    // Компенсируем сдвигом приложения на этот offset и не даём странице уехать.
-    // На Android (нативная оболочка сама ресайзит) offsetTop=0 → transform пустой, поведение прежнее.
-    const off=Math.round(vv.offsetTop||0);
-    ph.style.transform = off ? ('translateY('+off+'px)') : '';
-    if(off){ try{ window.scrollTo(0,0); }catch(e){} }
+    // Ужимаем высоту приложения до видимой части экрана над клавиатурой — поле ввода поднимается.
+    // ВАЖНО: НИКАКОГО translateY по offsetTop — на iOS он толкал весь чат вниз («всё съезжало»).
+    // Оставляем только высоту: это стабильно и не ломает раскладку.
+    ph.style.height=Math.round(window.visualViewport.height)+'px';
+    ph.style.transform='';
   } else {
     ph.style.height='';
     ph.style.transform='';
