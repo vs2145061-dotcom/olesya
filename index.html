@@ -1817,7 +1817,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.52', BUILD_ID='2026-07-24-ios-kbd-diag3';
+const APP_VERSION='4.9.53', BUILD_ID='2026-07-24-resume-same-screen';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -6463,13 +6463,9 @@ document.addEventListener('visibilitychange',()=>{
   let c={};try{c=lockCfg();}catch(e){}
   const thr=(c&&c.autolock!=null)?c.autolock:60000;
   if(c&&c.pin&&hidAt&&thr>=0&&Date.now()-hidAt>=thr){ maybeLock(); return; }   // покажем PIN → после ввода Главная
-  // Без блокировки приложение при возврате из фона открывается на ГЛАВНОЙ, а не на последнем
-  // экране (например, на списке чатов). НЕ трогаем: активный звонок, экран блокировки и
-  // открытую переписку (там логично остаться), и саму Главную.
-  if(hidAt && !_omInCall()){
-    const vis=[...document.querySelectorAll('.screen')].find(s=>!s.classList.contains('hidden'));
-    if(vis && vis.id!=='lockScreen' && vis.id!=='scrHome' && vis.id!=='scrConv'){ current=null; try{go('scrHome');renderHome();}catch(e){} }
-  }
+  // Свернули, но НЕ закрыли (процесс жив, DOM сохранён) → ОСТАЁМСЯ на том же экране,
+  // где были в момент сворачивания (требование владельца). Никуда не навигируем.
+  // Полное закрытие приложения = перезагрузка страницы → boot()→enterApp() и так открывает Главную.
 });
 function maybeLock(){const c=lockCfg();if(c.pin){pinMode='check';pinBuffer='';$('#lockTitle').textContent='Введите PIN-код';renderPinDots();go('lockScreen');tryBiometricUnlock();}}
 /* Биометрия (Face ID/отпечаток) — только в нативной обёртке, как быстрая замена PIN. */
