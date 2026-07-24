@@ -1817,7 +1817,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.54', BUILD_ID='2026-07-24-lock-cover+return';
+const APP_VERSION='4.9.55', BUILD_ID='2026-07-24-presence-dots-nolist-rebuild';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -3009,6 +3009,7 @@ function renderChats(){
         <div class="cr-top"><span class="cr-name"></span><span class="cr-time">${last?fmtTime(last.t):''}</span></div>
         <div class="cr-bottom"><span class="cr-msg"></span></div>
       </div>`;
+    row.dataset.peer=peerId;   // метка для точечного обновления точки «онлайн» без пересборки списка
     avDot(row.querySelector('.avatar'),u);
     row.querySelector('.cr-name').textContent=u.name;
     if(isSaved){row.querySelector('.cr-name').textContent='🔖 Избранное';const _a=row.querySelector('.avatar');_a.innerHTML='';_a.textContent='🔖';_a.style.background='linear-gradient(135deg,var(--primary),#8a7bff)';_a.style.color='#fff';}
@@ -6526,7 +6527,18 @@ $('#btnSearch').onclick=()=>{const w=$('#searchWrap');const show=w.style.display
 $('#searchInput').addEventListener('input',renderChats);
 
 /* ================== periodic presence refresh ================== */
-function refreshIfPresence(){if($('#scrChats')&&!$('#scrChats').classList.contains('hidden'))renderChats();if(current){const u=userById(current.id);if(u){current=u;updateConvStatus();const dot=$('#convAvatar .dot');if(dot)dot.classList.toggle('on',u.online);}}}
+// Обновляем ТОЛЬКО точки «онлайн» на уже отрисованных строках чата — без сноса и пересборки
+// всего списка. Раньше каждое событие presence (пинг онлайна любого контакта) вызывало полный
+// renderChats() → список моргал и подлагивал по несколько раз в секунду. Теперь — точечно.
+function refreshPresenceDots(){
+  const list=$('#chatList'); if(!list)return;
+  list.querySelectorAll('.chat-row[data-peer]').forEach(row=>{
+    const u=userById(row.dataset.peer); if(!u)return;
+    const dot=row.querySelector('.avatar .dot');
+    if(dot)dot.classList.toggle('on',!!u.online);
+  });
+}
+function refreshIfPresence(){if($('#scrChats')&&!$('#scrChats').classList.contains('hidden'))refreshPresenceDots();if(current){const u=userById(current.id);if(u){current=u;updateConvStatus();const dot=$('#convAvatar .dot');if(dot)dot.classList.toggle('on',u.online);}}}
 setInterval(()=>{if(me){const d=db();if(d.users[me.id]){d.users[me.id].lastSeen=Date.now();save(d);}refreshIfPresence();}},15000);
 
 /* ===== История экранов И ШТОРОК: аппаратная/жестовая «назад» закрывает верхний слой
