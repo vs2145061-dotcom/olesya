@@ -590,15 +590,19 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 .call-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:60px 24px 44px;position:relative}
 #remoteVideo,#localVideo{position:absolute;object-fit:cover;background:#000}
 #remoteVideo{inset:0;width:100%;height:100%}
-#localVideo{width:108px;height:150px;right:18px;top:54px;border-radius:16px;border:2px solid rgba(255,255,255,.25);z-index:2;transform:scaleX(-1)}
+#localVideo{width:108px;height:150px;right:18px;top:54px;border-radius:16px;border:2px solid rgba(255,255,255,.25);z-index:3;transform:scaleX(-1);touch-action:none;cursor:grab}
+#localVideo.dragging{cursor:grabbing;box-shadow:0 10px 28px -8px rgba(0,0,0,.6)}
 .call-info{text-align:center;z-index:3;display:flex;flex-direction:column;align-items:center;gap:14px}
 .call-info .nm{font-family:var(--disp);font-size:27px;font-weight:600}
 .call-info .stat{color:var(--muted);font-size:15px;font-family:var(--mono);display:flex;align-items:center;gap:7px}
 .call-secure{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--amber);background:rgba(0,0,0,.3);padding:5px 12px;border-radius:20px;z-index:3}
 .call-actions{display:flex;gap:18px;z-index:3}
-/* Видеозвонок: аватар/имя уезжают наверх, чтобы не закрывать видео собеседника */
+/* Видеозвонок: аватар прячем совсем (видно собеседника), имя+время — в левый верхний угол */
 #callScreen.video .call-secure{position:absolute;top:14px;left:0;right:0;z-index:3}
-#callScreen.video .call-info{position:absolute;top:44px;left:0;right:0;gap:6px;z-index:3;text-shadow:0 1px 6px rgba(0,0,0,.5)}
+#callScreen.video #callAvatar{display:none}
+#callScreen.video .call-info{position:absolute;top:50px;left:16px;right:auto;align-items:flex-start;text-align:left;gap:3px;z-index:3;text-shadow:0 1px 6px rgba(0,0,0,.65)}
+#callScreen.video .call-info .nm{font-size:20px}
+#callScreen.video .call-info .stat{font-size:14px}
 #callScreen.video .call-info .avatar.xl{width:52px;height:52px;font-size:21px;box-shadow:0 2px 12px rgba(0,0,0,.4)}
 #callScreen.video .call-info .nm{font-size:18px}
 #callScreen.video .call-info .stat{font-size:13px}
@@ -1813,7 +1817,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.45', BUILD_ID='2026-07-21-home+ioskbd+a2hs';
+const APP_VERSION='4.9.47', BUILD_ID='2026-07-24-video-call-ui';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -2877,8 +2881,12 @@ async function cloudSyncChats(){
   });
   if(changed)save(d);
   try{renderChats();if(typeof renderHome==='function')renderHome();}catch(e){}
-  // подтянуть историю каждого диалога (последние сообщения) — последовательно, чтобы не штурмовать сервер
-  for(const c of list.slice(0,30)){ if(c.peer&&c.peer!==me.id){ try{ await cloudLoadHistory(c.peer); }catch(e){} } }
+  // Подтянуть историю каждого диалога. ВАЖНО: полный ДОБОР (since=0), а не только «новее локального».
+  // Иначе устройство, которое было закрыто в какой-то день, никогда не увидит пропущенные тогда
+  // сообщения (они старше последнего локального → forward-only их не тянет). Так «вчера» и пропадало
+  // на ПК, хотя на сервере и на Android оно есть. Дедуп по id в cloudLoadHistory склеивает без дублей.
+  const FULL_BACKFILL=3650*24*60*60*1000;   // ~10 лет → since уходит в 0 = вся история чата (до 200 сообщений с сервера)
+  for(const c of list.slice(0,30)){ if(c.peer&&c.peer!==me.id){ try{ await cloudLoadHistory(c.peer, FULL_BACKFILL); }catch(e){} } }
   try{renderChats();if(typeof renderHome==='function')renderHome();}catch(e){}
 }
 function ensureChat(peerId,silent){
@@ -3087,7 +3095,13 @@ function addTrBlock(b,m){
   else{blk.innerHTML='<div class="tr-label">🌐 перевод…</div>';
     translate(m.text,target).then(r=>{trDone[m.id]=r?{text:r.text,engine:r.engine,lang:target}:{text:'(не удалось перевести — проверьте интернет)',engine:'—',lang:target};if(current)renderMessages();});}
   b.appendChild(blk);}
+let _convOrigin='scrChats';   // с какого экрана открыли переписку — туда и «назад»
 function openConv(peerId){
+  // «Назад» из переписки должно вести туда, откуда её открыли: Избранное с Главной → назад на Главную,
+  // чат из списка → назад в список. Запоминаем источник и проставляем его кнопке «назад» переписки.
+  const _from=(typeof currentScreenId==='function')?currentScreenId():'scrChats';
+  if(_from && _from!=='scrConv') _convOrigin=_from;
+  const _cb=document.querySelector('#scrConv .conv-head [data-back]'); if(_cb) _cb.dataset.back=_convOrigin;
   ensureChat(peerId,true);
   current=userById(peerId);
   av($('#convAvatar'),current);const dt=document.createElement('span');dt.className='dot'+(current.online?' on':'');$('#convAvatar').appendChild(dt);
@@ -4947,7 +4961,8 @@ async function setupPeer(isCaller,kind){
   try{
     if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){
       localStream=await getMediaWithTimeout({audio:true,video:(kind==='video'&&camAllowed())},15000);
-      if(kind==='video'){const lv=$('#localVideo');if(lv){try{lv.srcObject=localStream;if(lv.play)lv.play().catch(()=>{});}catch(e){}}}
+      if(kind==='video'){const lv=$('#localVideo');if(lv){try{lv.srcObject=localStream;if(lv.play)lv.play().catch(()=>{});}catch(e){}}
+        try{const cs=document.getElementById('callScreen');if(cs)cs.classList.add('video');}catch(e){}}   // видео пошло → верстка видеозвонка (аватар скрыт, имя в углу) гарантированно
     }
   }catch(e){ toast(kind==='video'?'Камера/микрофон недоступны':'Микрофон недоступен'); }
   if(!hasRTC())return; // нет WebRTC (например, jsdom) — выходим, локальное превью уже показано
@@ -4991,7 +5006,7 @@ function startCall(kind){
   if(recState==='recording')pauseRecForCall();
   if(!current)return;callKind=kind;callPeerId=current.id;callIncoming=false;callStart=0;
   av($('#callAvatar'),current);$('#callName').textContent=current.name;$('#callStatus').textContent='Вызов…';
-  go('callScreen');renderCallActions(false);
+  go('callScreen');try{window.__omResetLocalVid&&window.__omResetLocalVid();}catch(e){}renderCallActions(false);
   closePeer();pendingOffer=null;
   emit('call:invite',{to:current.id,from:me.id,name:me.name,kind});
   clearTimeout(callRingTO);
@@ -5015,7 +5030,7 @@ function showIncomingCall(p){
   av($('#callAvatar'),u);$('#callName').textContent=u.name;$('#callStatus').textContent=(p.kind==='video'?'Входящий видеозвонок':'Входящий звонок');
   $('#callSpamBadge').style.display=known?'none':'flex';
   if(recState==='recording'){const _k=recKind;pauseRecForCall();toast(_k==='video'?'🎥 Видео-кружок на паузе — продолжите после звонка':'🎙️ Запись голосового на паузе — продолжите после звонка');}
-  go('callScreen');renderCallActions(true,false,{unknown:!known,from:from});
+  go('callScreen');try{window.__omResetLocalVid&&window.__omResetLocalVid();}catch(e){}renderCallActions(true,false,{unknown:!known,from:from});
   $('#callAvatar').classList.add('incoming-ring');
   if(appHidden())showNotif('📞 Входящий '+(p.kind==='video'?'видеозвонок':'звонок'),(u.name||p.name||'Неизвестный номер'),from);
 }
@@ -6897,6 +6912,42 @@ if(window.visualViewport){
   window.visualViewport.addEventListener('scroll',fitViewport);
 }
 window.addEventListener('orientationchange',()=>setTimeout(fitViewport,250));
+/* Перетаскивание своего видео-окошка во время видеозвонка (как в WhatsApp/FaceTime). */
+(function(){
+  const lv=document.getElementById('localVideo'), scr=document.getElementById('callScreen');
+  if(!lv||!scr)return;
+  let dragging=false, sx=0, sy=0, ox=0, oy=0;
+  const clamp=(v,mn,mx)=>Math.max(mn,Math.min(mx,v));
+  function place(left,top){
+    const pad=8;
+    const maxL=Math.max(pad, scr.clientWidth  - lv.offsetWidth  - pad);
+    const maxT=Math.max(pad, scr.clientHeight - lv.offsetHeight - pad);
+    lv.style.left=clamp(left,pad,maxL)+'px';
+    lv.style.top =clamp(top, pad,maxT)+'px';
+    lv.style.right='auto'; lv.style.bottom='auto';
+  }
+  function down(e){
+    const r=lv.getBoundingClientRect(), sr=scr.getBoundingClientRect();
+    place(r.left-sr.left, r.top-sr.top);           // зафиксировать текущее место в left/top до перетаскивания
+    dragging=true; sx=e.clientX; sy=e.clientY;
+    ox=parseFloat(lv.style.left)||0; oy=parseFloat(lv.style.top)||0;
+    lv.classList.add('dragging'); lv.style.transition='none';
+    try{ lv.setPointerCapture(e.pointerId); }catch(_){}
+    try{ e.preventDefault(); }catch(_){}
+  }
+  function move(e){
+    if(!dragging)return;
+    place(ox+(e.clientX-sx), oy+(e.clientY-sy));
+    try{ e.preventDefault(); }catch(_){}
+  }
+  function up(){ if(!dragging)return; dragging=false; lv.classList.remove('dragging'); lv.style.transition=''; }
+  lv.addEventListener('pointerdown',down);
+  lv.addEventListener('pointermove',move);
+  lv.addEventListener('pointerup',up);
+  lv.addEventListener('pointercancel',up);
+  // Сброс к исходному углу при каждом новом звонке — чтобы окошко не «застревало» от прошлого раза.
+  window.__omResetLocalVid=function(){ lv.style.left='';lv.style.top='';lv.style.right='';lv.style.bottom='';lv.classList.remove('dragging'); };
+})();
 (function(){
   const onFocus=()=>{ fitViewport(); setTimeout(()=>{try{const msgs=$('#msgs');if(msgs)msgs.scrollTop=msgs.scrollHeight;}catch(e){}},140); };
   ['#msgInput','#contactsSearch','#searchInput','#contactSearch','#gifQuery'].forEach(sel=>{const el=$(sel);if(el)el.addEventListener('focus',onFocus);});
