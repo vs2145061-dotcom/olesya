@@ -1817,7 +1817,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.50', BUILD_ID='2026-07-24-ios-kbd-diag';
+const APP_VERSION='4.9.51', BUILD_ID='2026-07-24-ios-kbd-diag2';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -6908,18 +6908,21 @@ function fitViewport(){
   }
   // ⚠️ ВРЕМЕННЫЙ ЭКРАННЫЙ ЗАМЕР (диагностика iOS-клавиатуры). УБРАТЬ после снятия цифр!
   try{
+    var vv=window.visualViewport||{};
+    var h=Math.round(vv.height||0);
+    if(h){ window._vvMin=Math.min(window._vvMin||1e9,h); window._vvMax=Math.max(window._vvMax||0,h); }
     var d=document.getElementById('vvdbg');
     if(!d){ d=document.createElement('div'); d.id='vvdbg';
-      d.style.cssText='position:fixed;top:0;left:0;z-index:2147483647;background:rgba(0,0,0,.82);color:#0f0;font:11px/1.35 monospace;padding:3px 6px;white-space:pre;pointer-events:none;border-bottom-right-radius:6px';
+      d.style.cssText='position:fixed;top:0;left:0;z-index:2147483647;background:rgba(0,0,0,.85);color:#0f0;font:12px/1.4 monospace;padding:4px 7px;white-space:pre;pointer-events:none;border-bottom-right-radius:8px';
       document.body.appendChild(d); }
-    var vv=window.visualViewport||{};
     d.textContent =
-      'iH='+window.innerHeight+' vvH='+Math.round(vv.height||0)+' vvT='+Math.round(vv.offsetTop||0)+'\n'+
-      'sY='+Math.round(window.scrollY||window.pageYOffset||0)+' phH='+ph.offsetHeight+' cH='+document.documentElement.clientHeight;
+      'iH='+window.innerHeight+' vvH='+h+' vvT='+Math.round(vv.offsetTop||0)+' rz='+(window._vvRz||0)+'\n'+
+      'sY='+Math.round(window.scrollY||window.pageYOffset||0)+' phH='+ph.offsetHeight+' cH='+document.documentElement.clientHeight+'\n'+
+      'MIN='+(window._vvMin||0)+'  MAX='+(window._vvMax||0);
   }catch(e){}
 }
 if(window.visualViewport){
-  window.visualViewport.addEventListener('resize',fitViewport);
+  window.visualViewport.addEventListener('resize',function(){ window._vvRz=(window._vvRz||0)+1; fitViewport(); });
   window.visualViewport.addEventListener('scroll',fitViewport);
 }
 window.addEventListener('orientationchange',()=>setTimeout(fitViewport,250));
