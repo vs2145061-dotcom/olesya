@@ -1817,7 +1817,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.53', BUILD_ID='2026-07-24-resume-same-screen';
+const APP_VERSION='4.9.54', BUILD_ID='2026-07-24-lock-cover+return';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -6451,23 +6451,46 @@ $('#lockToggle').onclick=function(){
   else{enterPinSetup();}
 };
 function refreshLockToggle(){const c=lockCfg();$('#lockToggle').classList.toggle('on',!!c.pin);}
-let pinBuffer='',pinMode='check',pinFirst='',pinFails=0,pinLockUntil=0,pinLockInt=null,hidAt=0;
+let pinBuffer='',pinMode='check',pinFirst='',pinFails=0,pinLockUntil=0,pinLockInt=null,hidAt=0,_preLockScreen='';
+// Куда вернуться после разблокировки (экран, на котором были до блокировки). Возврат вместо Главной.
+function _unlockReturn(){
+  let dst=_preLockScreen||'scrHome';
+  if(dst==='scrConv' && !current) dst='scrHome';   // переписка потеряна — безопасно на Главную
+  if(dst!=='scrConv') current=null;
+  try{go(dst);}catch(e){try{go('scrHome');}catch(_){}}
+  _preLockScreen='';
+}
 function enterPinSetup(){pinMode='set1';pinBuffer='';$('#lockTitle').textContent='Придумайте PIN-код';renderPinDots();go('lockScreen');}
 function startPinLock(){pinLockUntil=Date.now()+30000;logSec('⛔ 5 неверных PIN — блокировка ввода на 30 секунд');clearInterval(pinLockInt);
   const upd=()=>{const left=Math.ceil((pinLockUntil-Date.now())/1000);if(left<=0){clearInterval(pinLockInt);$('#lockTitle').textContent='Введите PIN-код';pinFails=0;}else{$('#lockTitle').textContent='Слишком много попыток · '+left+' с';}};upd();pinLockInt=setInterval(upd,1000);}
 function _omInCall(){ try{ if(typeof callPeerId!=='undefined'&&callPeerId)return true; if(typeof gcall!=='undefined'&&gcall)return true; const g=document.getElementById('gcallScreen'); if(g&&!g.classList.contains('hidden'))return true; }catch(e){} return false; }
 document.addEventListener('visibilitychange',()=>{
   if(!me)return;
-  if(document.hidden){hidAt=Date.now();return;}
-  // Вернулись из фона.
   let c={};try{c=lockCfg();}catch(e){}
+  if(document.hidden){
+    hidAt=Date.now();
+    // Приватность: если задан PIN и мы НЕ в звонке — сразу закрываем контент экраном
+    // блокировки, запомнив, где были. Тогда и в списке недавних приложений Android, и на
+    // первом кадре при возврате виден замок, а не открытый чат (раньше чат «просвечивал»).
+    if(c&&c.pin&&!_omInCall()){
+      const cur=currentScreenId();
+      if(cur!=='lockScreen') _preLockScreen=cur;
+      pinMode='check'; pinBuffer='';
+      try{$('#lockTitle').textContent='Введите PIN-код';renderPinDots();}catch(e){}
+      go('lockScreen');
+    }
+    return;
+  }
+  // Вернулись из фона.
   const thr=(c&&c.autolock!=null)?c.autolock:60000;
-  if(c&&c.pin&&hidAt&&thr>=0&&Date.now()-hidAt>=thr){ maybeLock(); return; }   // покажем PIN → после ввода Главная
-  // Свернули, но НЕ закрыли (процесс жив, DOM сохранён) → ОСТАЁМСЯ на том же экране,
-  // где были в момент сворачивания (требование владельца). Никуда не навигируем.
-  // Полное закрытие приложения = перезагрузка страницы → boot()→enterApp() и так открывает Главную.
+  if(c&&c.pin&&!_omInCall()){
+    if(hidAt && thr>=0 && Date.now()-hidAt>=thr){ maybeLock(); return; }   // прошёл порог → требуем PIN/отпечаток
+    _unlockReturn();   // в пределах порога — блокировка не нужна, вернуться на свой экран (снять «обложку»)
+    return;
+  }
+  // PIN не задан (или идёт звонок) → остаёмся на том же экране (процесс жив = DOM сохранён).
 });
-function maybeLock(){const c=lockCfg();if(c.pin){pinMode='check';pinBuffer='';$('#lockTitle').textContent='Введите PIN-код';renderPinDots();go('lockScreen');tryBiometricUnlock();}}
+function maybeLock(){const c=lockCfg();if(c.pin){const cur=currentScreenId();if(cur!=='lockScreen')_preLockScreen=cur;pinMode='check';pinBuffer='';$('#lockTitle').textContent='Введите PIN-код';renderPinDots();go('lockScreen');tryBiometricUnlock();}}
 /* Биометрия (Face ID/отпечаток) — только в нативной обёртке, как быстрая замена PIN. */
 function bioAvailable(){try{const c=lockCfg();return !!(c&&c.pin&&c.bio!==false&&window.__OLESYA_NATIVE__&&window.ReactNativeWebView);}catch(e){return false;}}   // биометрия ВКЛЮЧЕНА по умолчанию (пока явно не выключили)
 function tryBiometricUnlock(){
@@ -6475,7 +6498,7 @@ function tryBiometricUnlock(){
   if(!bioAvailable())return;
   try{ window.ReactNativeWebView.postMessage(JSON.stringify({type:'biometric-unlock'})); }catch(e){}
 }
-window.olesyaBiometricResult=function(ok){ if(pinMode!=='check')return; if(ok){pinFails=0;pinBuffer='';current=null;go('scrHome');} };  // после разблокировки — Главная, а не чаты
+window.olesyaBiometricResult=function(ok){ if(pinMode!=='check')return; if(ok){pinFails=0;pinBuffer='';_unlockReturn();} };  // после разблокировки — вернуться на экран, где были
 {const _lb=$('#lockBio'); if(_lb)_lb.onclick=()=>tryBiometricUnlock();}
 function renderPinDots(){const w=$('#pinDots');w.innerHTML='';for(let i=0;i<4;i++){const d=document.createElement('div');d.className='pd'+(i<pinBuffer.length?' f':'');w.appendChild(d);}}
 (function buildKeypad(){const k=$('#keypad');['1','2','3','4','5','6','7','8','9','','0','⌫'].forEach(d=>{const b=document.createElement('button');b.className='key'+(d===''||d==='⌫'?' fn':'');b.textContent=d;if(d==='')b.style.visibility='hidden';b.onclick=()=>pinPress(d);k.appendChild(b);});})();
@@ -6492,7 +6515,7 @@ function handlePin(){
     else{toast('PIN не совпал, попробуйте снова');pinMode='set1';pinBuffer='';$('#lockTitle').textContent='Придумайте PIN-код';renderPinDots();}
   }else{
     const c=lockCfg();
-    if(pinBuffer===c.pin){pinFails=0;current=null;go('scrHome');}   // после разблокировки — Главная, а не чаты
+    if(pinBuffer===c.pin){pinFails=0;_unlockReturn();}   // после разблокировки — вернуться на экран, где были
     else{pinFails++;pinBuffer='';renderPinDots();$('#pinDots').animate([{transform:'translateX(-8px)'},{transform:'translateX(8px)'},{transform:'translateX(0)'}],{duration:300});
       if(pinFails>=5){startPinLock();}else{toast('Неверный PIN ('+pinFails+'/5)');}}
   }
