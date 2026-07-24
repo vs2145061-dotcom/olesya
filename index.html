@@ -1817,7 +1817,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.51', BUILD_ID='2026-07-24-ios-kbd-diag2';
+const APP_VERSION='4.9.52', BUILD_ID='2026-07-24-ios-kbd-diag3';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -6910,15 +6910,25 @@ function fitViewport(){
   try{
     var vv=window.visualViewport||{};
     var h=Math.round(vv.height||0);
-    if(h){ window._vvMin=Math.min(window._vvMin||1e9,h); window._vvMax=Math.max(window._vvMax||0,h); }
+    if(h){
+      // Снимок момента, когда высота видимой области МИНИМАЛЬНА (клавиатура открыта):
+      // фиксируем offsetTop, реальную высоту #phone и scrollY именно в этот миг.
+      if(h < (window._vvMin||1e9)){
+        window._vvSnap={ t:Math.round(vv.offsetTop||0), ph:ph.offsetHeight,
+                         sY:Math.round(window.scrollY||window.pageYOffset||0) };
+      }
+      window._vvMin=Math.min(window._vvMin||1e9,h); window._vvMax=Math.max(window._vvMax||0,h);
+    }
     var d=document.getElementById('vvdbg');
     if(!d){ d=document.createElement('div'); d.id='vvdbg';
       d.style.cssText='position:fixed;top:0;left:0;z-index:2147483647;background:rgba(0,0,0,.85);color:#0f0;font:12px/1.4 monospace;padding:4px 7px;white-space:pre;pointer-events:none;border-bottom-right-radius:8px';
       document.body.appendChild(d); }
+    var s=window._vvSnap||{};
     d.textContent =
       'iH='+window.innerHeight+' vvH='+h+' vvT='+Math.round(vv.offsetTop||0)+' rz='+(window._vvRz||0)+'\n'+
       'sY='+Math.round(window.scrollY||window.pageYOffset||0)+' phH='+ph.offsetHeight+' cH='+document.documentElement.clientHeight+'\n'+
-      'MIN='+(window._vvMin||0)+'  MAX='+(window._vvMax||0);
+      'MIN='+(window._vvMin||0)+'  MAX='+(window._vvMax||0)+'\n'+
+      'KBD t='+(s.t!=null?s.t:'-')+' ph='+(s.ph!=null?s.ph:'-')+' sY='+(s.sY!=null?s.sY:'-');
   }catch(e){}
 }
 if(window.visualViewport){
