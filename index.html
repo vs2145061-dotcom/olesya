@@ -1817,7 +1817,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.49', BUILD_ID='2026-07-24-ios-kbd-scrolltop';
+const APP_VERSION='4.9.50', BUILD_ID='2026-07-24-ios-kbd-diag';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -6898,23 +6898,32 @@ function fitViewport(){
   const conv = $('#scrConv') && !$('#scrConv').classList.contains('hidden');
   if(conv && mobile && window.visualViewport){
     // Ужимаем высоту приложения до видимой части экрана над клавиатурой — поле ввода поднимается.
-    // ВАЖНО: НИКАКОГО translateY по offsetTop — на iOS он толкал весь чат вниз («всё съезжало»).
+    // ВАЖНО: НИКАКОГО translateY и НИКАКОГО scrollTo — оба на iOS ломали раскладку
+    //  (translateY толкал чат вниз; scrollTo зацикливался со слушателем 'scroll' → каша рендера).
     ph.style.height=Math.round(window.visualViewport.height)+'px';
     ph.style.transform='';
-    // iOS при открытии клавиатуры прокручивает СТРАНИЦУ, чтобы показать поле — из-за этого
-    // между полем ввода и клавиатурой остаётся пустая полоса. Возвращаем страницу в 0 (без сдвига
-    // самого приложения). scrollTo(0,0) не может опустить контент вниз — только выровнять. Android: no-op.
-    try{ if(window.scrollY||window.pageYOffset) window.scrollTo(0,0); }catch(e){}
   } else {
     ph.style.height='';
     ph.style.transform='';
   }
+  // ⚠️ ВРЕМЕННЫЙ ЭКРАННЫЙ ЗАМЕР (диагностика iOS-клавиатуры). УБРАТЬ после снятия цифр!
+  try{
+    var d=document.getElementById('vvdbg');
+    if(!d){ d=document.createElement('div'); d.id='vvdbg';
+      d.style.cssText='position:fixed;top:0;left:0;z-index:2147483647;background:rgba(0,0,0,.82);color:#0f0;font:11px/1.35 monospace;padding:3px 6px;white-space:pre;pointer-events:none;border-bottom-right-radius:6px';
+      document.body.appendChild(d); }
+    var vv=window.visualViewport||{};
+    d.textContent =
+      'iH='+window.innerHeight+' vvH='+Math.round(vv.height||0)+' vvT='+Math.round(vv.offsetTop||0)+'\n'+
+      'sY='+Math.round(window.scrollY||window.pageYOffset||0)+' phH='+ph.offsetHeight+' cH='+document.documentElement.clientHeight;
+  }catch(e){}
 }
 if(window.visualViewport){
   window.visualViewport.addEventListener('resize',fitViewport);
   window.visualViewport.addEventListener('scroll',fitViewport);
 }
 window.addEventListener('orientationchange',()=>setTimeout(fitViewport,250));
+try{ fitViewport(); }catch(e){} // показать замер сразу (диагностика — временно)
 /* Перетаскивание своего видео-окошка во время видеозвонка (как в WhatsApp/FaceTime). */
 (function(){
   const lv=document.getElementById('localVideo'), scr=document.getElementById('callScreen');
