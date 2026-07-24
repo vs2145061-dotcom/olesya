@@ -1817,7 +1817,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.48', BUILD_ID='2026-07-24-gif+ioskbd-revert';
+const APP_VERSION='4.9.49', BUILD_ID='2026-07-24-ios-kbd-scrolltop';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -6899,9 +6899,12 @@ function fitViewport(){
   if(conv && mobile && window.visualViewport){
     // Ужимаем высоту приложения до видимой части экрана над клавиатурой — поле ввода поднимается.
     // ВАЖНО: НИКАКОГО translateY по offsetTop — на iOS он толкал весь чат вниз («всё съезжало»).
-    // Оставляем только высоту: это стабильно и не ломает раскладку.
     ph.style.height=Math.round(window.visualViewport.height)+'px';
     ph.style.transform='';
+    // iOS при открытии клавиатуры прокручивает СТРАНИЦУ, чтобы показать поле — из-за этого
+    // между полем ввода и клавиатурой остаётся пустая полоса. Возвращаем страницу в 0 (без сдвига
+    // самого приложения). scrollTo(0,0) не может опустить контент вниз — только выровнять. Android: no-op.
+    try{ if(window.scrollY||window.pageYOffset) window.scrollTo(0,0); }catch(e){}
   } else {
     ph.style.height='';
     ph.style.transform='';
