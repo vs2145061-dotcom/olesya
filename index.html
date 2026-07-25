@@ -1817,7 +1817,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.56', BUILD_ID='2026-07-24-ios-kbd-gap-FIXED-topanchor';
+const APP_VERSION='4.9.57', BUILD_ID='2026-07-24-ios-kbd-topanchor+lockscroll';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -6928,20 +6928,30 @@ function fitViewport(){
   // там оставляем обычную высоту, браузер сам аккуратно подкрутит к полю ввода.
   const conv = $('#scrConv') && !$('#scrConv').classList.contains('hidden');
   if(conv && mobile && window.visualViewport){
+    const h=Math.round(window.visualViewport.height);
     // Ужимаем высоту приложения до видимой части экрана над клавиатурой — поле ввода поднимается.
     // ВАЖНО: НИКАКОГО translateY и НИКАКОГО scrollTo — оба на iOS ломали раскладку
     //  (translateY толкал чат вниз; scrollTo зацикливался со слушателем 'scroll' → каша рендера).
-    ph.style.height=Math.round(window.visualViewport.height)+'px';
+    ph.style.height=h+'px';
     ph.style.transform='';
-    // ПРИЧИНА «дыры под клавиатурой» (найдена воспроизведением на ПК): body центрирует #phone
-    // (align-items:center). При полной высоте это незаметно, но как только высоту ужимаем под
-    // клавиатуру — укороченный #phone всплывает в ЦЕНТР, снизу остаётся пустое поле до клавиатуры.
-    // Прижимаем к верху видимой области → композер встаёт ровно на низ, дыра исчезает.
+    // ПРИЧИНА «дыры под клавиатурой» №1 (найдена воспроизведением на ПК): body центрирует #phone
+    // (align-items:center) → ужатый #phone всплывал в ЦЕНТР. Прижимаем к верху видимой области.
     ph.style.alignSelf='flex-start';
+    // ПРИЧИНА №2 (по замеру тестера KBD sY=390, cH=873): документ остаётся 873 → у iOS есть куда
+    // прокручивать, и он сам скроллит страницу, чтобы показать поле → #phone уезжает вверх, снизу
+    // пустота. Забираем «место для прокрутки»: ужимаем html/body до видимой высоты и запрещаем скролл.
+    document.documentElement.style.height=h+'px';
+    document.documentElement.style.overflow='hidden';
+    document.body.style.height=h+'px';
+    document.body.style.overflow='hidden';
   } else {
     ph.style.height='';
     ph.style.transform='';
     ph.style.alignSelf='';
+    document.documentElement.style.height='';
+    document.documentElement.style.overflow='';
+    document.body.style.height='';
+    document.body.style.overflow='';
   }
   // ⚠️ ВРЕМЕННЫЙ ЭКРАННЫЙ ЗАМЕР (диагностика iOS-клавиатуры). УБРАТЬ после снятия цифр!
   try{
