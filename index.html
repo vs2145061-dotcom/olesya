@@ -1817,7 +1817,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.63', BUILD_ID='2026-07-24-lock-privacy-overlay-noflash';
+const APP_VERSION='4.9.64', BUILD_ID='2026-07-24-multiselect+olesya-ai';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -2306,7 +2306,7 @@ function handleBus(m){
 /* ================== AUTH FLOW ================== */
 /* ================== AUTH FLOW ================== */
 function showScreen(id){ $$(  '.screen').forEach(s=>{ if(s.id===id){s.classList.remove('hidden','back')} }); }
-function go(id){ if(id==='scrPhone'){try{document.documentElement.removeAttribute('data-boot');}catch(e){}} $$('.screen').forEach(s=>s.classList.add('hidden')); const el=$('#'+id); if(el)el.classList.remove('hidden'); else {console.error('go(): экран не найден:',id);return;} if(typeof omPushScreen==='function')omPushScreen(id); }
+function go(id){ try{if(selMode)exitSel();}catch(e){} if(id==='scrPhone'){try{document.documentElement.removeAttribute('data-boot');}catch(e){}} $$('.screen').forEach(s=>s.classList.add('hidden')); const el=$('#'+id); if(el)el.classList.remove('hidden'); else {console.error('go(): экран не найден:',id);return;} if(typeof omPushScreen==='function')omPushScreen(id); }
 
 let pendingPhone='', genCode='', otpFails=0, otpLocked=false, pendingUser=null, pendingMode='', pwFails=0, pwLockUntil=0;
 /* ── Production OTP (используется когда cloudCfg().url задан) ── */
@@ -2947,11 +2947,13 @@ function openChatActions(row,chat,label){
 function attachChatMenu(row,chat,label){
   if(isPinned(chat.id))row.classList.add('pinned');
   let tmr=null,long=false;
-  row.addEventListener('touchstart',()=>{long=false;tmr=setTimeout(()=>{long=true;tmr=null;openChatActions(row,chat,label);},500);},{passive:true});
+  // Долгое нажатие → режим мультивыбора чатов (тап в режиме переключает). Правый клик (ПК) —
+  // одиночное меню чата, но в режиме выбора тоже переключает.
+  row.addEventListener('touchstart',()=>{long=false;tmr=setTimeout(()=>{long=true;tmr=null;enterSel('chat',chat.id);},500);},{passive:true});
   const cancel=()=>{if(tmr){clearTimeout(tmr);tmr=null;}};
   row.addEventListener('touchend',cancel);row.addEventListener('touchmove',cancel);
-  row.addEventListener('contextmenu',e=>{e.preventDefault();openChatActions(row,chat,label);});
-  row.addEventListener('click',e=>{if(long){e.stopImmediatePropagation();e.preventDefault();long=false;}},true);
+  row.addEventListener('contextmenu',e=>{e.preventDefault(); if(selMode==='chat'){toggleSel('chat',chat.id);return;} openChatActions(row,chat,label);});
+  row.addEventListener('click',e=>{ if(selMode==='chat'){e.stopImmediatePropagation();e.preventDefault();if(long){long=false;return;}toggleSel('chat',chat.id);return;} if(long){e.stopImmediatePropagation();e.preventDefault();long=false;} },true);
 }
 // Сверка по ключу (как в renderMessages): раньше ЛЮБОЕ обновление списка (входящее в неоткрытый
 // чат, directory) пересобирало весь список (innerHTML='' + все строки заново) → если смотришь на
@@ -3050,6 +3052,7 @@ function renderChats(){
     for(let i=0;i<finalNodes.length;i++){ if(wrap.childNodes[i]!==finalNodes[i])wrap.insertBefore(finalNodes[i], wrap.childNodes[i]||null); }
     while(wrap.childNodes.length>finalNodes.length) wrap.removeChild(wrap.lastChild);
   }
+  try{reapplySel();}catch(e){}   // сохранить подсветку выбранных чатов при инкрементальной перерисовке
   $('#myStatusTop').textContent='в сети';
 }
 function videoNoteEl(m){
@@ -3220,6 +3223,7 @@ function renderMessages(){
   // 4) привести DOM к финальному массиву (вставка/перемещение/удаление лишних)
   for(let i=0;i<finalNodes.length;i++){ if(box.childNodes[i]!==finalNodes[i])box.insertBefore(finalNodes[i], box.childNodes[i]||null); }
   while(box.childNodes.length>finalNodes.length) box.removeChild(box.lastChild);
+  try{reapplySel();}catch(e){}   // сохранить подсветку выбранных при инкрементальной перерисовке
   pinMsgsBottom();
   renderPinnedBar();
 }
@@ -3279,9 +3283,15 @@ function renderBubble(m){
     Object.entries(grp).forEach(([e,n])=>{const el=document.createElement('span');el.className='react';el.innerHTML=e+(n>1?` <span class="n">${n}</span>`:'');rc.appendChild(el);});
     b.appendChild(rc);}
   row.appendChild(b);
-  // react menu on click
-  b.addEventListener('click',ev=>{ if(m.type==='voice'||m.type==='videonote')return; ev.stopPropagation(); openReactMenu(b,m); });
-  b.addEventListener('contextmenu',ev=>{ev.preventDefault();ev.stopPropagation();openReactMenu(b,m);});
+  // Мультивыбор: долгое нажатие входит в режим выбора; тап в режиме — переключает сообщение.
+  let _lpT=null,_lp=false;
+  row.addEventListener('touchstart',()=>{_lp=false;_lpT=setTimeout(()=>{_lp=true;_lpT=null;enterSel('msg',m.id);},450);},{passive:true});
+  const _lpC=()=>{if(_lpT){clearTimeout(_lpT);_lpT=null;}};
+  row.addEventListener('touchend',_lpC);row.addEventListener('touchmove',_lpC);
+  row.addEventListener('click',ev=>{ if(selMode==='msg'){ev.stopPropagation();ev.preventDefault();if(_lp){_lp=false;return;}toggleSel('msg',m.id);} },true);
+  // меню реакций — только вне режима выбора
+  b.addEventListener('click',ev=>{ if(selMode==='msg')return; if(m.type==='voice'||m.type==='videonote')return; ev.stopPropagation(); openReactMenu(b,m); });
+  b.addEventListener('contextmenu',ev=>{ev.preventDefault();ev.stopPropagation(); if(selMode==='msg'){toggleSel('msg',m.id);return;} openReactMenu(b,m);});
   return row;
 }
 function voiceEl(m,mine){
@@ -3334,7 +3344,7 @@ function openReactMenu(anchor,m){
     trWant[m.id]=(trWant[m.id]===undefined||trWant[m.id]===null)?tgt:null;renderMessages();closeReactMenu();};
   menu.appendChild(_g);
   menu.appendChild(Object.assign(document.createElement('div'),{className:'rm-sep'}));
-  const _acts=[['↗️','Переслать',()=>{closeReactMenu();openFwd(m);}],['🔖','В Избранное',()=>{closeReactMenu();saveToFaves(m);}]];
+  const _acts=[['☑️','Выбрать',()=>{closeReactMenu();enterSel('msg',m.id);}],['↗️','Переслать',()=>{closeReactMenu();openFwd(m);}],['🔖','В Избранное',()=>{closeReactMenu();saveToFaves(m);}]];
   // закрепить / открепить (в группе — только администратор)
   const _gc=getChat();const _canPin=(current&&current.channel)?!!current._isAdmin:(!(current&&current.group)||isGroupAdmin(_gc));
   if(_canPin&&_gc){const _isPinned=_gc.pinned&&_gc.pinned.id===m.id;_acts.push([_isPinned?'📌':'📍',_isPinned?'Открепить':'Закрепить',()=>{closeReactMenu();_isPinned?unpinMessage():pinMessage(m);}]);}
@@ -3353,6 +3363,146 @@ function openReactMenu(anchor,m){
 }
 function closeReactMenu(){if(reactMenuEl){reactMenuEl.remove();reactMenuEl=null;}}
 document.addEventListener('click',closeReactMenu);
+
+/* ==================== МУЛЬТИВЫБОР (чаты и сообщения) + ИИ-панель Олеси ==================== */
+(function _selCss(){ if(document.getElementById('selCss'))return;
+  const s=document.createElement('style'); s.id='selCss'; s.textContent=`
+  #chatList.selmode .chat-row,#msgs.selmode .row{cursor:pointer}
+  #chatList.selmode .chat-row{position:relative;padding-left:48px;transition:padding .18s}
+  #msgs.selmode .row{padding-left:36px;transition:padding .18s}
+  #chatList.selmode .chat-row::before,#msgs.selmode .row::before{content:'';position:absolute;width:22px;height:22px;border-radius:50%;border:2px solid var(--line);box-sizing:border-box;background:var(--surface);transition:transform .15s,background .15s,border-color .15s;z-index:2}
+  #chatList.selmode .chat-row::before{left:13px;top:50%;transform:translateY(-50%)}
+  #msgs.selmode .row::before{left:7px;top:50%;transform:translateY(-50%)}
+  #chatList.selmode .chat-row.selrow::before,#msgs.selmode .row.selrow::before{border-color:transparent;background:linear-gradient(135deg,var(--primary),#8a7bff);box-shadow:0 2px 9px rgba(108,123,255,.55)}
+  #chatList.selmode .chat-row.selrow::after,#msgs.selmode .row.selrow::after{content:'';position:absolute;width:5.5px;height:10px;border:solid #fff;border-width:0 2.4px 2.4px 0;transform:rotate(45deg);z-index:3}
+  #chatList.selmode .chat-row.selrow::after{left:21.5px;top:calc(50% - 7px)}
+  #msgs.selmode .row.selrow::after{left:15.5px;top:calc(50% - 7px)}
+  #chatList.selmode .chat-row.selrow{background:rgba(108,123,255,.09)}
+  #msgs.selmode .row.selrow>.bubble{outline:2px solid var(--primary);outline-offset:1px}
+  .sel-bar{position:absolute;left:0;right:0;bottom:0;z-index:70;transform:translateY(120%);transition:transform .26s cubic-bezier(.2,.8,.2,1);background:var(--surface);border-top:1px solid var(--line);padding:7px 6px calc(7px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:2px;box-shadow:0 -7px 26px rgba(0,0,0,.20)}
+  .sel-bar.show{transform:translateY(0)}
+  .sb-x{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-size:20px;color:var(--muted);flex:none}
+  .sb-count{font-weight:700;font-size:13.5px;margin:0 4px 0 2px;white-space:nowrap;flex:none}
+  .sb-acts{display:flex;gap:1px;margin-left:auto;overflow-x:auto;scrollbar-width:none}
+  .sb-acts::-webkit-scrollbar{display:none}
+  .sb-btn{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:54px;padding:6px 6px;border-radius:12px;color:var(--text);font-size:10.5px;background:none;flex:none;line-height:1.1}
+  .sb-btn svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .sb-btn:active{background:var(--raised)}
+  .sb-btn.danger{color:var(--red)}
+  .sb-btn.ai{background:linear-gradient(135deg,rgba(108,123,255,.16),rgba(138,123,255,.16));color:var(--primary)}
+  .sb-btn.ai svg{fill:var(--primary);stroke:none}
+  .aisel-back{position:absolute;inset:0;z-index:120;background:rgba(10,10,20,.5);display:none;align-items:flex-end}
+  .aisel-back.show{display:flex}
+  .aisel-card{width:100%;background:var(--surface);border-radius:20px 20px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));max-height:82%;overflow-y:auto;box-shadow:0 -10px 40px rgba(0,0,0,.3);animation:aiselUp .26s cubic-bezier(.2,.8,.2,1)}
+  @keyframes aiselUp{from{transform:translateY(40px);opacity:.6}to{transform:translateY(0);opacity:1}}
+  .aisel-h{display:flex;align-items:center;gap:9px;font-weight:700;font-size:15.5px;margin-bottom:13px}
+  .aisel-h .av{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#8a7bff);display:grid;place-items:center;font-size:17px}
+  .aisel-opt{display:flex;align-items:center;gap:12px;padding:13px 12px;border-radius:14px;background:var(--raised);margin-bottom:8px;cursor:pointer;transition:transform .1s}
+  .aisel-opt:active{transform:scale(.98)}
+  .aisel-opt .em{font-size:20px}
+  .aisel-opt .tt{font-weight:600;font-size:14px}
+  .aisel-opt .ds{font-size:12px;color:var(--muted);margin-top:1px}
+  .aisel-res{white-space:pre-wrap;font-size:14px;line-height:1.5;background:var(--raised);border-radius:14px;padding:13px;margin-bottom:12px}
+  .aisel-acts{display:flex;gap:8px}
+  .aisel-acts button{flex:1;padding:11px;border-radius:12px;font-weight:600;font-size:13.5px}
+  .aisel-acts .prim{background:linear-gradient(135deg,var(--primary),#8a7bff);color:#fff}
+  .aisel-acts .sec{background:var(--raised);color:var(--text)}`;
+  document.head.appendChild(s);
+})();
+let selMode=null, selSet=new Set();
+function selBoxFor(mode){ return document.getElementById(mode==='msg'?'msgs':'chatList'); }
+function markSelNode(mode,id,on){ const box=selBoxFor(mode); if(!box)return; const k=(mode==='msg'?'msg:':'chat:')+id;
+  Array.prototype.forEach.call(box.children,ch=>{ if(ch.dataset&&ch.dataset.k===k)ch.classList.toggle('selrow',on); }); }
+function enterSel(mode,id){ if(selMode&&selMode!==mode)exitSel(); selMode=mode; selSet=new Set(); const box=selBoxFor(mode); if(box)box.classList.add('selmode');
+  if(id){selSet.add(id);markSelNode(mode,id,true);} try{navigator.vibrate&&navigator.vibrate(12);}catch(e){} updateSelBar(); }
+function exitSel(){ if(!selMode)return; const box=selBoxFor(selMode); if(box){box.classList.remove('selmode'); box.querySelectorAll('.selrow').forEach(n=>n.classList.remove('selrow'));} selMode=null; selSet.clear(); hideSelBar(); }
+function toggleSel(mode,id){ if(selMode!==mode){enterSel(mode,id);return;} if(selSet.has(id)){selSet.delete(id);markSelNode(mode,id,false);}else{selSet.add(id);markSelNode(mode,id,true);} if(selSet.size===0){exitSel();return;} updateSelBar(); }
+function reapplySel(){ if(!selMode)return; const box=selBoxFor(selMode); if(!box)return; box.classList.add('selmode'); const pref=selMode==='msg'?'msg:':'chat:';
+  Array.prototype.forEach.call(box.children,ch=>{ const k=ch.dataset&&ch.dataset.k; if(k&&k.indexOf(pref)===0)ch.classList.toggle('selrow',selSet.has(k.slice(pref.length))); }); }
+function ensureSelBar(){ let bar=document.getElementById('selBar'); if(!bar){ bar=document.createElement('div'); bar.id='selBar'; bar.className='sel-bar'; (document.getElementById('phone')||document.body).appendChild(bar);} return bar; }
+function hideSelBar(){ const bar=document.getElementById('selBar'); if(bar)bar.classList.remove('show'); }
+const _SBIC={
+  copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/>',
+  fwd:'<path d="M13 17l5-5-5-5"/><path d="M18 12H7a4 4 0 0 0-4 4v2"/>',
+  fave:'<path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>',
+  del:'<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>',
+  pin:'<path d="M9 4h6l-1 7 4 3H6l4-3z"/><path d="M12 14v6"/>',
+  read:'<path d="M4 12l4 4L20 6"/>',
+  ai:'<path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15l-1.9-4.1L5.5 9l4.6-1.4z"/>'
+};
+function _sbBtn(cls,icon,label,fn){ const b=document.createElement('button'); b.className='sb-btn'+(cls?' '+cls:''); b.innerHTML='<svg viewBox="0 0 24 24">'+_SBIC[icon]+'</svg><span>'+label+'</span>'; b.onclick=(e)=>{e.stopPropagation();fn();}; return b; }
+function updateSelBar(){ const bar=ensureSelBar(); bar.innerHTML='';
+  const x=document.createElement('div'); x.className='sb-x'; x.textContent='✕'; x.onclick=(e)=>{e.stopPropagation();exitSel();}; bar.appendChild(x);
+  const cnt=document.createElement('div'); cnt.className='sb-count'; cnt.textContent=selSet.size; bar.appendChild(cnt);
+  const acts=document.createElement('div'); acts.className='sb-acts'; bar.appendChild(acts);
+  if(selMode==='msg'){
+    acts.appendChild(_sbBtn('ai','ai','Олеся',selAiMenu));
+    acts.appendChild(_sbBtn('','copy','Копир.',selCopy));
+    acts.appendChild(_sbBtn('','fwd','Переслать',selForward));
+    acts.appendChild(_sbBtn('','fave','В избр.',selFave));
+    acts.appendChild(_sbBtn('danger','del','Удалить',selDelete));
+  }else{
+    acts.appendChild(_sbBtn('','pin','Закрепить',selPinChats));
+    acts.appendChild(_sbBtn('','read','Прочитано',selReadChats));
+    acts.appendChild(_sbBtn('danger','del','Удалить',selDeleteChats));
+  }
+  bar.classList.add('show');
+}
+function _selMsgs(){ const c=getChat(); if(!c)return []; return c.messages.filter(m=>selSet.has(m.id)); }
+function _selMsgText(){ return _selMsgs().map(m=>{ const who=m.from===me.id?'Вы':((db().users[m.from]&&db().users[m.from].name)||'Собеседник'); return who+': '+(m.text||previewText(m)); }).join('\n'); }
+/* --- действия с сообщениями --- */
+function selCopy(){ const t=_selMsgs().map(m=>m.text||previewText(m)).filter(Boolean).join('\n'); if(!t){toast('Нечего копировать');return;} copyText(t); exitSel(); }
+function selFave(){ const ms=_selMsgs(); ms.forEach(m=>saveToFaves(m)); toast('🔖 В Избранное: '+ms.length); exitSel(); }
+function selForward(){ const ms=_selMsgs(); if(!ms.length)return; openFwd(ms[0], ms); }
+async function selDelete(){ const ms=_selMsgs(); const mine=ms.filter(m=>m.from===me.id&&!m.deleted);
+  if(!mine.length){toast('Удалять можно только свои сообщения');return;}
+  const ok=await appConfirm('Удалить '+mine.length+' сообщ. у всех?',{okText:'Удалить',danger:true}); if(!ok)return;
+  const d=db(); const c=d.chats[curChatKey()];
+  if(c){ mine.forEach(m=>{ const mm=c.messages.find(x=>x.id===m.id); if(mm){mm.deleted=true;mm.text='';delete mm.src;delete mm.audio;}
+    if(current&&current.group)current.members.filter(x=>x!==me.id).forEach(u=>emit('msg:del',{to:u,gid:current.id,id:m.id}));
+    else if(current)emit('msg:del',{to:current.id,from:me.id,id:m.id}); }); save(d); }
+  exitSel(); renderMessages(); renderChats(); toast('Удалено: '+mine.length);
+}
+/* --- действия с чатами --- */
+function selPinChats(){ const ids=[...selSet]; ids.forEach(id=>{ if(!isPinned(id))togglePin(id); }); const n=ids.length; exitSel(); renderChats(); toast('📌 Закреплено: '+n); }
+function selReadChats(){ const ids=[...selSet]; const d=db(); ids.forEach(id=>{ const c=d.chats[id]; if(!c)return; if(c.group){try{markReadGroup(id);}catch(e){}} else { const pid=(c.members||[]).find(x=>x!==me.id); if(pid)markRead(pid); } }); const n=ids.length; exitSel(); renderChats(); toast('Прочитано: '+n); }
+async function selDeleteChats(){ const ids=[...selSet]; if(!ids.length)return;
+  const ok=await appConfirm('Собеседники свои копии сохранят. Чаты вернутся при новом сообщении.',{title:'Удалить '+ids.length+' чат(ов)?',okText:'Удалить',danger:true}); if(!ok)return;
+  const d=db(); const h=hiddenChats(); ids.forEach(id=>{ const c=d.chats[id]; if(c)c.messages=[]; h[id]=Date.now(); }); saveHiddenChats(h); save(d);
+  const n=ids.length; exitSel(); try{renderChats();}catch(e){} try{if(typeof renderHome==='function')renderHome();}catch(e){} toast('Удалено чатов: '+n);
+}
+/* --- ✨ изюминка: действия с Олесей над выбранными сообщениями --- */
+function _aiSelBack(){ let back=document.getElementById('aiSelBack');
+  if(!back){ back=document.createElement('div'); back.id='aiSelBack'; back.className='aisel-back'; back.innerHTML='<div class="aisel-card"></div>';
+    back.addEventListener('click',e=>{if(e.target===back)back.classList.remove('show');}); (document.getElementById('phone')||document.body).appendChild(back); }
+  return back; }
+function selAiMenu(){ const ms=_selMsgs(); if(!ms.length)return;
+  const back=_aiSelBack(); const card=back.querySelector('.aisel-card');
+  card.innerHTML='<div class="aisel-h"><span class="av">🤖</span>Олеся · выбрано '+ms.length+'</div>';
+  const opt=(em,tt,ds,fn)=>{ const o=document.createElement('div'); o.className='aisel-opt'; o.innerHTML='<span class="em">'+em+'</span><div><div class="tt">'+tt+'</div><div class="ds">'+ds+'</div></div>'; o.onclick=fn; card.appendChild(o); };
+  opt('📝','Резюмировать','Краткая выжимка выбранного',()=>selAiRun('summ'));
+  opt('🌐','Перевести всё','Перевод всех выбранных сообщений',()=>selAiRun('tr'));
+  opt('✍️','Составить ответ','Олеся предложит уместный ответ',()=>selAiRun('reply'));
+  back.classList.add('show');
+}
+async function selAiRun(kind){ const ms=_selMsgs(); if(!ms.length)return; const text=_selMsgText();
+  let prompt;
+  if(kind==='summ') prompt='Кратко и по делу резюмируй эту переписку на русском (ключевые пункты списком, если уместно):\n\n'+text;
+  else if(kind==='tr') prompt='Переведи на русский каждое из этих сообщений, сохрани порядок и укажи автора:\n\n'+text;
+  else prompt='Ниже последние сообщения переписки. Составь один уместный, вежливый ответ от моего лица. Верни ТОЛЬКО текст ответа, без пояснений:\n\n'+text;
+  const back=_aiSelBack(); const card=back.querySelector('.aisel-card');
+  card.innerHTML='<div class="aisel-h"><span class="av">🤖</span>Олеся думает…</div><div class="aisel-res" id="aiSelRes">✨ Минутку, обрабатываю '+ms.length+' сообщ.</div>';
+  back.classList.add('show');
+  let out='';
+  try{ out=await aiAsk(prompt); }
+  catch(e){ out=(e&&e.message==='no_cloud')?'ИИ доступен при подключённом сервере.':'ИИ сейчас недоступен, попробуйте позже.'; }
+  const res=card.querySelector('#aiSelRes'); if(res)res.textContent=out||'Олеся не дала ответа.';
+  const acts=document.createElement('div'); acts.className='aisel-acts';
+  const bCopy=document.createElement('button'); bCopy.className='sec'; bCopy.textContent='Копировать'; bCopy.onclick=()=>copyText(out); acts.appendChild(bCopy);
+  if(kind==='reply'){ const bIns=document.createElement('button'); bIns.className='prim'; bIns.textContent='Вставить в поле'; bIns.onclick=()=>{ const inp=document.getElementById('msgInput'); if(inp){inp.value=out; inp.dispatchEvent(new Event('input',{bubbles:true})); inp.focus();} back.classList.remove('show'); exitSel(); }; acts.appendChild(bIns); }
+  else { const bDone=document.createElement('button'); bDone.className='prim'; bDone.textContent='Готово'; bDone.onclick=()=>{back.classList.remove('show'); exitSel();}; acts.appendChild(bDone); }
+  card.appendChild(acts);
+}
 function addReaction(m,emoji){
   const d=db();const c=getChat();if(!c)return;const mm=c.messages.find(x=>x.id===m.id);if(!mm)return;
   mm.reactions=mm.reactions||[];
@@ -4705,7 +4855,8 @@ function fwdPayload(m){
   return o;
 }
 function saveToFaves(m){ensureChat(me.id,true);sendMediaTo(me.id,fwdPayload(m));toast('🔖 Сохранено в Избранное');}
-function openFwd(m){
+function openFwd(m, multi){
+  window.fwdMsgs=(multi&&multi.length)?multi.slice():null;   // мультивыбор передаёт массив
   fwdMsg=m;const list=$('#fwdList');list.innerHTML='';const d=db();
   const addRow=(id,nm,ic)=>{const r=document.createElement('div');r.className='fwd-row';
     const i=document.createElement('div');i.className='fr-ic';i.textContent=ic;
@@ -4722,10 +4873,14 @@ function openFwd(m){
 }
 function closeFwd(){$('#fwdSheet').classList.remove('show');fwdMsg=null;}
 function doForward(targetId){
-  if(!fwdMsg)return;const pl=fwdPayload(fwdMsg);
-  ensureChat(targetId,true);sendMediaTo(targetId,pl);closeFwd();
+  const list=(window.fwdMsgs&&window.fwdMsgs.length)?window.fwdMsgs:(fwdMsg?[fwdMsg]:[]);
+  if(!list.length)return;
+  ensureChat(targetId,true);
+  list.forEach(m=>sendMediaTo(targetId,fwdPayload(m)));
+  closeFwd(); window.fwdMsgs=null;
   const u=userById(targetId);
-  toast('↗️ Переслано: '+(targetId===me.id?'Избранное':(u?u.name:'')));
+  toast('↗️ Переслано ('+list.length+'): '+(targetId===me.id?'Избранное':(u?u.name:'')));
+  try{if(selMode)exitSel();}catch(e){}
 }
 $('#fwdClose').onclick=closeFwd;
 $('#fwdSheet').addEventListener('click',ev=>{if(ev.target===$('#fwdSheet'))closeFwd();});
