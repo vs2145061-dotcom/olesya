@@ -1817,7 +1817,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.62', BUILD_ID='2026-07-24-perf-chats-reconcile';
+const APP_VERSION='4.9.63', BUILD_ID='2026-07-24-lock-privacy-overlay-noflash';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -6524,31 +6524,34 @@ function enterPinSetup(){pinMode='set1';pinBuffer='';$('#lockTitle').textContent
 function startPinLock(){pinLockUntil=Date.now()+30000;logSec('⛔ 5 неверных PIN — блокировка ввода на 30 секунд');clearInterval(pinLockInt);
   const upd=()=>{const left=Math.ceil((pinLockUntil-Date.now())/1000);if(left<=0){clearInterval(pinLockInt);$('#lockTitle').textContent='Введите PIN-код';pinFails=0;}else{$('#lockTitle').textContent='Слишком много попыток · '+left+' с';}};upd();pinLockInt=setInterval(upd,1000);}
 function _omInCall(){ try{ if(typeof callPeerId!=='undefined'&&callPeerId)return true; if(typeof gcall!=='undefined'&&gcall)return true; const g=document.getElementById('gcallScreen'); if(g&&!g.classList.contains('hidden'))return true; }catch(e){} return false; }
+// Приватная «шторка»: непрозрачный оверлей ПОВЕРХ контента (не отдельный экран!). Показываем при
+// сворачивании, если задан PIN — тогда в списке недавних приложений Android не виден чат. При
+// возврате убираем МГНОВЕННО (display:none, без смены экрана и без анимации). Раньше на сворачивание
+// подменялся экран на lockScreen → при коротком возврате он мелькал и слайдил. Теперь экран под
+// шторкой НЕ меняется → мелькать нечему. Настоящий lockScreen показываем только при автолоке (порог).
+function showPrivacyCover(){
+  let cov=document.getElementById('privacyCover');
+  if(!cov){ cov=document.createElement('div'); cov.id='privacyCover';
+    cov.style.cssText='position:fixed;inset:0;z-index:2147483646;background:var(--bg,#0e1020)';
+    document.body.appendChild(cov); }
+  cov.style.display='block';
+}
+function hidePrivacyCover(){ const cov=document.getElementById('privacyCover'); if(cov)cov.style.display='none'; }
 document.addEventListener('visibilitychange',()=>{
   if(!me)return;
   let c={};try{c=lockCfg();}catch(e){}
   if(document.hidden){
     hidAt=Date.now();
-    // Приватность: если задан PIN и мы НЕ в звонке — сразу закрываем контент экраном
-    // блокировки, запомнив, где были. Тогда и в списке недавних приложений Android, и на
-    // первом кадре при возврате виден замок, а не открытый чат (раньше чат «просвечивал»).
-    if(c&&c.pin&&!_omInCall()){
-      const cur=currentScreenId();
-      if(cur!=='lockScreen') _preLockScreen=cur;
-      pinMode='check'; pinBuffer='';
-      try{$('#lockTitle').textContent='Введите PIN-код';renderPinDots();}catch(e){}
-      go('lockScreen');
-    }
+    if(c&&c.pin&&!_omInCall()) showPrivacyCover();   // только шторка, экран не трогаем
     return;
   }
-  // Вернулись из фона.
+  // Вернулись из фона: сначала мгновенно снять шторку (экран под ней не менялся → без мелькания).
+  hidePrivacyCover();
   const thr=(c&&c.autolock!=null)?c.autolock:60000;
-  if(c&&c.pin&&!_omInCall()){
-    if(hidAt && thr>=0 && Date.now()-hidAt>=thr){ maybeLock(); return; }   // прошёл порог → требуем PIN/отпечаток
-    _unlockReturn();   // в пределах порога — блокировка не нужна, вернуться на свой экран (снять «обложку»)
-    return;
+  if(c&&c.pin&&!_omInCall() && hidAt && thr>=0 && Date.now()-hidAt>=thr){
+    maybeLock();   // прошёл порог → настоящий экран блокировки + PIN/отпечаток; после — возврат на свой экран
   }
-  // PIN не задан (или идёт звонок) → остаёмся на том же экране (процесс жив = DOM сохранён).
+  // в пределах порога / без PIN — ничего не делаем: экран под шторкой тот же, что был.
 });
 function maybeLock(){const c=lockCfg();if(c.pin){const cur=currentScreenId();if(cur!=='lockScreen')_preLockScreen=cur;pinMode='check';pinBuffer='';$('#lockTitle').textContent='Введите PIN-код';renderPinDots();go('lockScreen');tryBiometricUnlock();}}
 /* Биометрия (Face ID/отпечаток) — только в нативной обёртке, как быстрая замена PIN. */
