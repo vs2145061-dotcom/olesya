@@ -1817,7 +1817,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.65', BUILD_ID='2026-07-24-multiselect-fixes';
+const APP_VERSION='4.9.66', BUILD_ID='2026-07-24-multiselect-haptic+pinunpin';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -3415,13 +3415,15 @@ let selMode=null, selSet=new Set();
 // системное contextmenu (которое иначе открыло бы старое одиночное меню) — глушим.
 try{ document.addEventListener('touchstart',()=>{window._lastTouch=Date.now();},{passive:true,capture:true}); }catch(e){}
 function _touchRecent(){ return (Date.now()-(window._lastTouch||0))<1200; }
+// виброотклик выбора через нативный мост doVibe (navigator.vibrate в Android WebView отключён)
+function _selVibe(ms){ try{ if(typeof doVibe==='function')doVibe(ms||10); else if(navigator.vibrate)navigator.vibrate(ms||10); }catch(e){} }
 function selBoxFor(mode){ return document.getElementById(mode==='msg'?'msgs':'chatList'); }
 function markSelNode(mode,id,on){ const box=selBoxFor(mode); if(!box)return; const k=(mode==='msg'?'msg:':'chat:')+id;
   Array.prototype.forEach.call(box.children,ch=>{ if(ch.dataset&&ch.dataset.k===k)ch.classList.toggle('selrow',on); }); }
 function enterSel(mode,id){ if(selMode&&selMode!==mode)exitSel(); selMode=mode; selSet=new Set(); const box=selBoxFor(mode); if(box)box.classList.add('selmode');
-  if(id){selSet.add(id);markSelNode(mode,id,true);} try{navigator.vibrate&&navigator.vibrate(12);}catch(e){} updateSelBar(); }
+  if(id){selSet.add(id);markSelNode(mode,id,true);} _selVibe(14); updateSelBar(); }
 function exitSel(){ if(!selMode)return; const box=selBoxFor(selMode); if(box){box.classList.remove('selmode'); box.querySelectorAll('.selrow').forEach(n=>n.classList.remove('selrow'));} selMode=null; selSet.clear(); hideSelBar(); }
-function toggleSel(mode,id){ if(selMode!==mode){enterSel(mode,id);return;} if(selSet.has(id)){selSet.delete(id);markSelNode(mode,id,false);}else{selSet.add(id);markSelNode(mode,id,true);} if(selSet.size===0){exitSel();return;} updateSelBar(); }
+function toggleSel(mode,id){ if(selMode!==mode){enterSel(mode,id);return;} if(selSet.has(id)){selSet.delete(id);markSelNode(mode,id,false);}else{selSet.add(id);markSelNode(mode,id,true);} _selVibe(8); if(selSet.size===0){exitSel();return;} updateSelBar(); }
 function reapplySel(){ if(!selMode)return; const box=selBoxFor(selMode); if(!box)return; box.classList.add('selmode'); const pref=selMode==='msg'?'msg:':'chat:';
   Array.prototype.forEach.call(box.children,ch=>{ const k=ch.dataset&&ch.dataset.k; if(k&&k.indexOf(pref)===0)ch.classList.toggle('selrow',selSet.has(k.slice(pref.length))); }); }
 function ensureSelBar(){ let bar=document.getElementById('selBar'); if(!bar){ bar=document.createElement('div'); bar.id='selBar'; bar.className='sel-bar'; (document.getElementById('phone')||document.body).appendChild(bar);
@@ -3435,12 +3437,13 @@ const _SBIC={
   fave:'<path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>',
   del:'<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>',
   pin:'<path d="M9 4h6l-1 7 4 3H6l4-3z"/><path d="M12 14v6"/>',
+  unpin:'<path d="M9 4h6l-1 7 4 3H6l4-3z"/><path d="M12 14v6"/><path d="M3 3l18 18"/>',
   read:'<path d="M4 12l4 4L20 6"/>',
   ai:'<path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15l-1.9-4.1L5.5 9l4.6-1.4z"/>'
 };
-function _sbBtn(cls,icon,label,fn){ const b=document.createElement('button'); b.className='sb-btn'+(cls?' '+cls:''); b.innerHTML='<svg viewBox="0 0 24 24">'+_SBIC[icon]+'</svg><span>'+label+'</span>'; b.onclick=(e)=>{e.stopPropagation();fn();}; return b; }
+function _sbBtn(cls,icon,label,fn){ const b=document.createElement('button'); b.className='sb-btn'+(cls?' '+cls:''); b.innerHTML='<svg viewBox="0 0 24 24">'+_SBIC[icon]+'</svg><span>'+label+'</span>'; b.onclick=(e)=>{e.stopPropagation();_selVibe(10);fn();}; return b; }
 function updateSelBar(){ const bar=ensureSelBar(); bar.innerHTML='';
-  const x=document.createElement('div'); x.className='sb-x'; x.textContent='✕'; x.onclick=(e)=>{e.stopPropagation();exitSel();}; bar.appendChild(x);
+  const x=document.createElement('div'); x.className='sb-x'; x.textContent='✕'; x.onclick=(e)=>{e.stopPropagation();_selVibe(10);exitSel();}; bar.appendChild(x);
   const cnt=document.createElement('div'); cnt.className='sb-count'; cnt.textContent=selSet.size; bar.appendChild(cnt);
   const acts=document.createElement('div'); acts.className='sb-acts'; bar.appendChild(acts);
   if(selMode==='msg'){
@@ -3450,7 +3453,9 @@ function updateSelBar(){ const bar=ensureSelBar(); bar.innerHTML='';
     acts.appendChild(_sbBtn('','fave','В избр.',selFave));
     acts.appendChild(_sbBtn('danger','del','Удалить',selDelete));
   }else{
-    acts.appendChild(_sbBtn('','pin','Закрепить',selPinChats));
+    // если ВСЕ выбранные закреплены → «Открепить», иначе → «Закрепить»
+    const _allPinned = selSet.size>0 && [...selSet].every(id=>isPinned(id));
+    acts.appendChild(_sbBtn('', _allPinned?'unpin':'pin', _allPinned?'Открепить':'Закрепить', selTogglePin));
     acts.appendChild(_sbBtn('','read','Прочитано',selReadChats));
     acts.appendChild(_sbBtn('danger','del','Удалить',selDeleteChats));
   }
@@ -3472,7 +3477,9 @@ async function selDelete(){ const ms=_selMsgs(); const mine=ms.filter(m=>m.from=
   exitSel(); renderMessages(); renderChats(); toast('Удалено: '+mine.length);
 }
 /* --- действия с чатами --- */
-function selPinChats(){ const ids=[...selSet]; ids.forEach(id=>{ if(!isPinned(id))togglePin(id); }); const n=ids.length; exitSel(); renderChats(); toast('📌 Закреплено: '+n); }
+function selTogglePin(){ const ids=[...selSet]; if(!ids.length)return; const allPinned=ids.every(id=>isPinned(id));
+  ids.forEach(id=>{ const p=isPinned(id); if(allPinned){ if(p)togglePin(id); } else { if(!p)togglePin(id); } });
+  const n=ids.length; exitSel(); renderChats(); toast(allPinned?('Откреплено: '+n):('📌 Закреплено: '+n)); }
 function selReadChats(){ const ids=[...selSet]; const d=db(); ids.forEach(id=>{ const c=d.chats[id]; if(!c)return; if(c.group){try{markReadGroup(id);}catch(e){}} else { const pid=(c.members||[]).find(x=>x!==me.id); if(pid)markRead(pid); } }); const n=ids.length; exitSel(); renderChats(); toast('Прочитано: '+n); }
 async function selDeleteChats(){ const ids=[...selSet]; if(!ids.length)return;
   const ok=await appConfirm('Собеседники свои копии сохранят. Чаты вернутся при новом сообщении.',{title:'Удалить '+ids.length+' чат(ов)?',okText:'Удалить',danger:true}); if(!ok)return;
