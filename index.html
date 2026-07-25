@@ -1817,7 +1817,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.58', BUILD_ID='2026-07-24-ios-kbd-diag-liverects';
+const APP_VERSION='4.9.59', BUILD_ID='2026-07-24-ios-kbd-native-noshrink';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -6927,24 +6927,19 @@ function fitViewport(){
   // клавиатурой). На экранах входа/регистрации это давало резкий скачок страницы вверх —
   // там оставляем обычную высоту, браузер сам аккуратно подкрутит к полю ввода.
   const conv = $('#scrConv') && !$('#scrConv').classList.contains('hidden');
-  if(conv && mobile && window.visualViewport){
-    const h=Math.round(window.visualViewport.height);
-    // Ужимаем высоту приложения до видимой части экрана над клавиатурой — поле ввода поднимается.
-    // ВАЖНО: НИКАКОГО translateY и НИКАКОГО scrollTo — оба на iOS ломали раскладку
-    //  (translateY толкал чат вниз; scrollTo зацикливался со слушателем 'scroll' → каша рендера).
-    ph.style.height=h+'px';
+  // iOS определяем отдельно: на нём ЛЮБОЕ ужатие высоты ломается — iOS всё равно ВНУТРЕННЕ
+  // прокручивает поле ввода (замер тестера: KBD t=390 sY=390 даже при overflow:hidden), из-за
+  // чего под полем остаётся дыра. Перебрали translateY/scrollTo/top-anchor/lock-scroll — все
+  // проиграли этому поведению. Решение: на iOS НЕ трогать высоту вовсе — Safari сам поднимает
+  // поле над клавиатурой (нативно, как в любом сайте). Ужатие оставляем только Android/прочим.
+  const isIOS = /iP(hone|od|ad)/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && 'ontouchend' in document);
+  if(conv && mobile && window.visualViewport && !isIOS){
+    // Android/прочие: ужимаем высоту под клавиатуру (это работало исходно).
+    ph.style.height=Math.round(window.visualViewport.height)+'px';
     ph.style.transform='';
-    // ПРИЧИНА «дыры под клавиатурой» №1 (найдена воспроизведением на ПК): body центрирует #phone
-    // (align-items:center) → ужатый #phone всплывал в ЦЕНТР. Прижимаем к верху видимой области.
-    ph.style.alignSelf='flex-start';
-    // ПРИЧИНА №2 (по замеру тестера KBD sY=390, cH=873): документ остаётся 873 → у iOS есть куда
-    // прокручивать, и он сам скроллит страницу, чтобы показать поле → #phone уезжает вверх, снизу
-    // пустота. Забираем «место для прокрутки»: ужимаем html/body до видимой высоты и запрещаем скролл.
-    document.documentElement.style.height=h+'px';
-    document.documentElement.style.overflow='hidden';
-    document.body.style.height=h+'px';
-    document.body.style.overflow='hidden';
+    ph.style.alignSelf='';
   } else {
+    // iOS (и все прочие состояния): никаких манипуляций — нативное поведение.
     ph.style.height='';
     ph.style.transform='';
     ph.style.alignSelf='';
