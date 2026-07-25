@@ -1817,7 +1817,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.60', BUILD_ID='2026-07-24-ios-kbd-DONE-cleanup';
+const APP_VERSION='4.9.61', BUILD_ID='2026-07-24-perf-msgs-reconcile';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -3148,19 +3148,52 @@ function pinMsgsBottom(force){
   });
 }
 {const _mb=$('#msgs');if(_mb)_mb.addEventListener('touchstart',()=>{_stickBottom=false;},{passive:true});}
+// Подпись пузыря: ВСЁ, от чего зависит его вид. Совпала → переиспользуем существующий DOM-узел,
+// не пересобирая (нет морганий картинок и лишней работы). JSON(m) ловит текст/тип/статус/реакции/
+// правку/удаление/медиа; отдельно — состояние перевода, поиск, размер группы, имя отправителя.
+function _msgSig(m){
+  return JSON.stringify(m)
+    +'|tw:'+(trWant[m.id]==null?'':trWant[m.id])
+    +'|td:'+(trDone[m.id]?JSON.stringify(trDone[m.id]):'')
+    +'|s:'+(searchTerm||'')
+    +'|mem:'+((current&&current.members&&current.members.length)||0)
+    +'|fr:'+(((current&&current.group)&&(db().users[m.from]||{}).name)||'');
+}
+// Сверка по ключу (reconciliation) вместо полной пересборки: раньше КАЖДОЕ входящее сообщение,
+// реакция, галочка перерисовывали ВЕСЬ список (innerHTML='' + все пузыри заново) → тормоза и
+// моргание картинок. Теперь трогаем только изменившиеся/новые пузыри, остальные остаются как есть.
 function renderMessages(){
-  const box=$('#msgs');box.innerHTML='';const c=getChat();if(!c)return;
-  let lastDay='';
-  c.messages.forEach(m=>{
+  const box=$('#msgs');if(!box)return;const c=getChat();if(!c){box.innerHTML='';return;}
+  // при смене чата — чистый лист (ключи сообщений уникальны, но так надёжнее и как раньше)
+  const ck=c.id||'';
+  if(box.dataset.chat!==ck){ box.innerHTML=''; box.dataset.chat=ck; }
+  // 1) желаемая последовательность: разделители дней / системные / пузыри — с ключами и подписями
+  const desired=[]; let lastDay='';
+  c.messages.forEach(m0=>{
+    let m=m0;
     if(m.pending){
       if(_memMedia[m.id])m=Object.assign({},m,_memMedia[m.id]);   // медиа ещё грузится — показываем из памяти
-      else m=Object.assign({},m,{type:'text',text:'📎 Вложение не отправлено — приложение закрылось во время загрузки'});   // осиротело после перезапуска
+      else m=Object.assign({},m,{type:'text',text:'📎 Вложение не отправлено — приложение закрылось во время загрузки'});
     }
-    if(m.system){const sn=document.createElement('div');sn.className='sys-note';sn.dataset.mid=m.id;sn.textContent=m.text||'';if(searchTerm)highlightInNode(sn,searchTerm);box.appendChild(sn);return;}
+    if(m.system){ const _m=m; desired.push({key:'sys:'+m.id, sig:'sys|'+(m.text||'')+'|s:'+(searchTerm||''),
+      make:()=>{const sn=document.createElement('div');sn.className='sys-note';sn.dataset.mid=_m.id;sn.textContent=_m.text||'';if(searchTerm)highlightInNode(sn,searchTerm);return sn;}}); return; }
     const day=new Date(m.t).toDateString();
-    if(day!==lastDay){lastDay=day;const sep=document.createElement('div');sep.className='daysep';sep.textContent=fmtDay(m.t);box.appendChild(sep);}
-    box.appendChild(renderBubble(m));
+    if(day!==lastDay){ lastDay=day; const lbl=fmtDay(m.t); desired.push({key:'sep:'+day, sig:'sep|'+lbl,
+      make:()=>{const sep=document.createElement('div');sep.className='daysep';sep.textContent=lbl;return sep;}}); }
+    const _m=m; desired.push({key:'msg:'+m.id, sig:_msgSig(m), make:()=>renderBubble(_m)});
   });
+  // 2) существующие узлы по ключу
+  const existing={};
+  Array.prototype.forEach.call(box.children,ch=>{ const k=ch.dataset&&ch.dataset.k; if(k)existing[k]=ch; });
+  // 3) финальные узлы: совпал ключ+подпись → переиспользуем, иначе создаём заново
+  const finalNodes=desired.map(it=>{
+    const ex=existing[it.key];
+    if(ex && ex.dataset.sig===it.sig) return ex;
+    const node=it.make(); node.dataset.k=it.key; node.dataset.sig=it.sig; return node;
+  });
+  // 4) привести DOM к финальному массиву (вставка/перемещение/удаление лишних)
+  for(let i=0;i<finalNodes.length;i++){ if(box.childNodes[i]!==finalNodes[i])box.insertBefore(finalNodes[i], box.childNodes[i]||null); }
+  while(box.childNodes.length>finalNodes.length) box.removeChild(box.lastChild);
   pinMsgsBottom();
   renderPinnedBar();
 }
