@@ -1817,7 +1817,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.61', BUILD_ID='2026-07-24-perf-msgs-reconcile';
+const APP_VERSION='4.9.62', BUILD_ID='2026-07-24-perf-chats-reconcile';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -2953,77 +2953,103 @@ function attachChatMenu(row,chat,label){
   row.addEventListener('contextmenu',e=>{e.preventDefault();openChatActions(row,chat,label);});
   row.addEventListener('click',e=>{if(long){e.stopImmediatePropagation();e.preventDefault();long=false;}},true);
 }
+// Сверка по ключу (как в renderMessages): раньше ЛЮБОЕ обновление списка (входящее в неоткрытый
+// чат, directory) пересобирало весь список (innerHTML='' + все строки заново) → если смотришь на
+// список, он моргал. Теперь строим желаемый список с подписями и трогаем только изменённые строки.
+// Точку «онлайн» в подпись НЕ включаем — ей отдельно занимается refreshPresenceDots (без пересборки).
 function renderChats(){
   if(!me)return;const d=db();const wrap=$('#chatList');
   const term=($('#searchInput').value||'').toLowerCase();
   const myChats=Object.values(d.chats).filter(c=>(c.members&&c.members.includes(me.id))||(c.channel&&c.subscribed));
-  // sort by last message time
   myChats.sort((a,b)=>{const pa=isPinned(a.id)?1:0,pb=isPinned(b.id)?1:0;if(pa!==pb)return pb-pa;const la=a.messages.at(-1)?.t||0,lb=b.messages.at(-1)?.t||0;return lb-la;});
-  wrap.innerHTML='';
-  let shown=0;
+  const desired=[];
   myChats.forEach(c=>{
     if(isChatHidden(c))return;
+    const pin=isPinned(c.id)?1:0;
     if(c.channel){
       const last=(c.messages||[]).at(-1);
       if(term){const hay=(c.name+' @'+c.handle+' '+(last?previewText(last):'')).toLowerCase();if(!hay.includes(term))return;}
-      const row=document.createElement('div');row.className='chat-row';
-      row.innerHTML=`<div class="avatar lg"></div><div class="cr-main"><div class="cr-top"><span class="cr-name"></span><span class="cr-time">${last?fmtTime(last.t):''}</span></div><div class="cr-bottom"><span class="cr-msg"></span></div></div>`;
-      av(row.querySelector('.avatar'),{avatar:(typeof c.avatar==='string'&&/^(https?:|data:|blob:)/i.test(c.avatar))?c.avatar:'channel',color:c.color,name:c.name});
-      row.querySelector('.cr-name').textContent='📢 '+c.name;
-      row.querySelector('.cr-msg').textContent=last?previewText(last):('@'+c.handle);
-      row.onclick=()=>openChannel(c.id);
-      attachChatMenu(row,c,c.name);
-      wrap.appendChild(row);shown++;return;
+      const sig='ch|'+(c.name||'')+'|'+(c.handle||'')+'|'+(c.avatar||'')+'|'+(c.color||'')+'|'+(last?previewText(last)+'@'+last.t:'@'+c.handle)+'|p'+pin;
+      desired.push({key:'chat:'+c.id, sig, make:()=>{
+        const row=document.createElement('div');row.className='chat-row';
+        row.innerHTML=`<div class="avatar lg"></div><div class="cr-main"><div class="cr-top"><span class="cr-name"></span><span class="cr-time">${last?fmtTime(last.t):''}</span></div><div class="cr-bottom"><span class="cr-msg"></span></div></div>`;
+        av(row.querySelector('.avatar'),{avatar:(typeof c.avatar==='string'&&/^(https?:|data:|blob:)/i.test(c.avatar))?c.avatar:'channel',color:c.color,name:c.name});
+        row.querySelector('.cr-name').textContent='📢 '+c.name;
+        row.querySelector('.cr-msg').textContent=last?previewText(last):('@'+c.handle);
+        row.onclick=()=>openChannel(c.id);
+        attachChatMenu(row,c,c.name);
+        return row;
+      }});
+      return;
     }
     if(c.group){
       const last=c.messages.at(-1);
       if(term){const hay=(c.name+' '+(last?previewText(last):'')).toLowerCase();if(!hay.includes(term))return;}
       const unread=c.messages.filter(m=>m.from!==me.id&&!m.readBy?.includes(me.id)).length;
-      const row=document.createElement('div');row.className='chat-row';
-      row.innerHTML=`<div class="avatar lg"></div>
-        <div class="cr-main">
-          <div class="cr-top"><span class="cr-name"></span><span class="cr-time">${last?fmtTime(last.t):''}</span></div>
-          <div class="cr-bottom"><span class="cr-msg"></span></div>
-        </div>`;
-      av(row.querySelector('.avatar'),{avatar:(typeof c.avatar==='string'&&/^(https?:|data:|blob:)/i.test(c.avatar))?c.avatar:'group',color:c.color,name:c.name});
-      row.querySelector('.cr-name').textContent='👥 '+c.name;
-      const msgEl=row.querySelector('.cr-msg');
-      if(last){
-        const who=last.from===me.id?'Вы':((d.users[last.from]&&d.users[last.from].name)||'Участник');
-        const y=document.createElement('span');y.className='ya';y.textContent=who+': ';msgEl.appendChild(y);
-        msgEl.appendChild(document.createTextNode(previewText(last)));
-      }else{msgEl.textContent=(c.members||[]).length+' '+plural((c.members||[]).length,'участник','участника','участников');}
-      if(unread>0){const bg=document.createElement('span');bg.className='badge';bg.textContent=unread;row.querySelector('.cr-bottom').appendChild(bg);}
-      row.onclick=()=>openGroup(c.id);
-      attachChatMenu(row,c,c.name);
-      wrap.appendChild(row);shown++;return;
+      const who=last?(last.from===me.id?'Вы':((d.users[last.from]&&d.users[last.from].name)||'Участник')):'';
+      const sig='gr|'+(c.name||'')+'|'+(c.avatar||'')+'|'+(c.color||'')+'|'+(last?who+':'+previewText(last)+'@'+last.t:(c.members||[]).length+'уч')+'|u'+unread+'|p'+pin;
+      desired.push({key:'chat:'+c.id, sig, make:()=>{
+        const row=document.createElement('div');row.className='chat-row';
+        row.innerHTML=`<div class="avatar lg"></div>
+          <div class="cr-main">
+            <div class="cr-top"><span class="cr-name"></span><span class="cr-time">${last?fmtTime(last.t):''}</span></div>
+            <div class="cr-bottom"><span class="cr-msg"></span></div>
+          </div>`;
+        av(row.querySelector('.avatar'),{avatar:(typeof c.avatar==='string'&&/^(https?:|data:|blob:)/i.test(c.avatar))?c.avatar:'group',color:c.color,name:c.name});
+        row.querySelector('.cr-name').textContent='👥 '+c.name;
+        const msgEl=row.querySelector('.cr-msg');
+        if(last){
+          const y=document.createElement('span');y.className='ya';y.textContent=who+': ';msgEl.appendChild(y);
+          msgEl.appendChild(document.createTextNode(previewText(last)));
+        }else{msgEl.textContent=(c.members||[]).length+' '+plural((c.members||[]).length,'участник','участника','участников');}
+        if(unread>0){const bg=document.createElement('span');bg.className='badge';bg.textContent=unread;row.querySelector('.cr-bottom').appendChild(bg);}
+        row.onclick=()=>openGroup(c.id);
+        attachChatMenu(row,c,c.name);
+        return row;
+      }});
+      return;
     }
     const peerId=(c.members.find(x=>x!==me.id))??me.id;const u=d.users[peerId];if(!u)return;
     const isSaved=peerId===me.id;
     const last=c.messages.at(-1);
     if(term){const hay=(u.name+' '+u.phone+' '+(last?last.text:'')).toLowerCase();if(!hay.includes(term))return;}
     const unread=c.messages.filter(m=>m.from!==me.id&&!m.readBy?.includes(me.id)).length;
-    const row=document.createElement('div');row.className='chat-row';
-    row.innerHTML=`<div class="avatar lg"></div>
-      <div class="cr-main">
-        <div class="cr-top"><span class="cr-name"></span><span class="cr-time">${last?fmtTime(last.t):''}</span></div>
-        <div class="cr-bottom"><span class="cr-msg"></span></div>
-      </div>`;
-    row.dataset.peer=peerId;   // метка для точечного обновления точки «онлайн» без пересборки списка
-    avDot(row.querySelector('.avatar'),u);
-    row.querySelector('.cr-name').textContent=u.name;
-    if(isSaved){row.querySelector('.cr-name').textContent='🔖 Избранное';const _a=row.querySelector('.avatar');_a.innerHTML='';_a.textContent='🔖';_a.style.background='linear-gradient(135deg,var(--primary),#8a7bff)';_a.style.color='#fff';}
-    const msgEl=row.querySelector('.cr-msg');
-    if(last){
-      if(last.from===me.id){const y=document.createElement('span');y.className='ya';y.textContent='Вы: ';msgEl.appendChild(y);}
-      msgEl.appendChild(document.createTextNode(previewText(last)));
-    }else{msgEl.textContent='Нет сообщений';}
-    if(unread>0){const b=document.createElement('span');b.className='badge';b.textContent=unread;row.querySelector('.cr-bottom').appendChild(b);}
-    row.onclick=()=>openConv(peerId);
-    attachChatMenu(row,c,isSaved?'Избранное':u.name);
-    wrap.appendChild(row);shown++;
+    const sig='dm|'+peerId+'|'+(u.name||'')+'|'+(u.avatar||'')+'|'+(u.color||'')+'|'+(last?(last.from===me.id?'Вы:':'')+previewText(last)+'@'+last.t:'нет')+'|u'+unread+'|sv'+(isSaved?1:0)+'|p'+pin;
+    desired.push({key:'chat:'+c.id, sig, make:()=>{
+      const row=document.createElement('div');row.className='chat-row';
+      row.innerHTML=`<div class="avatar lg"></div>
+        <div class="cr-main">
+          <div class="cr-top"><span class="cr-name"></span><span class="cr-time">${last?fmtTime(last.t):''}</span></div>
+          <div class="cr-bottom"><span class="cr-msg"></span></div>
+        </div>`;
+      row.dataset.peer=peerId;   // метка для точечного обновления точки «онлайн» без пересборки списка
+      avDot(row.querySelector('.avatar'),u);
+      row.querySelector('.cr-name').textContent=u.name;
+      if(isSaved){row.querySelector('.cr-name').textContent='🔖 Избранное';const _a=row.querySelector('.avatar');_a.innerHTML='';_a.textContent='🔖';_a.style.background='linear-gradient(135deg,var(--primary),#8a7bff)';_a.style.color='#fff';}
+      const msgEl=row.querySelector('.cr-msg');
+      if(last){
+        if(last.from===me.id){const y=document.createElement('span');y.className='ya';y.textContent='Вы: ';msgEl.appendChild(y);}
+        msgEl.appendChild(document.createTextNode(previewText(last)));
+      }else{msgEl.textContent='Нет сообщений';}
+      if(unread>0){const b=document.createElement('span');b.className='badge';b.textContent=unread;row.querySelector('.cr-bottom').appendChild(b);}
+      row.onclick=()=>openConv(peerId);
+      attachChatMenu(row,c,isSaved?'Избранное':u.name);
+      return row;
+    }});
   });
-  if(shown===0){wrap.innerHTML=`<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><div>${term?'Ничего не найдено':'Пока нет чатов.<br>Нажмите + чтобы начать.'}</div></div>`;}
+  if(desired.length===0){
+    wrap.innerHTML=`<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><div>${term?'Ничего не найдено':'Пока нет чатов.<br>Нажмите + чтобы начать.'}</div></div>`;
+  }else{
+    const existing={};
+    Array.prototype.forEach.call(wrap.children,ch=>{const k=ch.dataset&&ch.dataset.k;if(k)existing[k]=ch;});
+    const finalNodes=desired.map(it=>{
+      const ex=existing[it.key];
+      if(ex && ex.dataset.sig===it.sig)return ex;
+      const node=it.make();node.dataset.k=it.key;node.dataset.sig=it.sig;return node;
+    });
+    for(let i=0;i<finalNodes.length;i++){ if(wrap.childNodes[i]!==finalNodes[i])wrap.insertBefore(finalNodes[i], wrap.childNodes[i]||null); }
+    while(wrap.childNodes.length>finalNodes.length) wrap.removeChild(wrap.lastChild);
+  }
   $('#myStatusTop').textContent='в сети';
 }
 function videoNoteEl(m){
