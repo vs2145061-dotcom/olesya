@@ -1817,7 +1817,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.64', BUILD_ID='2026-07-24-multiselect+olesya-ai';
+const APP_VERSION='4.9.65', BUILD_ID='2026-07-24-multiselect-fixes';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -2952,7 +2952,7 @@ function attachChatMenu(row,chat,label){
   row.addEventListener('touchstart',()=>{long=false;tmr=setTimeout(()=>{long=true;tmr=null;enterSel('chat',chat.id);},500);},{passive:true});
   const cancel=()=>{if(tmr){clearTimeout(tmr);tmr=null;}};
   row.addEventListener('touchend',cancel);row.addEventListener('touchmove',cancel);
-  row.addEventListener('contextmenu',e=>{e.preventDefault(); if(selMode==='chat'){toggleSel('chat',chat.id);return;} openChatActions(row,chat,label);});
+  row.addEventListener('contextmenu',e=>{e.preventDefault(); if(_touchRecent())return; if(selMode==='chat'){toggleSel('chat',chat.id);return;} openChatActions(row,chat,label);});
   row.addEventListener('click',e=>{ if(selMode==='chat'){e.stopImmediatePropagation();e.preventDefault();if(long){long=false;return;}toggleSel('chat',chat.id);return;} if(long){e.stopImmediatePropagation();e.preventDefault();long=false;} },true);
 }
 // Сверка по ключу (как в renderMessages): раньше ЛЮБОЕ обновление списка (входящее в неоткрытый
@@ -3291,7 +3291,7 @@ function renderBubble(m){
   row.addEventListener('click',ev=>{ if(selMode==='msg'){ev.stopPropagation();ev.preventDefault();if(_lp){_lp=false;return;}toggleSel('msg',m.id);} },true);
   // меню реакций — только вне режима выбора
   b.addEventListener('click',ev=>{ if(selMode==='msg')return; if(m.type==='voice'||m.type==='videonote')return; ev.stopPropagation(); openReactMenu(b,m); });
-  b.addEventListener('contextmenu',ev=>{ev.preventDefault();ev.stopPropagation(); if(selMode==='msg'){toggleSel('msg',m.id);return;} openReactMenu(b,m);});
+  b.addEventListener('contextmenu',ev=>{ev.preventDefault();ev.stopPropagation(); if(_touchRecent())return; if(selMode==='msg'){toggleSel('msg',m.id);return;} openReactMenu(b,m);});
   return row;
 }
 function voiceEl(m,mine){
@@ -3406,10 +3406,15 @@ document.addEventListener('click',closeReactMenu);
   .aisel-acts{display:flex;gap:8px}
   .aisel-acts button{flex:1;padding:11px;border-radius:12px;font-weight:600;font-size:13.5px}
   .aisel-acts .prim{background:linear-gradient(135deg,var(--primary),#8a7bff);color:#fff}
-  .aisel-acts .sec{background:var(--raised);color:var(--text)}`;
+  .aisel-acts .sec{background:var(--raised);color:var(--text)}
+  .chat-row,#msgs .row{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}`;
   document.head.appendChild(s);
 })();
 let selMode=null, selSet=new Set();
+// запоминаем время последнего касания: на сенсоре долгое нажатие обрабатывает наш таймер, а
+// системное contextmenu (которое иначе открыло бы старое одиночное меню) — глушим.
+try{ document.addEventListener('touchstart',()=>{window._lastTouch=Date.now();},{passive:true,capture:true}); }catch(e){}
+function _touchRecent(){ return (Date.now()-(window._lastTouch||0))<1200; }
 function selBoxFor(mode){ return document.getElementById(mode==='msg'?'msgs':'chatList'); }
 function markSelNode(mode,id,on){ const box=selBoxFor(mode); if(!box)return; const k=(mode==='msg'?'msg:':'chat:')+id;
   Array.prototype.forEach.call(box.children,ch=>{ if(ch.dataset&&ch.dataset.k===k)ch.classList.toggle('selrow',on); }); }
@@ -3419,7 +3424,10 @@ function exitSel(){ if(!selMode)return; const box=selBoxFor(selMode); if(box){bo
 function toggleSel(mode,id){ if(selMode!==mode){enterSel(mode,id);return;} if(selSet.has(id)){selSet.delete(id);markSelNode(mode,id,false);}else{selSet.add(id);markSelNode(mode,id,true);} if(selSet.size===0){exitSel();return;} updateSelBar(); }
 function reapplySel(){ if(!selMode)return; const box=selBoxFor(selMode); if(!box)return; box.classList.add('selmode'); const pref=selMode==='msg'?'msg:':'chat:';
   Array.prototype.forEach.call(box.children,ch=>{ const k=ch.dataset&&ch.dataset.k; if(k&&k.indexOf(pref)===0)ch.classList.toggle('selrow',selSet.has(k.slice(pref.length))); }); }
-function ensureSelBar(){ let bar=document.getElementById('selBar'); if(!bar){ bar=document.createElement('div'); bar.id='selBar'; bar.className='sel-bar'; (document.getElementById('phone')||document.body).appendChild(bar);} return bar; }
+function ensureSelBar(){ let bar=document.getElementById('selBar'); if(!bar){ bar=document.createElement('div'); bar.id='selBar'; bar.className='sel-bar'; (document.getElementById('phone')||document.body).appendChild(bar);
+    // подключаем к системе аппаратной «назад»: первый «назад» закрывает выбор, второй — уводит с экрана
+    try{ if(typeof OM_OVERLAYS!=='undefined'){ if(OM_OVERLAYS.indexOf('selBar')<0)OM_OVERLAYS.push('selBar'); if(OM_OVERLAYS.indexOf('aiSelBack')<0)OM_OVERLAYS.push('aiSelBack'); } if(typeof _omWatchOverlay==='function')_omWatchOverlay('selBar'); }catch(e){}
+  } return bar; }
 function hideSelBar(){ const bar=document.getElementById('selBar'); if(bar)bar.classList.remove('show'); }
 const _SBIC={
   copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/>',
@@ -3474,7 +3482,8 @@ async function selDeleteChats(){ const ids=[...selSet]; if(!ids.length)return;
 /* --- ✨ изюминка: действия с Олесей над выбранными сообщениями --- */
 function _aiSelBack(){ let back=document.getElementById('aiSelBack');
   if(!back){ back=document.createElement('div'); back.id='aiSelBack'; back.className='aisel-back'; back.innerHTML='<div class="aisel-card"></div>';
-    back.addEventListener('click',e=>{if(e.target===back)back.classList.remove('show');}); (document.getElementById('phone')||document.body).appendChild(back); }
+    back.addEventListener('click',e=>{if(e.target===back)back.classList.remove('show');}); (document.getElementById('phone')||document.body).appendChild(back);
+    try{ if(typeof _omWatchOverlay==='function')_omWatchOverlay('aiSelBack'); }catch(e){} }
   return back; }
 function selAiMenu(){ const ms=_selMsgs(); if(!ms.length)return;
   const back=_aiSelBack(); const card=back.querySelector('.aisel-card');
@@ -6797,6 +6806,8 @@ function _omCloseOverlay(id){
     case 'pasteSheet':      if(typeof closePasteContacts==='function'){closePasteContacts();return;} break;
     case 'aiImgSheet':      if(typeof closeAiImg==='function'){closeAiImg();return;} break;
     case 'vnShapeSheet':    if(typeof closeVnoteShapePicker==='function'){closeVnoteShapePicker();return;} break;
+    case 'aiSelBack':       { const a=document.getElementById('aiSelBack'); if(a)a.classList.remove('show'); return; }   // «назад» из ИИ-листа → к выбору
+    case 'selBar':          if(typeof exitSel==='function'){exitSel();return;} break;                                   // «назад» из режима выбора → выход
   }
   const e=document.getElementById(id); if(e)e.classList.remove('show');
 }
