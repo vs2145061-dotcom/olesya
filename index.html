@@ -851,6 +851,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 #scrHome.homebg .topbar{position:relative;z-index:1;background:transparent;border-bottom-color:transparent}
 #scrHome.homebg .home-wrap{position:relative;z-index:1}
 #scrHome.homebg .title,#scrHome.homebg .home-hero .greet{color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.55)}
+#scrHome.homebg .brandmark{color:#fff;font-weight:800;letter-spacing:.3px;text-shadow:0 1px 3px rgba(0,0,0,.9),0 2px 12px rgba(0,0,0,.45)}
 #scrHome.homebg .sub,#scrHome.homebg .home-hero .subg{color:rgba(255,255,255,.85);text-shadow:0 1px 4px rgba(0,0,0,.5)}
 #scrHome.homebg .iconbtn{color:#fff}
 #scrHome.homebg .home-foot{color:rgba(255,255,255,.72)}
@@ -1832,7 +1833,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.72', BUILD_ID='2026-07-24-homebg-remove-confirm';
+const APP_VERSION='4.9.73', BUILD_ID='2026-07-24-brandmark-bright+delete-wording';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -6239,7 +6240,7 @@ $('#btnCallPick').onclick=()=>{renderContacts();go('scrContacts');};
 {const cs=$('#contactsSearch');if(cs)cs.addEventListener('input',renderContacts);}
 /* фон лицевой страницы */
 $('#btnHomeBg').onclick=()=>$('#homeBgInput').click();
-$('#btnHomeBgRemove').onclick=async()=>{ if(await appConfirm('Точно убрать фон лицевой страницы?',{title:'Убрать фон?',okText:'Убрать',danger:true})) removeHomeBg(); };
+$('#btnHomeBgRemove').onclick=async()=>{ if(await appConfirm('Точно хотите удалить фон лицевой страницы?',{title:'Удалить фон?',okText:'Удалить',danger:true})) removeHomeBg(); };
 $('#homeBgInput').onchange=e=>{const f=e.target.files[0];loadHomeBgPhoto(f);e.target.value='';};
 
 /* ---- Запоминание входа (без СМС при перезапуске) ---- */
