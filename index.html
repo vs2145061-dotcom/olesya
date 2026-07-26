@@ -1832,7 +1832,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.71', BUILD_ID='2026-07-24-desktop-twopane-phase1';
+const APP_VERSION='4.9.72', BUILD_ID='2026-07-24-homebg-remove-confirm';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -6239,7 +6239,7 @@ $('#btnCallPick').onclick=()=>{renderContacts();go('scrContacts');};
 {const cs=$('#contactsSearch');if(cs)cs.addEventListener('input',renderContacts);}
 /* фон лицевой страницы */
 $('#btnHomeBg').onclick=()=>$('#homeBgInput').click();
-$('#btnHomeBgRemove').onclick=removeHomeBg;
+$('#btnHomeBgRemove').onclick=async()=>{ if(await appConfirm('Точно убрать фон лицевой страницы?',{title:'Убрать фон?',okText:'Убрать',danger:true})) removeHomeBg(); };
 $('#homeBgInput').onchange=e=>{const f=e.target.files[0];loadHomeBgPhoto(f);e.target.value='';};
 
 /* ---- Запоминание входа (без СМС при перезапуске) ---- */
