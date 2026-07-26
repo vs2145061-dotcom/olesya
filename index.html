@@ -246,7 +246,9 @@ h1.brandname{font-family:var(--brand);font-weight:400;font-size:52px;line-height
 .conv-head{display:flex;align-items:center;gap:11px;padding:11px 12px;border-bottom:1px solid var(--line-soft);background:var(--surface)}
 .conv-head .who{flex:1;min-width:0;cursor:pointer}
 .conv-head .nm{font-weight:600;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.conv-head .st{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px;width:auto;height:auto;border-radius:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:default}
+.conv-head .st{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px;width:auto;height:auto;border-radius:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:default;box-shadow:none;border:none;background:none;transform:none;padding:0}
+.conv-head .st::after{display:none}
+.conv-head .st:hover{transform:none}
 .conv-head .st.typing{color:var(--green)}
 .e2ee-banner{display:flex;align-items:center;justify-content:center;gap:7px;padding:7px;font-size:11.5px;
   color:var(--amber);background:rgba(245,181,68,.07);border-bottom:1px solid var(--line-soft)}
@@ -1817,7 +1819,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.67', BUILD_ID='2026-07-24-selbar-bigger+tapsound';
+const APP_VERSION='4.9.68', BUILD_ID='2026-07-24-status-frame+msgsel+olesya-icon';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -3378,7 +3380,7 @@ document.addEventListener('click',closeReactMenu);
   #chatList.selmode .chat-row.selrow::after{left:21.5px;top:calc(50% - 7px)}
   #msgs.selmode .row.selrow::after{left:15.5px;top:calc(50% - 7px)}
   #chatList.selmode .chat-row.selrow{background:rgba(108,123,255,.09)}
-  #msgs.selmode .row.selrow>.bubble{outline:2px solid var(--primary);outline-offset:1px}
+  #msgs.selmode .row.selrow{background:rgba(108,123,255,.11)}
   .sel-bar{position:absolute;left:0;right:0;bottom:0;z-index:70;transform:translateY(120%);transition:transform .26s cubic-bezier(.2,.8,.2,1);background:var(--surface);border-top:1px solid var(--line);padding:11px 8px calc(11px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:2px;box-shadow:0 -7px 26px rgba(0,0,0,.20)}
   .sel-bar.show{transform:translateY(0)}
   .sb-x{width:47px;height:47px;border-radius:13px;display:grid;place-items:center;font-size:23px;color:var(--muted);flex:none;cursor:pointer}
@@ -3390,7 +3392,7 @@ document.addEventListener('click',closeReactMenu);
   .sb-btn:active{background:var(--raised)}
   .sb-btn.danger{color:var(--red)}
   .sb-btn.ai{background:linear-gradient(135deg,rgba(108,123,255,.16),rgba(138,123,255,.16));color:var(--primary)}
-  .sb-btn.ai svg{fill:var(--primary);stroke:none}
+  .sb-btn.ai svg{stroke:none}
   .aisel-back{position:absolute;inset:0;z-index:120;background:rgba(10,10,20,.5);display:none;align-items:flex-end}
   .aisel-back.show{display:flex}
   .aisel-card{width:100%;background:var(--surface);border-radius:20px 20px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));max-height:82%;overflow-y:auto;box-shadow:0 -10px 40px rgba(0,0,0,.3);animation:aiselUp .26s cubic-bezier(.2,.8,.2,1)}
@@ -3407,7 +3409,8 @@ document.addEventListener('click',closeReactMenu);
   .aisel-acts button{flex:1;padding:11px;border-radius:12px;font-weight:600;font-size:13.5px}
   .aisel-acts .prim{background:linear-gradient(135deg,var(--primary),#8a7bff);color:#fff}
   .aisel-acts .sec{background:var(--raised);color:var(--text)}
-  .chat-row,#msgs .row{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}`;
+  #phone{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  input,textarea,[contenteditable="true"],.selectable{-webkit-user-select:text;user-select:text}`;
   document.head.appendChild(s);
 })();
 let selMode=null, selSet=new Set();
@@ -3439,7 +3442,7 @@ const _SBIC={
   pin:'<path d="M9 4h6l-1 7 4 3H6l4-3z"/><path d="M12 14v6"/>',
   unpin:'<path d="M9 4h6l-1 7 4 3H6l4-3z"/><path d="M12 14v6"/><path d="M3 3l18 18"/>',
   read:'<path d="M4 12l4 4L20 6"/>',
-  ai:'<path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15l-1.9-4.1L5.5 9l4.6-1.4z"/>'
+  ai:'<defs><linearGradient id="olsg" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#8A7BFF"/><stop offset="1" stop-color="#C77BFF"/></linearGradient></defs><path fill="url(#olsg)" d="M11 2.2c.4 4 1.7 6.3 5.9 6.7-4.2.4-5.5 2.7-5.9 6.7-.4-4-1.7-6.3-5.9-6.7 4.2-.4 5.5-2.7 5.9-6.7z"/><path fill="url(#olsg)" d="M18 12.8c.2 1.85.82 2.95 2.85 3.15-2.03.2-2.65 1.3-2.85 3.15-.2-1.85-.82-2.95-2.85-3.15 2.03-.2 2.65-1.3 2.85-3.15z"/>'
 };
 function _sbBtn(cls,icon,label,fn){ const b=document.createElement('button'); b.className='sb-btn'+(cls?' '+cls:''); b.innerHTML='<svg viewBox="0 0 24 24">'+_SBIC[icon]+'</svg><span>'+label+'</span>'; b.onclick=(e)=>{e.stopPropagation();_selVibe(10);fn();}; return b; }
 function updateSelBar(){ const bar=ensureSelBar(); bar.innerHTML='';
