@@ -1819,7 +1819,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.69', BUILD_ID='2026-07-24-msgsel-circles+hidecomposer+emoji';
+const APP_VERSION='4.9.70', BUILD_ID='2026-07-24-olesya-sparkle-brandcolor';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -3445,11 +3445,9 @@ const _SBIC={
   pin:'<path d="M9 4h6l-1 7 4 3H6l4-3z"/><path d="M12 14v6"/>',
   unpin:'<path d="M9 4h6l-1 7 4 3H6l4-3z"/><path d="M12 14v6"/><path d="M3 3l18 18"/>',
   read:'<path d="M4 12l4 4L20 6"/>',
-  ai:'<defs><linearGradient id="olsg" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#8A7BFF"/><stop offset="1" stop-color="#C77BFF"/></linearGradient></defs><path fill="url(#olsg)" d="M11 2.2c.4 4 1.7 6.3 5.9 6.7-4.2.4-5.5 2.7-5.9 6.7-.4-4-1.7-6.3-5.9-6.7 4.2-.4 5.5-2.7 5.9-6.7z"/><path fill="url(#olsg)" d="M18 12.8c.2 1.85.82 2.95 2.85 3.15-2.03.2-2.65 1.3-2.85 3.15-.2-1.85-.82-2.95-2.85-3.15 2.03-.2 2.65-1.3 2.85-3.15z"/>'
+  ai:'<defs><linearGradient id="olsg" x1="2" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#7B8CFF"/><stop offset="1" stop-color="#C46CFF"/></linearGradient></defs><path fill="url(#olsg)" d="M14 3.8Q14 12 21.5 12Q14 12 14 20.2Q14 12 6.5 12Q14 12 14 3.8Z"/><path fill="url(#olsg)" d="M6 2.5Q6 6.2 9.5 6.2Q6 6.2 6 9.9Q6 6.2 2.5 6.2Q6 6.2 6 2.5Z"/><path fill="url(#olsg)" d="M6.6 15.4Q6.6 18 9.1 18Q6.6 18 6.6 20.6Q6.6 18 4 18Q6.6 18 6.6 15.4Z"/>'
 };
-function _sbBtn(cls,icon,label,fn){ const b=document.createElement('button'); b.className='sb-btn'+(cls?' '+cls:'');
-  const ico=(icon==='ai')?'<span class="sb-em">✨</span>':'<svg viewBox="0 0 24 24">'+_SBIC[icon]+'</svg>';
-  b.innerHTML=ico+'<span>'+label+'</span>'; b.onclick=(e)=>{e.stopPropagation();_selVibe(10);fn();}; return b; }
+function _sbBtn(cls,icon,label,fn){ const b=document.createElement('button'); b.className='sb-btn'+(cls?' '+cls:''); b.innerHTML='<svg viewBox="0 0 24 24">'+_SBIC[icon]+'</svg><span>'+label+'</span>'; b.onclick=(e)=>{e.stopPropagation();_selVibe(10);fn();}; return b; }
 function updateSelBar(){ const bar=ensureSelBar(); bar.innerHTML='';
   const x=document.createElement('div'); x.className='sb-x'; x.textContent='✕'; x.onclick=(e)=>{e.stopPropagation();_selVibe(10);exitSel();}; bar.appendChild(x);
   const cnt=document.createElement('div'); cnt.className='sb-count'; cnt.textContent=selSet.size; bar.appendChild(cnt);
