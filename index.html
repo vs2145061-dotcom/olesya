@@ -103,6 +103,19 @@ input,textarea{font-family:inherit}
   transform:translateX(0);transition:transform .28s cubic-bezier(.4,0,.2,1),opacity .2s;}
 .screen.hidden{transform:translateX(100%);opacity:0;pointer-events:none}
 .screen.back{transform:translateX(-22%);opacity:.4;pointer-events:none}
+/* ===== Двухпанельный десктоп (≥900px): список чатов слева, переписка справа ===== */
+@media (min-width:900px){
+  body{align-items:stretch;justify-content:stretch;overflow:hidden}
+  #phone{width:100vw;height:100vh;max-height:100vh;border:none;border-radius:0;box-shadow:none}
+  body.two-pane .screen{z-index:1}
+  body.two-pane #scrChats{left:0;right:auto;width:370px;transform:none!important;opacity:1!important;pointer-events:auto!important;border-right:1px solid var(--line)}
+  body.two-pane #scrConv{left:370px;right:0}
+  #deskEmpty{display:none}
+  body.two-pane #deskEmpty{display:flex;position:absolute;left:370px;right:0;top:0;bottom:0;z-index:0;align-items:center;justify-content:center;flex-direction:column;gap:15px;color:var(--muted);background:var(--bg)}
+  #deskEmpty .de-logo{width:92px;height:92px;border-radius:27px;background:linear-gradient(135deg,var(--primary),#8a7bff);display:grid;place-items:center;font-size:46px;box-shadow:var(--shadow)}
+  #deskEmpty .de-t{font-size:15px;font-weight:500}
+  body.two-pane #scrConv .bubble{max-width:560px}   /* на широкой панели пузыри не растягиваются */
+}
 /* Вошедшим экран номера не рисуем вовсе — до решения boot() виден только фон приложения */
 html[data-boot="app"] #scrPhone{display:none}
 
@@ -1819,7 +1832,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.70', BUILD_ID='2026-07-24-olesya-sparkle-brandcolor';
+const APP_VERSION='4.9.71', BUILD_ID='2026-07-24-desktop-twopane-phase1';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -2308,7 +2321,27 @@ function handleBus(m){
 /* ================== AUTH FLOW ================== */
 /* ================== AUTH FLOW ================== */
 function showScreen(id){ $$(  '.screen').forEach(s=>{ if(s.id===id){s.classList.remove('hidden','back')} }); }
-function go(id){ try{if(selMode)exitSel();}catch(e){} if(id==='scrPhone'){try{document.documentElement.removeAttribute('data-boot');}catch(e){}} $$('.screen').forEach(s=>s.classList.add('hidden')); const el=$('#'+id); if(el)el.classList.remove('hidden'); else {console.error('go(): экран не найден:',id);return;} if(typeof omPushScreen==='function')omPushScreen(id); }
+function go(id){ try{if(selMode)exitSel();}catch(e){} if(id==='scrPhone'){try{document.documentElement.removeAttribute('data-boot');}catch(e){}} $$('.screen').forEach(s=>s.classList.add('hidden')); const el=$('#'+id); if(el)el.classList.remove('hidden'); else {console.error('go(): экран не найден:',id);return;} if(typeof omPushScreen==='function')omPushScreen(id); try{_deskSync(id);}catch(e){} }
+/* Двухпанельный десктоп (≥900px): при переписке/списке чатов держим список слева, чат справа. */
+function _isDesk(){ try{return window.matchMedia&&window.matchMedia('(min-width:900px)').matches;}catch(e){return false;} }
+function _ensureDeskEmpty(){ if(document.getElementById('deskEmpty'))return; const d=document.createElement('div'); d.id='deskEmpty';
+  d.innerHTML='<div class="de-logo">💬</div><div class="de-t">Выберите чат, чтобы начать общение</div>';
+  const ph=document.getElementById('phone'); if(ph)ph.appendChild(d); }
+function _deskSync(id){
+  if(!_isDesk()){
+    if(document.body.classList.contains('two-pane')){
+      document.body.classList.remove('two-pane');
+      // назад к одноэкранности: если открыта переписка — она главная, список прячем
+      const conv=document.getElementById('scrConv'), ch=document.getElementById('scrChats');
+      if(conv&&!conv.classList.contains('hidden')&&ch)ch.classList.add('hidden');
+    }
+    return;
+  }
+  const two = (id==='scrConv'||id==='scrChats');
+  document.body.classList.toggle('two-pane', two);
+  if(two){ _ensureDeskEmpty(); const ch=document.getElementById('scrChats'); if(ch)ch.classList.remove('hidden','back'); }
+}
+window.addEventListener('resize',()=>{ try{ const vis=[...document.querySelectorAll('.screen')].find(s=>!s.classList.contains('hidden')); _deskSync(vis?vis.id:''); }catch(e){} });
 
 let pendingPhone='', genCode='', otpFails=0, otpLocked=false, pendingUser=null, pendingMode='', pwFails=0, pwLockUntil=0;
 /* ── Production OTP (используется когда cloudCfg().url задан) ── */
