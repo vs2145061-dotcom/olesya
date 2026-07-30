@@ -149,7 +149,20 @@ h1.brandname{font-family:var(--brand);font-weight:400;font-size:52px;line-height
 .input:focus{border-color:var(--primary);background:var(--input-focus)}
 .input::placeholder{color:var(--faint)}
 .phone-row{display:flex;gap:10px}
-.phone-row .cc{width:96px;text-align:center;font-family:var(--mono)}
+.phone-row .cc-wrap{width:122px;display:flex;align-items:center;gap:5px;background:var(--raised);border:1px solid var(--line);border-radius:14px;padding:0 9px;cursor:pointer;box-sizing:border-box;transition:border-color .15s,background .15s}
+.phone-row .cc-wrap:active{background:var(--raised-2)}
+.phone-row .cc-wrap .cc{flex:1;width:auto;min-width:0;background:transparent;border:none;border-radius:0;padding:14px 0;text-align:left;font-family:var(--mono);cursor:pointer;color:var(--text);font-size:16px}
+.cc-flag{font-size:20px;line-height:1}
+.cc-caret{color:var(--muted);font-size:11px}
+.cc-sheet-card{max-width:420px;width:100%;padding:17px 15px 11px;display:flex;flex-direction:column;max-height:82vh}
+.cc-sheet-card .cc-search{margin-bottom:10px}
+.cc-list{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0;max-height:62vh;margin:0 -4px}
+.cc-item{display:flex;align-items:center;gap:12px;padding:12px 8px;border-radius:12px;cursor:pointer}
+.cc-item:active{background:var(--raised)}
+.cc-item.cur{background:var(--raised-2)}
+.cc-i-flag{font-size:22px;line-height:1;width:26px;text-align:center}
+.cc-i-name{flex:1;min-width:0;color:var(--text);font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc-i-dial{color:var(--muted);font-family:var(--mono);font-size:14px}
 .btn{
   width:100%;margin-top:22px;padding:15px;border-radius:14px;font-size:16px;font-weight:600;
   background:linear-gradient(135deg,var(--primary),#8a7bff);color:#fff;
@@ -1040,7 +1053,11 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
       </div>
       <div class="field-label">Номер телефона</div>
       <div class="phone-row">
-        <input class="input cc" id="cc" value="+7" maxlength="5" placeholder="+7" />
+        <div class="cc-wrap" id="ccPick" role="button" tabindex="0" aria-label="Код страны — выбрать">
+          <span class="cc-flag" id="ccFlag">🇷🇺</span>
+          <input class="input cc" id="cc" value="+7" maxlength="5" placeholder="+7" readonly />
+          <span class="cc-caret">▾</span>
+        </div>
         <input class="input" id="phoneNum" inputmode="tel" placeholder="900 123 45 67" />
       </div>
       <button class="btn" id="btnSendCode">Получить код</button>
@@ -1835,7 +1852,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.77', BUILD_ID='2026-07-30-uz-eskiz-routing';
+const APP_VERSION='4.9.78', BUILD_ID='2026-07-30-country-picker-autodetect';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -2567,6 +2584,151 @@ $('#btnSendCode').onclick=async()=>{
     resetRecaptcha();
   }finally{b.disabled=false;}
 };
+
+/* ============ КОД СТРАНЫ: ручной выбор всех стран + автоопределение (сеть+пояс, GPS запасной) ============ */
+const COUNTRIES=[
+ ['UZ','998','Узбекистан'],['RU','7','Россия'],['KZ','7','Казахстан'],['KG','996','Киргизия'],['TJ','992','Таджикистан'],
+ ['TM','993','Туркменистан'],['AZ','994','Азербайджан'],['AM','374','Армения'],['GE','995','Грузия'],['BY','375','Беларусь'],
+ ['UA','380','Украина'],['MD','373','Молдова'],['TR','90','Турция'],['AE','971','ОАЭ'],['US','1','США'],
+ ['CA','1','Канада'],['GB','44','Великобритания'],['DE','49','Германия'],['FR','33','Франция'],['IT','39','Италия'],
+ ['ES','34','Испания'],['PT','351','Португалия'],['NL','31','Нидерланды'],['BE','32','Бельгия'],['CH','41','Швейцария'],
+ ['AT','43','Австрия'],['PL','48','Польша'],['CZ','420','Чехия'],['SK','421','Словакия'],['HU','36','Венгрия'],
+ ['RO','40','Румыния'],['BG','359','Болгария'],['GR','30','Греция'],['RS','381','Сербия'],['HR','385','Хорватия'],
+ ['SI','386','Словения'],['BA','387','Босния и Герцеговина'],['MK','389','Северная Македония'],['AL','355','Албания'],['ME','382','Черногория'],
+ ['SE','46','Швеция'],['NO','47','Норвегия'],['FI','358','Финляндия'],['DK','45','Дания'],['IS','354','Исландия'],
+ ['IE','353','Ирландия'],['LT','370','Литва'],['LV','371','Латвия'],['EE','372','Эстония'],['LU','352','Люксембург'],
+ ['MT','356','Мальта'],['CY','357','Кипр'],['CN','86','Китай'],['JP','81','Япония'],['KR','82','Южная Корея'],
+ ['IN','91','Индия'],['PK','92','Пакистан'],['BD','880','Бангладеш'],['LK','94','Шри-Ланка'],['NP','977','Непал'],
+ ['TH','66','Таиланд'],['VN','84','Вьетнам'],['MY','60','Малайзия'],['SG','65','Сингапур'],['ID','62','Индонезия'],
+ ['PH','63','Филиппины'],['MM','95','Мьянма'],['KH','855','Камбоджа'],['LA','856','Лаос'],['MN','976','Монголия'],
+ ['SA','966','Саудовская Аравия'],['QA','974','Катар'],['KW','965','Кувейт'],['BH','973','Бахрейн'],['OM','968','Оман'],
+ ['JO','962','Иордания'],['LB','961','Ливан'],['IL','972','Израиль'],['IR','98','Иран'],['IQ','964','Ирак'],
+ ['SY','963','Сирия'],['YE','967','Йемен'],['AF','93','Афганистан'],['EG','20','Египет'],['MA','212','Марокко'],
+ ['DZ','213','Алжир'],['TN','216','Тунис'],['LY','218','Ливия'],['SD','249','Судан'],['NG','234','Нигерия'],
+ ['GH','233','Гана'],['KE','254','Кения'],['ET','251','Эфиопия'],['TZ','255','Танзания'],['UG','256','Уганда'],
+ ['ZA','27','ЮАР'],['ZM','260','Замбия'],['ZW','263','Зимбабве'],['AO','244','Ангола'],['CM','237','Камерун'],
+ ['CI','225','Кот-д’Ивуар'],['SN','221','Сенегал'],['ML','223','Мали'],['CD','243','ДР Конго'],['RW','250','Руанда'],
+ ['MX','52','Мексика'],['BR','55','Бразилия'],['AR','54','Аргентина'],['CL','56','Чили'],['CO','57','Колумбия'],
+ ['PE','51','Перу'],['VE','58','Венесуэла'],['EC','593','Эквадор'],['BO','591','Боливия'],['PY','595','Парагвай'],
+ ['UY','598','Уругвай'],['CR','506','Коста-Рика'],['PA','507','Панама'],['GT','502','Гватемала'],['CU','53','Куба'],
+ ['DO','1','Доминикана'],['AU','61','Австралия'],['NZ','64','Новая Зеландия'],['FJ','679','Фиджи'],['PG','675','Папуа — Новая Гвинея'],
+ ['HK','852','Гонконг'],['TW','886','Тайвань'],['MO','853','Макао'],['BN','673','Бруней'],['MV','960','Мальдивы'],
+ ['BT','975','Бутан'],['KP','850','Северная Корея'],['PS','970','Палестина'],['GN','224','Гвинея'],['BF','226','Буркина-Фасо'],
+ ['NE','227','Нигер'],['TG','228','Того'],['BJ','229','Бенин'],['GA','241','Габон'],['MZ','258','Мозамбик'],
+ ['MG','261','Мадагаскар'],['BW','267','Ботсвана'],['NA','264','Намибия'],['MW','265','Малави'],['GM','220','Гамбия'],
+ ['LR','231','Либерия'],['SL','232','Сьерра-Леоне'],['MR','222','Мавритания'],['SO','252','Сомали'],['SS','211','Южный Судан'],
+ ['GE2','7','Абхазия'],['XK','383','Косово'],['GI','350','Гибралтар'],['AD','376','Андорра'],['MC','377','Монако'],
+ ['SM','378','Сан-Марино'],['LI','423','Лихтенштейн'],['FO','298','Фарерские острова'],['GL','299','Гренландия'],['JM','1','Ямайка'],
+ ['TT','1','Тринидад и Тобаго'],['BS','1','Багамы'],['BB','1','Барбадос'],['HN','504','Гондурас'],['NI','505','Никарагуа'],
+ ['SV','503','Сальвадор'],['BZ','501','Белиз'],['GY','592','Гайана'],['SR','597','Суринам'],['HT','509','Гаити']
+];
+const _CENT={
+ UZ:[41.31,69.24],RU:[55.75,37.62],KZ:[51.16,71.43],KG:[42.87,74.60],TJ:[38.56,68.79],TM:[37.95,58.38],AZ:[40.41,49.87],
+ AM:[40.18,44.51],GE:[41.72,44.79],BY:[53.90,27.57],UA:[50.45,30.52],MD:[47.01,28.86],TR:[39.93,32.86],AE:[25.20,55.27],
+ US:[38.90,-77.04],CA:[45.42,-75.70],GB:[51.51,-0.13],DE:[52.52,13.40],FR:[48.85,2.35],IT:[41.90,12.50],ES:[40.42,-3.70],
+ PT:[38.72,-9.13],NL:[52.37,4.90],PL:[52.23,21.01],CZ:[50.08,14.44],RO:[44.43,26.10],GR:[37.98,23.73],SE:[59.33,18.06],
+ NO:[59.91,10.75],FI:[60.17,24.94],DK:[55.68,12.57],CH:[46.95,7.44],AT:[48.21,16.37],HU:[47.50,19.04],BG:[42.70,23.32],
+ RS:[44.79,20.45],LV:[56.95,24.11],LT:[54.69,25.28],EE:[59.44,24.75],CN:[39.90,116.40],IN:[28.61,77.21],JP:[35.68,139.69],
+ KR:[37.57,126.98],BR:[-15.79,-47.88],EG:[30.04,31.24],ZA:[-25.75,28.19],AU:[-35.28,149.13],ID:[-6.21,106.85],PK:[33.68,73.05],
+ SA:[24.71,46.68],IR:[35.69,51.39],TH:[13.75,100.50],VN:[21.03,105.85],MY:[3.14,101.69],PH:[14.60,120.98],NG:[9.06,7.50],
+ MX:[19.43,-99.13],AR:[-34.60,-58.38],IL:[31.77,35.21],QA:[25.29,51.53],KW:[29.38,47.99]
+};
+const TZ2C={
+ 'Asia/Tashkent':'UZ','Asia/Samarkand':'UZ',
+ 'Europe/Moscow':'RU','Europe/Kaliningrad':'RU','Europe/Samara':'RU','Europe/Volgograd':'RU','Europe/Saratov':'RU','Europe/Astrakhan':'RU','Europe/Ulyanovsk':'RU','Asia/Yekaterinburg':'RU','Asia/Omsk':'RU','Asia/Novosibirsk':'RU','Asia/Krasnoyarsk':'RU','Asia/Irkutsk':'RU','Asia/Yakutsk':'RU','Asia/Vladivostok':'RU','Asia/Magadan':'RU','Asia/Kamchatka':'RU','Asia/Sakhalin':'RU','Asia/Chita':'RU','Asia/Barnaul':'RU',
+ 'Asia/Almaty':'KZ','Asia/Aqtau':'KZ','Asia/Aqtobe':'KZ','Asia/Qostanay':'KZ','Asia/Oral':'KZ','Asia/Atyrau':'KZ','Asia/Qyzylorda':'KZ',
+ 'Asia/Bishkek':'KG','Asia/Dushanbe':'TJ','Asia/Ashgabat':'TM','Asia/Baku':'AZ','Asia/Yerevan':'AM','Asia/Tbilisi':'GE',
+ 'Europe/Minsk':'BY','Europe/Kiev':'UA','Europe/Kyiv':'UA','Europe/Simferopol':'UA','Europe/Chisinau':'MD',
+ 'Europe/Istanbul':'TR','Asia/Dubai':'AE',
+ 'America/New_York':'US','America/Chicago':'US','America/Denver':'US','America/Los_Angeles':'US','America/Phoenix':'US','America/Anchorage':'US','Pacific/Honolulu':'US','America/Detroit':'US',
+ 'America/Toronto':'CA','America/Vancouver':'CA','America/Edmonton':'CA','America/Winnipeg':'CA','America/Halifax':'CA',
+ 'Europe/London':'GB','Europe/Berlin':'DE','Europe/Paris':'FR','Europe/Rome':'IT','Europe/Madrid':'ES','Europe/Lisbon':'PT','Europe/Amsterdam':'NL','Europe/Brussels':'BE','Europe/Zurich':'CH','Europe/Vienna':'AT','Europe/Warsaw':'PL','Europe/Prague':'CZ','Europe/Bratislava':'SK','Europe/Budapest':'HU','Europe/Bucharest':'RO','Europe/Sofia':'BG','Europe/Athens':'GR','Europe/Belgrade':'RS','Europe/Zagreb':'HR','Europe/Ljubljana':'SI','Europe/Sarajevo':'BA','Europe/Skopje':'MK','Europe/Tirane':'AL','Europe/Podgorica':'ME',
+ 'Europe/Stockholm':'SE','Europe/Oslo':'NO','Europe/Helsinki':'FI','Europe/Copenhagen':'DK','Atlantic/Reykjavik':'IS','Europe/Dublin':'IE','Europe/Vilnius':'LT','Europe/Riga':'LV','Europe/Tallinn':'EE','Europe/Luxembourg':'LU','Europe/Malta':'MT','Asia/Nicosia':'CY',
+ 'Asia/Shanghai':'CN','Asia/Urumqi':'CN','Asia/Hong_Kong':'HK','Asia/Taipei':'TW','Asia/Macau':'MO','Asia/Tokyo':'JP','Asia/Seoul':'KR','Asia/Pyongyang':'KP',
+ 'Asia/Kolkata':'IN','Asia/Calcutta':'IN','Asia/Karachi':'PK','Asia/Dhaka':'BD','Asia/Colombo':'LK','Asia/Kathmandu':'NP','Asia/Thimphu':'BT',
+ 'Asia/Bangkok':'TH','Asia/Ho_Chi_Minh':'VN','Asia/Kuala_Lumpur':'MY','Asia/Singapore':'SG','Asia/Jakarta':'ID','Asia/Manila':'PH','Asia/Yangon':'MM','Asia/Phnom_Penh':'KH','Asia/Vientiane':'LA','Asia/Ulaanbaatar':'MN','Asia/Brunei':'BN','Indian/Maldives':'MV',
+ 'Asia/Riyadh':'SA','Asia/Qatar':'QA','Asia/Kuwait':'KW','Asia/Bahrain':'BH','Asia/Muscat':'OM','Asia/Amman':'JO','Asia/Beirut':'LB','Asia/Jerusalem':'IL','Asia/Tehran':'IR','Asia/Baghdad':'IQ','Asia/Damascus':'SY','Asia/Aden':'YE','Asia/Kabul':'AF','Asia/Gaza':'PS','Asia/Hebron':'PS',
+ 'Africa/Cairo':'EG','Africa/Casablanca':'MA','Africa/Algiers':'DZ','Africa/Tunis':'TN','Africa/Tripoli':'LY','Africa/Khartoum':'SD','Africa/Lagos':'NG','Africa/Accra':'GH','Africa/Nairobi':'KE','Africa/Addis_Ababa':'ET','Africa/Dar_es_Salaam':'TZ','Africa/Kampala':'UG','Africa/Johannesburg':'ZA','Africa/Lusaka':'ZM','Africa/Harare':'ZW','Africa/Luanda':'AO','Africa/Douala':'CM','Africa/Abidjan':'CI','Africa/Dakar':'SN','Africa/Bamako':'ML','Africa/Kinshasa':'CD','Africa/Kigali':'RW','Africa/Maputo':'MZ','Indian/Antananarivo':'MG','Africa/Gaborone':'BW','Africa/Windhoek':'NA',
+ 'America/Mexico_City':'MX','America/Sao_Paulo':'BR','America/Argentina/Buenos_Aires':'AR','America/Santiago':'CL','America/Bogota':'CO','America/Lima':'PE','America/Caracas':'VE','America/Guayaquil':'EC','America/La_Paz':'BO','America/Asuncion':'PY','America/Montevideo':'UY','America/Costa_Rica':'CR','America/Panama':'PA','America/Guatemala':'GT','America/Havana':'CU','America/Santo_Domingo':'DO','America/Tegucigalpa':'HN','America/Managua':'NI','America/El_Salvador':'SV',
+ 'Australia/Sydney':'AU','Australia/Melbourne':'AU','Australia/Brisbane':'AU','Australia/Perth':'AU','Australia/Adelaide':'AU','Pacific/Auckland':'NZ','Pacific/Fiji':'FJ','Pacific/Port_Moresby':'PG'
+};
+function _flag(iso){try{iso=String(iso||'').toUpperCase().replace(/[^A-Z]/g,'').slice(0,2);if(iso.length!==2)return '🏳️';return iso.replace(/[A-Z]/g,c=>String.fromCodePoint(127397+c.charCodeAt(0)));}catch(e){return '🏳️';}}
+function _ccEntry(iso){for(let i=0;i<COUNTRIES.length;i++)if(COUNTRIES[i][0]===iso)return COUNTRIES[i];return null;}
+function applyCC(iso){const e=_ccEntry(iso);if(!e)return false;const cc=$('#cc');if(cc){cc.value='+'+e[1];cc.dataset.iso=iso;}const f=$('#ccFlag');if(f)f.textContent=_flag(iso);return true;}
+let _ccUserSet=false;
+async function autodetectCC(){
+  try{
+    if(_ccUserSet)return;
+    const saved=localStorage.getItem('om_cc_iso');
+    if(saved&&applyCC(saved))return;                      // уже определяли/выбирали — не трогаем
+    let iso=null;
+    try{const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;iso=(tz&&TZ2C[tz])||null;}catch(e){}   // 1) часовой пояс — мгновенно, офлайн
+    if(iso)applyCC(iso);
+    try{                                                  // 2) сеть — ПРЯМОЙ запрос к api.zemex.pro (Cloudflare), не через Яндекс-шлюз.
+      // Через шлюз (getApiUrl) cf.country=RU у всех → бесполезно. Прямой: в UZ Cloudflare доступен → реальная
+      // страна; в РФ обычно режется оператором → запрос отвалится по таймауту, останется определение по поясу.
+      const r=await apiFetch('https://api.zemex.pro/netcheck',{timeout:5000});
+      const d=await r.json();
+      if(!_ccUserSet&&d&&d.country&&_ccEntry(d.country)){iso=d.country;applyCC(iso);}
+    }catch(e){}
+    if(iso){try{localStorage.setItem('om_cc_iso',iso);}catch(_){}return;}
+    _geoFallbackCC();                                     // 3) GPS — запасной, только если пояс+сеть не дали страну
+  }catch(e){}
+}
+function _geoFallbackCC(){
+  try{
+    if(_ccUserSet||!navigator.geolocation)return;
+    if(localStorage.getItem('om_geo_asked'))return;       // просим геопозицию только раз
+    localStorage.setItem('om_geo_asked','1');
+    navigator.geolocation.getCurrentPosition(function(pos){
+      if(_ccUserSet)return;
+      const iso=_isoByCoords(pos.coords.latitude,pos.coords.longitude);
+      if(iso&&applyCC(iso))localStorage.setItem('om_cc_iso',iso);
+    },function(){},{timeout:8000,maximumAge:600000,enableHighAccuracy:false});
+  }catch(e){}
+}
+function _isoByCoords(la,lo){                              // ближайшая столица (грубо, для запасного GPS)
+  let best=null,bd=Infinity;const k=Math.cos(la*Math.PI/180);
+  for(const iso in _CENT){const c=_CENT[iso];const dx=c[0]-la,dy=(c[1]-lo)*k;const d=dx*dx+dy*dy;if(d<bd){bd=d;best=iso;}}
+  return (best&&bd<400)?best:null;                         // ~20° порог — иначе оставим ручной выбор
+}
+function openCCPicker(){
+  const back=document.createElement('div');back.className='confirm-back';
+  const card=document.createElement('div');card.className='confirm-card cc-sheet-card';
+  card.innerHTML='<div class="cf-title">Код страны</div>'
+    +'<input class="input cc-search" type="text" placeholder="Поиск: страна или код" autocomplete="off" inputmode="search">'
+    +'<div class="cc-list"></div>'
+    +'<div class="cf-acts" style="margin-top:10px"><button class="cf-btn cf-cancel">Закрыть</button></div>';
+  back.appendChild(card);document.body.appendChild(back);
+  requestAnimationFrame(()=>back.classList.add('show'));
+  const listEl=card.querySelector('.cc-list'),search=card.querySelector('.cc-search');
+  const cur=($('#cc')&&$('#cc').dataset.iso)||null;
+  const POP=['UZ','RU','KZ','KG','TJ','TM','AZ','AM','GE','BY','UA','MD'];
+  const sorted=COUNTRIES.slice().sort((a,b)=>{const pa=POP.indexOf(a[0]),pb=POP.indexOf(b[0]);if(pa>=0&&pb>=0)return pa-pb;if(pa>=0)return -1;if(pb>=0)return 1;return a[2].localeCompare(b[2],'ru');});
+  let done=false;const finish=()=>{if(done)return;done=true;try{back.remove();}catch(e){}};
+  function render(q){
+    q=(q||'').trim().toLowerCase();listEl.innerHTML='';const frag=document.createDocumentFragment();
+    for(const e of sorted){
+      if(q&&!(e[2].toLowerCase().includes(q)||('+'+e[1]).includes(q)||e[1].includes(q)))continue;
+      const row=document.createElement('div');row.className='cc-item'+(e[0]===cur?' cur':'');
+      row.innerHTML='<span class="cc-i-flag">'+_flag(e[0])+'</span><span class="cc-i-name"></span><span class="cc-i-dial">+'+e[1]+'</span>';
+      row.querySelector('.cc-i-name').textContent=e[2];
+      row.onclick=()=>{applyCC(e[0]);_ccUserSet=true;try{localStorage.setItem('om_cc_iso',e[0]);}catch(_){}try{if(typeof doVibe==='function')doVibe(8);}catch(_){}finish();};
+      frag.appendChild(row);
+    }
+    if(!listEl.children.length&&frag.childNodes.length===0){const em=document.createElement('div');em.className='cc-i-name';em.style.padding='16px 8px';em.style.color='var(--muted)';em.textContent='Ничего не найдено';listEl.appendChild(em);}
+    listEl.appendChild(frag);
+  }
+  render('');
+  search.addEventListener('input',()=>render(search.value));
+  card.querySelector('.cf-cancel').onclick=finish;
+  back.onclick=e=>{if(e.target===back)finish();};
+}
+try{
+  const _cp=$('#ccPick');
+  if(_cp){ _cp.onclick=openCCPicker; _cp.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openCCPicker();}}); }
+}catch(e){}
+try{ autodetectCC(); }catch(e){}
 
 async function verifyOtp(raw){
   const code=raw.replace(/\D/g,'').slice(0,6);
@@ -6324,7 +6486,8 @@ function forceLogout(msg){try{dropSession();}catch(e){}try{setOnline(false);}cat
   $('#settingsSheet').classList.remove('show');$('#subSheet').classList.remove('show');
   otpFails=0;otpLocked=false;pendingUser=null;
   if($('#cc'))$('#cc').value='+7';if($('#phoneNum'))$('#phoneNum').value='';
-  go('scrPhone');if(msg)toast(msg);}
+  go('scrPhone');if(msg)toast(msg);
+  try{_ccUserSet=false;autodetectCC();}catch(e){}}
 
 function buildServer(body){const cfg=cloudCfg();
   body.appendChild(el('<div class="note">Основной адрес API для продукта: <b>https://api.zemex.pro</b>. Резерв: <b>https://backup-api.zemex.pro</b>. Старый workers.dev оставлен только как аварийный fallback, чтобы вход не ломался у пользователей при проблемах DNS/оператора.</div>'));
