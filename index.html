@@ -1835,7 +1835,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.76', BUILD_ID='2026-07-29-videocall-diag';
+const APP_VERSION='4.9.77', BUILD_ID='2026-07-30-uz-eskiz-routing';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -2435,9 +2435,10 @@ $('#btnSendCode').onclick=async()=>{
   }
   pendingPhone=phone;
   const b=$('#btnSendCode');b.disabled=true;
-  // Маршрутизация: РФ-номера (+7) → SMSC через Worker (без VPN); остальные → Firebase
+  // Маршрутизация: РФ-номера (+7) → SMSC через Worker; UZ-номера (+998) → Eskiz через Worker; остальные → Firebase
   const isRussian=/^\+7\d{10}$/.test(phone);
-  const useWorkerSms=isRussian && isCloudReady();
+  const isUZ=/^\+998\d{9}$/.test(phone);
+  const useWorkerSms=(isRussian||isUZ) && isCloudReady();
   try{
     if(useWorkerSms){
       /* ── SMSC.ru через Worker (РФ, без VPN) ── */
@@ -2459,8 +2460,8 @@ $('#btnSendCode').onclick=async()=>{
         const data=await resp.json();
         if(data.error==='rate_limit'){const oh=$('#otpHint');if(oh)oh.textContent='⏳ '+(data.message||'Слишком много запросов — подождите.')+' Если прошлый код ещё активен — просто введите его.';startResendCooldown(Math.min(180,data.retry_after||60));b.disabled=false;return;}
         if(data.error==='sms_not_configured'){
-          // SMSC не настроен на сервере — пробуем Firebase как резерв
-          if(isFirebaseReady()){smscNotConfigured=true;}
+          // SMSC не настроен на сервере — пробуем Firebase как резерв (кроме UZ: там Firebase не работает)
+          if(isFirebaseReady() && !isUZ){smscNotConfigured=true;}
           else{toast('SMS-провайдер не настроен. Обратитесь к администратору.');go('scrPhone');b.disabled=false;return;}
         }
         else if(data.ok){workerOtpOk=true;workerOtpInfo=data;}
@@ -2702,7 +2703,8 @@ function otpChannelUI(info,phone){
 }
 $('#btnResend').onclick=async()=>{
   const isRussian=/^\+7\d{10}$/.test(pendingPhone||'');
-  const useWorkerSms=isRussian && isCloudReady();   // РФ-номера: всегда SMSC (как и первая отправка) — без смены провайдера
+  const isUZ=/^\+998\d{9}$/.test(pendingPhone||'');
+  const useWorkerSms=(isRussian||isUZ) && isCloudReady();   // РФ→SMSC, UZ→Eskiz (как и первая отправка) — без смены провайдера
   if(!useWorkerSms && isFirebaseReady() && initFirebase()){
     const b=$('#btnResend');b.disabled=true;
     try{
