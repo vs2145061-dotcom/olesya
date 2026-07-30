@@ -1852,7 +1852,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.78', BUILD_ID='2026-07-30-country-picker-autodetect';
+const APP_VERSION='4.9.79', BUILD_ID='2026-07-30-turn-cloudflare';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -5391,12 +5391,28 @@ document.addEventListener('pointerdown',()=>{ if(_pendingRemoteAudio){ const ra=
    разными сетями (мобильный интернет/симметричный NAT), без него звонки часто не проходят.
    Ниже — бесплатные публичные TURN (Open Relay). Для продакшна заведите свой TURN
    (coturn, или бесплатный тариф metered.ca с API-ключом, или Twilio) — публичные нестабильны. */
+/* STUN — база. TURN (ретранслятор через NAT) больше НЕ хардкодим: openrelay.metered.ca закрыт.
+   TURN-креды короткоживущие, берём с воркера /turn (Cloudflare Realtime TURN) и кэшируем. */
 const RTC_CFG={iceServers:[
-  {urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302','stun:global.stun.twilio.com:3478']},
-  {urls:'turn:openrelay.metered.ca:80',username:'openrelayproject',credential:'openrelayproject'},
-  {urls:'turn:openrelay.metered.ca:443',username:'openrelayproject',credential:'openrelayproject'},
-  {urls:'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'}
+  {urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302','stun:global.stun.twilio.com:3478']}
 ],iceCandidatePoolSize:6};
+let _iceServers=RTC_CFG.iceServers.slice();   // текущий набор (STUN + подтянутый TURN)
+let _iceAt=0;
+async function ensureTurn(force){
+  try{
+    if(!force && _iceServers.length>RTC_CFG.iceServers.length && (Date.now()-_iceAt)<3000000) return; // кэш свеж (<50 мин)
+    const url=(typeof getApiUrl==='function')&&getApiUrl();
+    if(!url)return;
+    const r=await apiFetch(url+'/turn',{timeout:6000});
+    const d=await r.json();
+    let extra=[];
+    if(d&&d.iceServers) extra=Array.isArray(d.iceServers)?d.iceServers:[d.iceServers];
+    extra=extra.filter(s=>s&&s.urls);
+    if(extra.length){ _iceServers=RTC_CFG.iceServers.concat(extra); _iceAt=Date.now(); }
+  }catch(e){}
+}
+function rtcConfig(){ return {iceServers:_iceServers, iceCandidatePoolSize:6}; }
+try{ ensureTurn(); }catch(e){}   // прогрев на старте
 function hasRTC(){return typeof RTCPeerConnection!=='undefined';}
 function startCallPoll(){ // ускоряем доставку сигналов WebRTC во время звонка
   if(callPollTimer)return;
@@ -5423,7 +5439,8 @@ async function setupPeer(isCaller,kind){
   }catch(e){ toast(kind==='video'?'Камера/микрофон недоступны':'Микрофон недоступен'); }
   if(!hasRTC())return; // нет WebRTC (например, jsdom) — выходим, локальное превью уже показано
   try{
-    pc=new RTCPeerConnection(RTC_CFG);
+    await ensureTurn();                       // подтягиваем TURN-креды (Cloudflare) перед соединением
+    pc=new RTCPeerConnection(rtcConfig());
     _rtrk=0; try{clearInterval(_callDbgTimer);}catch(e){} _callDbgTimer=setInterval(_callDbgShow,600); _callDbgShow();   // ⚠️ диагностика
     if(localStream)localStream.getTracks().forEach(t=>{try{pc.addTrack(t,localStream);}catch(e){}});
     pc.ontrack=ev=>{ _rtrk++; _callDbgShow();   // ⚠️ диагностика: пришла удалённая дорожка
@@ -5592,7 +5609,7 @@ function gcPeer(uid){
   if(!gcall)return null;
   if(gcall.peers[uid])return gcall.peers[uid];
   if(!hasRTC())return null;
-  const pcp=new RTCPeerConnection(RTC_CFG);
+  const pcp=new RTCPeerConnection(rtcConfig());   // TURN из кэша (прогрет ensureTurn при старте звонка)
   const entry={pc:pcp,cand:[],hasRemote:false};
   gcall.peers[uid]=entry;
   if(gcall.localStream)gcall.localStream.getTracks().forEach(t=>{try{pcp.addTrack(t,gcall.localStream);}catch(e){}});
@@ -5617,6 +5634,7 @@ function gcEnter(gid,kind){
 async function startGroupCall(kind){
   if(!current||!current.group)return;
   if(gcall||callPeerId){toast('Завершите текущий звонок');return;}
+  try{await ensureTurn();}catch(e){}   // прогрев TURN-кред до создания peer-соединений участников
   const g=db().chats[current.id];if(!g)return;
   if(g.members.length<2){toast('В группе нет других участников');return;}
   gcEnter(g.id,kind);
