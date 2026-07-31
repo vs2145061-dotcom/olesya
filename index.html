@@ -1852,7 +1852,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.80', BUILD_ID='2026-07-30-call-invite-retry';
+const APP_VERSION='4.9.81', BUILD_ID='2026-07-30-call-quality-icefix';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -5374,6 +5374,8 @@ let _callIceBuf=[], _callHasRemote=false;   // trickle ICE: буфер удал�
 function _addRemoteIce(c){ if(!c)return; if(pc&&_callHasRemote){ try{pc.addIceCandidate(c);}catch(e){} } else { _callIceBuf.push(c); } }
 function _drainRemoteIce(){ _callHasRemote=true; if(!pc)return; const buf=_callIceBuf; _callIceBuf=[]; for(const c of buf){ try{pc.addIceCandidate(c);}catch(e){} } }
 function stopCallInvite(){ if(callInviteTimer){clearInterval(callInviteTimer);callInviteTimer=null;} }
+// RTCIceCandidate нельзя структурно клонировать (BroadcastChannel/localStorage) → шлём простой объект
+function _iceToPlain(c){ if(!c)return c; try{ if(typeof c.toJSON==='function')return c.toJSON(); }catch(e){} return {candidate:c.candidate,sdpMid:c.sdpMid,sdpMLineIndex:c.sdpMLineIndex,usernameFragment:c.usernameFragment}; }
 let _pendingRemoteAudio=false, _spkOn=true;
 // ⚠️ ВРЕМЕННАЯ ДИАГНОСТИКА ЗВОНКА (плашка на экране звонка). Убрать после диагноза.
 let _rtrk=0, _callDbgTimer=null;
@@ -5437,7 +5439,8 @@ async function setupPeer(isCaller,kind){
   // получаем локальные медиа (звук всегда; видео — только для видеозвонка)
   try{
     if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){
-      localStream=await getMediaWithTimeout({audio:true,video:(kind==='video'&&camAllowed())},15000);
+      const _vc=(kind==='video'&&camAllowed())?{width:{ideal:1280},height:{ideal:720},frameRate:{ideal:30},facingMode:'user'}:false;   // HD-видео (адаптируется вниз под сеть/камеру)
+      localStream=await getMediaWithTimeout({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:_vc},15000);
       if(kind==='video'){const lv=$('#localVideo');if(lv){try{lv.srcObject=localStream;if(lv.play)lv.play().catch(()=>{});}catch(e){}}
         try{const cs=document.getElementById('callScreen');if(cs)cs.classList.add('video');}catch(e){}}   // видео пошло → верстка видеозвонка (аватар скрыт, имя в углу) гарантированно
     }
@@ -5448,8 +5451,9 @@ async function setupPeer(isCaller,kind){
     _callIceBuf=[]; _callHasRemote=false;     // сброс trickle-состояния под новый звонок
     pc=new RTCPeerConnection(rtcConfig());
     _rtrk=0; try{clearInterval(_callDbgTimer);}catch(e){} _callDbgTimer=setInterval(_callDbgShow,600); _callDbgShow();   // ⚠️ диагностика
-    pc.onicecandidate=e=>{ if(e.candidate&&callPeerId)emit('call:ice',{to:callPeerId,from:me.id,candidate:e.candidate}); };   // trickle ICE — кандидаты по мере сбора (в т.ч. TURN relay)
+    pc.onicecandidate=e=>{ if(e.candidate&&callPeerId)emit('call:ice',{to:callPeerId,from:me.id,candidate:_iceToPlain(e.candidate)}); };   // trickle ICE — кандидаты по мере сбора (в т.ч. TURN relay)
     if(localStream)localStream.getTracks().forEach(t=>{try{pc.addTrack(t,localStream);}catch(e){}});
+    try{ if(kind==='video'&&pc.getSenders){ const vs=pc.getSenders().find(s=>s.track&&s.track.kind==='video'); if(vs&&vs.getParameters&&vs.setParameters){ const prm=vs.getParameters(); prm.encodings=(prm.encodings&&prm.encodings.length)?prm.encodings:[{}]; prm.encodings[0].maxBitrate=2500000; vs.setParameters(prm).catch(()=>{}); } } }catch(e){}   // потолок битрейта видео ~2.5 Мбит/с для чёткого 720p
     pc.ontrack=ev=>{ _rtrk++; _callDbgShow();   // ⚠️ диагностика: пришла удалённая дорожка
       const st=ev.streams&&ev.streams[0]; if(!st)return;
       const rv=$('#remoteVideo'); if(rv){ if(rv.srcObject!==st)rv.srcObject=st; if(rv.play)rv.play().catch(()=>{}); }
@@ -5626,7 +5630,7 @@ function gcPeer(uid){
   const entry={pc:pcp,cand:[],hasRemote:false};
   gcall.peers[uid]=entry;
   if(gcall.localStream)gcall.localStream.getTracks().forEach(t=>{try{pcp.addTrack(t,gcall.localStream);}catch(e){}});
-  pcp.onicecandidate=e=>{ if(e.candidate&&gcall)emit('gcall:ice',{to:uid,from:me.id,gid:gcall.gid,candidate:e.candidate}); };
+  pcp.onicecandidate=e=>{ if(e.candidate&&gcall)emit('gcall:ice',{to:uid,from:me.id,gid:gcall.gid,candidate:_iceToPlain(e.candidate)}); };
   pcp.ontrack=ev=>{ if(ev.streams&&ev.streams[0])gcAddTile(uid,ev.streams[0],false); if(gcall)$('#gcallStat').textContent=fmtDur((Date.now()-(gcall.start||Date.now()))/1000,true)+' · в эфире'; };
   pcp.onconnectionstatechange=()=>{ if(pcp.connectionState==='failed'){try{pcp.restartIce&&pcp.restartIce();}catch(e){}} };
   return entry;
