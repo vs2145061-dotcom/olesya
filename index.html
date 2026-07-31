@@ -2315,7 +2315,7 @@ function handleBus(m){
     case 'call:answer': if(me&&callPeerId===m.payload.from&&pc){ Promise.resolve(pc.setRemoteDescription(m.payload.sdp)).then(()=>_drainRemoteIce()).catch(e=>console.error('setRemote',e)); } break;
     case 'call:ice': if(me&&callPeerId===m.payload.from){ _addRemoteIce(m.payload.candidate); } break;
     case 'call:end': if(me&&callPeerId===m.payload.from)endCall(true); break;
-    case 'call:reject': if(me&&callPeerId===m.payload.from){clearTimeout(callRingTO);const rr=m.payload.reason;$('#callStatus').textContent=rr==='busy'?'Занято':(rr==='blocked'?'Абонент недоступен':(rr==='screen'?'Вызов отклонён':'Вызов отклонён'));setTimeout(()=>endCall(true),1300);} break;
+    case 'call:reject': if(me&&callPeerId===m.payload.from){clearTimeout(callRingTO);stopCallInvite();const rr=m.payload.reason;$('#callStatus').textContent=rr==='busy'?'Занято':(rr==='blocked'?'Абонент недоступен':(rr==='screen'?'Вызов отклонён':'Вызов отклонён'));setTimeout(()=>endCall(true),1300);} break;
     case 'session:kill': if(me&&m.payload.uid===me.id&&m.payload.sid===TAB){forceLogout('⚠️ Сеанс завершён с другого устройства');} break;
     case 'security:login': if(me&&m.payload.uid===me.id){logSec('⚠️ Новый вход в аккаунт: '+m.payload.device);toast('⚠️ Новый вход: '+m.payload.device);} break;
     case 'directory': renderChats(); break;
@@ -5368,11 +5368,12 @@ $('#vdSend').onclick=()=>stopRec(true);
 $('#vdCancel').onclick=()=>{discardDraft();refreshVoiceDraft();toast('Черновик удалён');};
 
 /* ================== CALLS (реальный WebRTC P2P) ================== */
-let callPeerId=null,callKind='audio',callTimer=null,callStart=0,localStream=null,callIncoming=false,callRingTO=null;
+let callPeerId=null,callKind='audio',callTimer=null,callStart=0,localStream=null,callIncoming=false,callRingTO=null,callInviteTimer=null;
 let pc=null, pendingOffer=null, callPollTimer=null;
 let _callIceBuf=[], _callHasRemote=false;   // trickle ICE: буфер удалённых кандидатов до setRemoteDescription
 function _addRemoteIce(c){ if(!c)return; if(pc&&_callHasRemote){ try{pc.addIceCandidate(c);}catch(e){} } else { _callIceBuf.push(c); } }
 function _drainRemoteIce(){ _callHasRemote=true; if(!pc)return; const buf=_callIceBuf; _callIceBuf=[]; for(const c of buf){ try{pc.addIceCandidate(c);}catch(e){} } }
+function stopCallInvite(){ if(callInviteTimer){clearInterval(callInviteTimer);callInviteTimer=null;} }
 let _pendingRemoteAudio=false, _spkOn=true;
 // ⚠️ ВРЕМЕННАЯ ДИАГНОСТИКА ЗВОНКА (плашка на экране звонка). Убрать после диагноза.
 let _rtrk=0, _callDbgTimer=null;
@@ -5491,7 +5492,12 @@ function startCall(kind){
   emit('call:invite',{to:current.id,from:me.id,name:me.name,kind});
   clearTimeout(callRingTO);
   if(current.bot){setTimeout(()=>{onCallAccepted();},1800);} // бот отвечает (симуляция, без реального WebRTC)
-  else{ startCallPoll(); setupPeer(true,kind); callRingTO=setTimeout(()=>{$('#callStatus').textContent='Не отвечает';setTimeout(()=>endCall(true),1200);},30000); }
+  else{ startCallPoll(); setupPeer(true,kind); callRingTO=setTimeout(()=>{$('#callStatus').textContent='Не отвечает';setTimeout(()=>endCall(true),1200);},30000);
+    // Надёжная доставка приглашения: облачная шина best-effort, одна отправка может не дойти →
+    // повторяем call:invite каждые 2с, пока не ответят (callStart>0) или звонок не завершится.
+    stopCallInvite();
+    callInviteTimer=setInterval(()=>{ if(callPeerId&&callStart===0){ emit('call:invite',{to:callPeerId,from:me.id,name:me.name,kind}); } else { stopCallInvite(); } },2000);
+  }
 }
 $('#btnAudioCall').onclick=()=>startCall('audio');
 $('#btnVideoCall').onclick=()=>startCall('video');
@@ -5499,6 +5505,7 @@ $('#favEntry').onclick=()=>{if(me)openConv(me.id);};
 
 function showIncomingCall(p){
   const sec=getSec();const from=p.from;const known=isContact(from);const now=Date.now();
+  if(callPeerId===from)return;   // уже звоним/в звонке с этим абонентом — повтор приглашения игнорируем (надёжная доставка шлёт его несколько раз; иначе антиспам примет за спам)
   if(callPeerId&&callPeerId!==from){emit('call:reject',{to:from,from:me.id,reason:'busy'});return;}
   if(sec.blocked.includes(from)||(sec.tmp[from]&&sec.tmp[from]>now)){emit('call:reject',{to:from,from:me.id,reason:'blocked'});logSec('🚫 Отклонён звонок от заблокированного: '+(p.name||from));return;}
   const h=(sec.hist[from]||[]).filter(t=>now-t<60000);h.push(now);sec.hist[from]=h.slice(-10);
@@ -5515,7 +5522,7 @@ function showIncomingCall(p){
   if(appHidden())showNotif('📞 Входящий '+(p.kind==='video'?'видеозвонок':'звонок'),(u.name||p.name||'Неизвестный номер'),from);
 }
 function onCallAccepted(){
-  clearTimeout(callRingTO);
+  clearTimeout(callRingTO);stopCallInvite();
   callIncoming=false;$('#callAvatar').classList.remove('incoming-ring');$('#callSpamBadge').style.display='none';
   $('#callStatus').textContent='00:00';callStart=Date.now();
   if(callTimer)clearInterval(callTimer);
@@ -5530,6 +5537,7 @@ function acceptCall(){
   if(!(peer&&peer.bot)){ startCallPoll(); setupPeer(false,callKind); } // реальные медиа собеседника
 }
 function endCall(remote){
+  stopCallInvite();
   // запись в историю звонков
   try{ if(me&&callPeerId){ const connected=callStart>0; const dur=connected?(Date.now()-callStart)/1000:0; const dir=callIncoming?(connected?'in':'missed'):'out'; logCall(callPeerId,callKind,dir,dur); } }catch(e){}
   if(callTimer){clearInterval(callTimer);callTimer=null;}
