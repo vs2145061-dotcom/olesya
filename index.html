@@ -1852,7 +1852,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.81', BUILD_ID='2026-07-30-call-quality-icefix';
+const APP_VERSION='4.9.82', BUILD_ID='2026-07-30-callpush-cleanup';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -5377,21 +5377,6 @@ function stopCallInvite(){ if(callInviteTimer){clearInterval(callInviteTimer);ca
 // RTCIceCandidate нельзя структурно клонировать (BroadcastChannel/localStorage) → шлём простой объект
 function _iceToPlain(c){ if(!c)return c; try{ if(typeof c.toJSON==='function')return c.toJSON(); }catch(e){} return {candidate:c.candidate,sdpMid:c.sdpMid,sdpMLineIndex:c.sdpMLineIndex,usernameFragment:c.usernameFragment}; }
 let _pendingRemoteAudio=false, _spkOn=true;
-// ⚠️ ВРЕМЕННАЯ ДИАГНОСТИКА ЗВОНКА (плашка на экране звонка). Убрать после диагноза.
-let _rtrk=0, _callDbgTimer=null;
-function _callDbgShow(){
-  try{
-    let d=document.getElementById('callDbg');
-    if(!d){ d=document.createElement('div'); d.id='callDbg';
-      d.style.cssText='position:absolute;top:3px;left:3px;z-index:99;background:rgba(0,0,0,.72);color:#0f0;font:10px/1.35 monospace;padding:3px 6px;white-space:pre;pointer-events:none;border-radius:6px';
-      const cs=document.getElementById('callScreen'); (cs||document.body).appendChild(d); }
-    const rv=document.getElementById('remoteVideo');
-    const lt=localStream?localStream.getTracks().map(t=>t.kind[0]+(t.enabled?'':'x')).join(' '):'-';
-    d.textContent='conn '+(pc?pc.connectionState:'-')+'  ice '+(pc?pc.iceConnectionState:'-')+'\n'
-      +'sig '+(pc?pc.signalingState:'-')+'  L['+lt+']  Rtrk '+_rtrk+'\n'
-      +'remoteVid '+(rv?rv.videoWidth+'x'+rv.videoHeight:'-');
-  }catch(e){}
-}
 // Если автоплей звука собеседника заблокирован — включаем по первому касанию экрана звонка
 document.addEventListener('pointerdown',()=>{ if(_pendingRemoteAudio){ const ra=document.getElementById('remoteAudio'); if(ra){ ra.muted=false; const pr=ra.play(); if(pr&&pr.then)pr.then(()=>{_pendingRemoteAudio=false;}).catch(()=>{}); } } },{passive:true});
 /* ICE-серверы. STUN — обнаружение публичного адреса; TURN — РЕЛЕ для звонков между
@@ -5450,17 +5435,16 @@ async function setupPeer(isCaller,kind){
     await ensureTurn();                       // подтягиваем TURN-креды (Cloudflare) перед соединением
     _callIceBuf=[]; _callHasRemote=false;     // сброс trickle-состояния под новый звонок
     pc=new RTCPeerConnection(rtcConfig());
-    _rtrk=0; try{clearInterval(_callDbgTimer);}catch(e){} _callDbgTimer=setInterval(_callDbgShow,600); _callDbgShow();   // ⚠️ диагностика
     pc.onicecandidate=e=>{ if(e.candidate&&callPeerId)emit('call:ice',{to:callPeerId,from:me.id,candidate:_iceToPlain(e.candidate)}); };   // trickle ICE — кандидаты по мере сбора (в т.ч. TURN relay)
     if(localStream)localStream.getTracks().forEach(t=>{try{pc.addTrack(t,localStream);}catch(e){}});
     try{ if(kind==='video'&&pc.getSenders){ const vs=pc.getSenders().find(s=>s.track&&s.track.kind==='video'); if(vs&&vs.getParameters&&vs.setParameters){ const prm=vs.getParameters(); prm.encodings=(prm.encodings&&prm.encodings.length)?prm.encodings:[{}]; prm.encodings[0].maxBitrate=2500000; vs.setParameters(prm).catch(()=>{}); } } }catch(e){}   // потолок битрейта видео ~2.5 Мбит/с для чёткого 720p
-    pc.ontrack=ev=>{ _rtrk++; _callDbgShow();   // ⚠️ диагностика: пришла удалённая дорожка
+    pc.ontrack=ev=>{
       const st=ev.streams&&ev.streams[0]; if(!st)return;
       const rv=$('#remoteVideo'); if(rv){ if(rv.srcObject!==st)rv.srcObject=st; if(rv.play)rv.play().catch(()=>{}); }
       // ЗВУК собеседника — через отдельный <audio>, иначе на мобильных при скрытом видео звука нет
       const ra=$('#remoteAudio'); if(ra){ if(ra.srcObject!==st)ra.srcObject=st; ra.muted=false; ra.volume=1; const pr=ra.play(); if(pr&&pr.catch)pr.catch(()=>{ _pendingRemoteAudio=true; }); }
     };
-    pc.onconnectionstatechange=()=>{ if(!pc)return; _callDbgShow(); const st=pc.connectionState;
+    pc.onconnectionstatechange=()=>{ if(!pc)return; const st=pc.connectionState;
       if(st==='failed'){ const cs=$('#callStatus'); if(cs)cs.textContent='Не удалось соединиться (сеть/NAT)'; setTimeout(()=>{try{endCall(true);}catch(e){}},1800); }
     };
     pc.oniceconnectionstatechange=()=>{ if(pc&&pc.iceConnectionState==='failed'){ try{pc.restartIce&&pc.restartIce();}catch(e){} } };
@@ -5483,7 +5467,7 @@ async function applyOfferAndAnswer(sdp){
     if(pc&&callPeerId)emit('call:answer',{to:callPeerId,from:me.id,sdp:pc.localDescription});   // trickle: answer сразу
   }catch(e){console.error('RTC answer error',e);}
 }
-function closePeer(){ try{if(pc){pc.ontrack=null;pc.onconnectionstatechange=null;pc.onicecandidate=null;pc.close();}}catch(e){} pc=null; pendingOffer=null; _callIceBuf=[]; _callHasRemote=false; stopCallPoll(); try{clearInterval(_callDbgTimer);_callDbgTimer=null;const _d=document.getElementById('callDbg');if(_d)_d.remove();}catch(e){} }
+function closePeer(){ try{if(pc){pc.ontrack=null;pc.onconnectionstatechange=null;pc.onicecandidate=null;pc.close();}}catch(e){} pc=null; pendingOffer=null; _callIceBuf=[]; _callHasRemote=false; stopCallPoll(); }
 function startCall(kind){
   if(current&&current.group)return startGroupCall(kind);
   if(!micAllowed()){toast('🎤 Включите доступ к микрофону в Настройках, чтобы звонить');return;}
@@ -5494,6 +5478,7 @@ function startCall(kind){
   go('callScreen');try{window.__omResetLocalVid&&window.__omResetLocalVid();}catch(e){}renderCallActions(false);
   closePeer();pendingOffer=null;
   emit('call:invite',{to:current.id,from:me.id,name:me.name,kind});
+  try{ jpost(wapi('/call/ring'),{to:current.id,name:me.name,kind}).catch(()=>{}); }catch(e){}   // разбудить получателя пушем, если апп свёрнут/закрыт (соединение всё равно идёт по шине)
   clearTimeout(callRingTO);
   if(current.bot){setTimeout(()=>{onCallAccepted();},1800);} // бот отвечает (симуляция, без реального WebRTC)
   else{ startCallPoll(); setupPeer(true,kind); callRingTO=setTimeout(()=>{$('#callStatus').textContent='Не отвечает';setTimeout(()=>endCall(true),1200);},30000);
