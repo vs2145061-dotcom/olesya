@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8" />
@@ -2312,7 +2312,8 @@ function handleBus(m){
     case 'call:invite': if(me&&m.payload.to===me.id)showIncomingCall(m.payload); break;
     case 'call:accept': if(me&&callPeerId===m.payload.from)onCallAccepted(); break;
     case 'call:offer': if(me&&callPeerId===m.payload.from){ if(pc&&pc.signalingState!=='closed'){applyOfferAndAnswer(m.payload.sdp);} else {pendingOffer=m.payload.sdp;} } break;
-    case 'call:answer': if(me&&callPeerId===m.payload.from&&pc){ try{pc.setRemoteDescription(m.payload.sdp);}catch(e){console.error('setRemote',e);} } break;
+    case 'call:answer': if(me&&callPeerId===m.payload.from&&pc){ Promise.resolve(pc.setRemoteDescription(m.payload.sdp)).then(()=>_drainRemoteIce()).catch(e=>console.error('setRemote',e)); } break;
+    case 'call:ice': if(me&&callPeerId===m.payload.from){ _addRemoteIce(m.payload.candidate); } break;
     case 'call:end': if(me&&callPeerId===m.payload.from)endCall(true); break;
     case 'call:reject': if(me&&callPeerId===m.payload.from){clearTimeout(callRingTO);const rr=m.payload.reason;$('#callStatus').textContent=rr==='busy'?'Занято':(rr==='blocked'?'Абонент недоступен':(rr==='screen'?'Вызов отклонён':'Вызов отклонён'));setTimeout(()=>endCall(true),1300);} break;
     case 'session:kill': if(me&&m.payload.uid===me.id&&m.payload.sid===TAB){forceLogout('⚠️ Сеанс завершён с другого устройства');} break;
@@ -5369,6 +5370,9 @@ $('#vdCancel').onclick=()=>{discardDraft();refreshVoiceDraft();toast('Черно
 /* ================== CALLS (реальный WebRTC P2P) ================== */
 let callPeerId=null,callKind='audio',callTimer=null,callStart=0,localStream=null,callIncoming=false,callRingTO=null;
 let pc=null, pendingOffer=null, callPollTimer=null;
+let _callIceBuf=[], _callHasRemote=false;   // trickle ICE: буфер удалённых кандидатов до setRemoteDescription
+function _addRemoteIce(c){ if(!c)return; if(pc&&_callHasRemote){ try{pc.addIceCandidate(c);}catch(e){} } else { _callIceBuf.push(c); } }
+function _drainRemoteIce(){ _callHasRemote=true; if(!pc)return; const buf=_callIceBuf; _callIceBuf=[]; for(const c of buf){ try{pc.addIceCandidate(c);}catch(e){} } }
 let _pendingRemoteAudio=false, _spkOn=true;
 // ⚠️ ВРЕМЕННАЯ ДИАГНОСТИКА ЗВОНКА (плашка на экране звонка). Убрать после диагноза.
 let _rtrk=0, _callDbgTimer=null;
@@ -5440,8 +5444,10 @@ async function setupPeer(isCaller,kind){
   if(!hasRTC())return; // нет WebRTC (например, jsdom) — выходим, локальное превью уже показано
   try{
     await ensureTurn();                       // подтягиваем TURN-креды (Cloudflare) перед соединением
+    _callIceBuf=[]; _callHasRemote=false;     // сброс trickle-состояния под новый звонок
     pc=new RTCPeerConnection(rtcConfig());
     _rtrk=0; try{clearInterval(_callDbgTimer);}catch(e){} _callDbgTimer=setInterval(_callDbgShow,600); _callDbgShow();   // ⚠️ диагностика
+    pc.onicecandidate=e=>{ if(e.candidate&&callPeerId)emit('call:ice',{to:callPeerId,from:me.id,candidate:e.candidate}); };   // trickle ICE — кандидаты по мере сбора (в т.ч. TURN relay)
     if(localStream)localStream.getTracks().forEach(t=>{try{pc.addTrack(t,localStream);}catch(e){}});
     pc.ontrack=ev=>{ _rtrk++; _callDbgShow();   // ⚠️ диагностика: пришла удалённая дорожка
       const st=ev.streams&&ev.streams[0]; if(!st)return;
@@ -5456,8 +5462,7 @@ async function setupPeer(isCaller,kind){
     if(isCaller){
       const offer=await pc.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:(kind==='video')});
       await pc.setLocalDescription(offer);
-      await iceComplete(pc,4500);
-      if(pc&&callPeerId)emit('call:offer',{to:callPeerId,from:me.id,sdp:pc.localDescription});
+      if(pc&&callPeerId)emit('call:offer',{to:callPeerId,from:me.id,sdp:pc.localDescription});   // trickle: offer сразу, кандидаты идут отдельно
     }else if(pendingOffer){
       const off=pendingOffer;pendingOffer=null;await applyOfferAndAnswer(off);
     }
@@ -5467,13 +5472,13 @@ async function applyOfferAndAnswer(sdp){
   if(!pc||!sdp)return;
   try{
     await pc.setRemoteDescription(sdp);
+    _drainRemoteIce();                        // применяем удалённые ICE-кандидаты, накопленные до setRemoteDescription
     const ans=await pc.createAnswer();
     await pc.setLocalDescription(ans);
-    await iceComplete(pc,2500);
-    if(pc&&callPeerId)emit('call:answer',{to:callPeerId,from:me.id,sdp:pc.localDescription});
+    if(pc&&callPeerId)emit('call:answer',{to:callPeerId,from:me.id,sdp:pc.localDescription});   // trickle: answer сразу
   }catch(e){console.error('RTC answer error',e);}
 }
-function closePeer(){ try{if(pc){pc.ontrack=null;pc.onconnectionstatechange=null;pc.close();}}catch(e){} pc=null; pendingOffer=null; stopCallPoll(); try{clearInterval(_callDbgTimer);_callDbgTimer=null;const _d=document.getElementById('callDbg');if(_d)_d.remove();}catch(e){} }
+function closePeer(){ try{if(pc){pc.ontrack=null;pc.onconnectionstatechange=null;pc.onicecandidate=null;pc.close();}}catch(e){} pc=null; pendingOffer=null; _callIceBuf=[]; _callHasRemote=false; stopCallPoll(); try{clearInterval(_callDbgTimer);_callDbgTimer=null;const _d=document.getElementById('callDbg');if(_d)_d.remove();}catch(e){} }
 function startCall(kind){
   if(current&&current.group)return startGroupCall(kind);
   if(!micAllowed()){toast('🎤 Включите доступ к микрофону в Настройках, чтобы звонить');return;}
