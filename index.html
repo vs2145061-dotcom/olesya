@@ -634,6 +634,11 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 #callScreen.video .call-info .avatar.xl{width:52px;height:52px;font-size:21px;box-shadow:0 2px 12px rgba(0,0,0,.4)}
 #callScreen.video .call-info .nm{font-size:18px}
 #callScreen.video .call-info .stat{font-size:13px}
+/* видеозвонок: ВСЕ кнопки — вниз (сверху их перекрывают всплывающие уведомления); ужимаем под 5 кнопок в ряд */
+#callScreen.video .call-actions{position:absolute;left:0;right:0;bottom:34px;justify-content:center;gap:12px;z-index:4}
+#callScreen.video .callbtn{width:56px;height:56px}
+#callScreen.video .callbtn.end{width:62px;height:62px}
+#callScreen.video::after{content:'';position:absolute;left:0;right:0;bottom:0;height:140px;background:linear-gradient(0deg,rgba(0,0,0,.5),transparent);z-index:2;pointer-events:none}
 .callbtn{width:62px;height:62px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.12);backdrop-filter:blur(8px);transition:transform .1s,background .15s}
 .callbtn:active{transform:scale(.92)}
 .callbtn svg{width:26px;height:26px;color:#fff}
@@ -1852,7 +1857,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.86', BUILD_ID='2026-07-30-video-adaptive-render';
+const APP_VERSION='4.9.87', BUILD_ID='2026-07-30-call-buttons-bottom-flipcam';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -5368,7 +5373,7 @@ $('#vdSend').onclick=()=>stopRec(true);
 $('#vdCancel').onclick=()=>{discardDraft();refreshVoiceDraft();toast('Черновик удалён');};
 
 /* ================== CALLS (реальный WebRTC P2P) ================== */
-let callPeerId=null,callKind='audio',callTimer=null,callStart=0,localStream=null,callIncoming=false,callRingTO=null,callInviteTimer=null,_autoAcceptFrom=null,_vidWatch=null;
+let callPeerId=null,callKind='audio',callTimer=null,callStart=0,localStream=null,callIncoming=false,callRingTO=null,callInviteTimer=null,_autoAcceptFrom=null,_vidWatch=null,_camFacing='user';
 let pc=null, pendingOffer=null, callPollTimer=null;
 let _callIceBuf=[], _callHasRemote=false;   // trickle ICE: буфер удалённых кандидатов до setRemoteDescription
 function _addRemoteIce(c){ if(!c)return; if(pc&&_callHasRemote){ try{pc.addIceCandidate(c);}catch(e){} } else { _callIceBuf.push(c); } }
@@ -5424,6 +5429,7 @@ async function setupPeer(isCaller,kind){
   // получаем локальные медиа (звук всегда; видео — только для видеозвонка)
   try{
     if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){
+      _camFacing='user';   // новый звонок стартует с фронтальной камеры
       const _vc=(kind==='video'&&camAllowed())?{width:{ideal:1280},height:{ideal:720},frameRate:{ideal:30},facingMode:'user'}:false;   // качественное видео; битрейт вручную НЕ ограничиваем — WebRTC сам адаптирует под сеть (стабильнее жёсткого потолка)
       localStream=await getMediaWithTimeout({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:_vc},15000);
       if(kind==='video'){const lv=$('#localVideo');if(lv){try{lv.srcObject=localStream;if(lv.play)lv.play().catch(()=>{});}catch(e){}}
@@ -5570,6 +5576,24 @@ function endCall(remote){
 function initLocalVideo(){
   if(navigator.mediaDevices){getMediaWithTimeout({video:true,audio:true},15000).then(s=>{if(!s)return;localStream=s;$('#localVideo').srcObject=s;}).catch(()=>{toast('Камера недоступна — звук активен');});}
 }
+async function switchCamera(fb){
+  try{
+    if(callKind!=='video'||!localStream)return;
+    if(fb)fb.disabled=true;
+    const next=(_camFacing==='user')?'environment':'user';
+    let ns=null;
+    try{ ns=await getMediaWithTimeout({audio:false,video:{facingMode:{ideal:next},width:{ideal:1280},height:{ideal:720}}},8000); }
+    catch(e){ toast('Не удалось переключить камеру'); if(fb)fb.disabled=false; return; }
+    const nt=ns&&ns.getVideoTracks&&ns.getVideoTracks()[0];
+    if(!nt){ toast('Вторая камера не найдена'); if(fb)fb.disabled=false; return; }
+    _camFacing=next;
+    try{ if(pc&&pc.getSenders){ const vs=pc.getSenders().find(s=>s.track&&s.track.kind==='video'); if(vs&&vs.replaceTrack)await vs.replaceTrack(nt); } }catch(e){}   // подмена дорожки без пересогласования
+    try{ const old=localStream.getVideoTracks()[0]; if(old){ localStream.removeTrack(old); old.stop(); } }catch(e){}
+    try{ localStream.addTrack(nt); }catch(e){}
+    const lv=$('#localVideo'); if(lv){ lv.srcObject=localStream; try{lv.play&&lv.play().catch(()=>{});}catch(_){} lv.style.transform=(next==='user')?'scaleX(-1)':'none'; }   // фронтальную зеркалим, тыловую — нет
+    if(fb)fb.disabled=false;
+  }catch(e){ if(fb)fb.disabled=false; }
+}
 function renderCallActions(incoming,active,opt){
   try{const cs=document.getElementById('callScreen');if(cs)cs.classList.toggle('video',callKind==='video');}catch(e){}
   const a=$('#callActions');a.innerHTML='';
@@ -5579,7 +5603,8 @@ function renderCallActions(incoming,active,opt){
     end:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 15.46l-5.27-.61-2.52 2.52a15.05 15.05 0 0 1-6.59-6.59l2.53-2.53L8.54 3H3.03C2.46 13.18 10.82 21.54 21 20.97v-5.51z" transform="rotate(135 12 12)"/></svg>',
     accept:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24 11.36 11.36 0 0 0 3.57.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1.02l-2.2 2.2z"/></svg>',
     spk:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg>',
-    spkoff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m23 9-6 6M17 9l6 6"/></svg>'};
+    spkoff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m23 9-6 6M17 9l6 6"/></svg>',
+    flip:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>'};
   if(incoming){
     a.appendChild(btn('end',ICON.end,()=>endCall(false)));
     if(opt&&opt.unknown){a.appendChild(btn('',"<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><circle cx='12' cy='12' r='10'/><path d='m4.9 4.9 14.2 14.2'/></svg>",()=>{const s=getSec();if(!s.blocked.includes(opt.from))s.blocked.push(opt.from);saveSec(s);logSec('🚫 Заблокирован номер из входящего звонка');toast('Номер заблокирован');emit('call:reject',{to:opt.from,from:me.id,reason:'blocked'});refreshSettings();endCall(true);}));}
@@ -5593,7 +5618,10 @@ function renderCallActions(incoming,active,opt){
     const sb=btn('',_spkOn?ICON.spk:ICON.spkoff,()=>{_spkOn=!_spkOn;sb.innerHTML=_spkOn?ICON.spk:ICON.spkoff;sb.classList.toggle('active',!_spkOn);applySpk();toast(_spkOn?'🔊 Громкая связь включена':'🔉 Тихий режим');});
     a.appendChild(sb);applySpk();
     a.appendChild(btn('end',ICON.end,()=>endCall(false)));
-    if(callKind==='video'){const cb=btn('',ICON.cam,()=>{camOff=!camOff;cb.classList.toggle('active',camOff);if(localStream)localStream.getVideoTracks().forEach(t=>t.enabled=!camOff);});a.appendChild(cb);}
+    if(callKind==='video'){
+      const cb=btn('',ICON.cam,()=>{camOff=!camOff;cb.classList.toggle('active',camOff);if(localStream)localStream.getVideoTracks().forEach(t=>t.enabled=!camOff);});a.appendChild(cb);
+      const fb=btn('',ICON.flip,()=>switchCamera(fb));a.appendChild(fb);   // переключение фронтальная/тыловая
+    }
   }
 }
 
