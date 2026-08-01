@@ -1852,7 +1852,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.83', BUILD_ID='2026-07-30-callpush-dedupe';
+const APP_VERSION='4.9.84', BUILD_ID='2026-07-30-native-call-bridge';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -5368,7 +5368,7 @@ $('#vdSend').onclick=()=>stopRec(true);
 $('#vdCancel').onclick=()=>{discardDraft();refreshVoiceDraft();toast('Черновик удалён');};
 
 /* ================== CALLS (реальный WebRTC P2P) ================== */
-let callPeerId=null,callKind='audio',callTimer=null,callStart=0,localStream=null,callIncoming=false,callRingTO=null,callInviteTimer=null;
+let callPeerId=null,callKind='audio',callTimer=null,callStart=0,localStream=null,callIncoming=false,callRingTO=null,callInviteTimer=null,_autoAcceptFrom=null;
 let pc=null, pendingOffer=null, callPollTimer=null;
 let _callIceBuf=[], _callHasRemote=false;   // trickle ICE: буфер удалённых кандидатов до setRemoteDescription
 function _addRemoteIce(c){ if(!c)return; if(pc&&_callHasRemote){ try{pc.addIceCandidate(c);}catch(e){} } else { _callIceBuf.push(c); } }
@@ -5508,6 +5508,7 @@ function showIncomingCall(p){
   go('callScreen');try{window.__omResetLocalVid&&window.__omResetLocalVid();}catch(e){}renderCallActions(true,false,{unknown:!known,from:from});
   $('#callAvatar').classList.add('incoming-ring');
   if(appHidden())showNotif('📞 Входящий '+(p.kind==='video'?'видеозвонок':'звонок'),(u.name||p.name||'Неизвестный номер'),from);
+  if(_autoAcceptFrom&&_autoAcceptFrom===from){ _autoAcceptFrom=null; setTimeout(()=>{try{acceptCall();}catch(e){}},150); }   // нативная оболочка нажала «Ответить» на полноэкранном звонке
 }
 function onCallAccepted(){
   clearTimeout(callRingTO);stopCallInvite();
@@ -5524,6 +5525,17 @@ function acceptCall(){
   const peer=userById(callPeerId);
   if(!(peer&&peer.bot)){ startCallPoll(); setupPeer(false,callKind); } // реальные медиа собеседника
 }
+/* Мост из нативной оболочки (Android): полноэкранный входящий звонок поверх блокировки.
+   Оболочка по пушу показывает нативный звонящий экран; действия («Ответить»/«Отклонить»/показать) идут сюда. */
+window.olesyaCallAction=function(action,from,kind,name){
+  try{
+    if(!me||!from)return;
+    if(action==='accept'){ _autoAcceptFrom=from; if(callPeerId===from&&callIncoming){ _autoAcceptFrom=null; acceptCall(); } return; }
+    if(action==='decline'){ if(callPeerId===from){ endCall(false); } else { try{emit('call:reject',{to:from,from:me.id,reason:'screen'});}catch(e){} } return; }
+    if(callPeerId===from)return;   // show — показать входящий сразу, не дожидаясь опроса
+    showIncomingCall({from:from,to:me.id,name:name||'',kind:(kind==='video'?'video':'audio')});
+  }catch(e){}
+};
 function endCall(remote){
   stopCallInvite();
   // запись в историю звонков
