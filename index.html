@@ -1647,7 +1647,7 @@ function applyTheme(pref){
 }
 // «Авто»: перепроверяем системную тему при каждом возврате в приложение
 // (смена темы устройства, пока приложение свёрнуто, может не дать событие matchMedia)
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&getThemePref()==='auto'){try{applyTheme('auto');}catch(e){}} });
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'){ if(getThemePref()==='auto'){try{applyTheme('auto');}catch(e){}} try{if(me&&typeof cloudPoll==='function')cloudPoll();}catch(e){} } });   // при возврате на экран сразу опрашиваем входящие (быстрее ловим звонок после тапа по уведомлению)
 function setThemePref(pref){
   try{localStorage.setItem(THEME_KEY,pref);}catch(e){}
   applyTheme(pref);
@@ -1852,7 +1852,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.82', BUILD_ID='2026-07-30-callpush-cleanup';
+const APP_VERSION='4.9.83', BUILD_ID='2026-07-30-callpush-dedupe';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -5477,8 +5477,7 @@ function startCall(kind){
   av($('#callAvatar'),current);$('#callName').textContent=current.name;$('#callStatus').textContent='Вызов…';
   go('callScreen');try{window.__omResetLocalVid&&window.__omResetLocalVid();}catch(e){}renderCallActions(false);
   closePeer();pendingOffer=null;
-  emit('call:invite',{to:current.id,from:me.id,name:me.name,kind});
-  try{ jpost(wapi('/call/ring'),{to:current.id,name:me.name,kind}).catch(()=>{}); }catch(e){}   // разбудить получателя пушем, если апп свёрнут/закрыт (соединение всё равно идёт по шине)
+  emit('call:invite',{to:current.id,from:me.id,name:me.name,kind});   // сервер /bus сам шлёт пуш получателю (с антиспам-дедупом)
   clearTimeout(callRingTO);
   if(current.bot){setTimeout(()=>{onCallAccepted();},1800);} // бот отвечает (симуляция, без реального WebRTC)
   else{ startCallPoll(); setupPeer(true,kind); callRingTO=setTimeout(()=>{$('#callStatus').textContent='Не отвечает';setTimeout(()=>endCall(true),1200);},30000);
