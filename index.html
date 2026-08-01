@@ -596,7 +596,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 .recbar .rtime{font-family:var(--mono);font-size:15px}
 
 /* ===== Call screen ===== */
-#callScreen{background:linear-gradient(160deg,var(--immersive),var(--immersive-2));z-index:50}
+#callScreen{background:radial-gradient(130% 85% at 50% -8%, rgba(108,123,255,.32), transparent 55%), linear-gradient(165deg,#201843 0%,#150F2E 55%,#100B22 100%);z-index:50}
 #gcallScreen{background:linear-gradient(160deg,var(--immersive),var(--immersive-2));z-index:50;display:flex;flex-direction:column;padding:0}
 #gcallScreen.hidden{display:none}
 .gcall-top{padding:46px 20px 8px;text-align:center;color:#fff;flex:none}
@@ -645,6 +645,14 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 .callbtn.active{background:#fff}.callbtn.active svg{color:#10131c}
 .callbtn.end{background:var(--red);width:70px;height:70px}
 .callbtn.accept{background:var(--green)}
+/* Входящий звонок: крупные кнопки «Отклонить»/«Ответить» с подписями, как в обычном звонке */
+.call-actions.answer-row{width:100%;justify-content:space-around;align-items:flex-start;gap:0}
+.ca-col{display:flex;flex-direction:column;align-items:center;gap:9px}
+.ca-label{color:#fff;font-size:14px;font-weight:600;letter-spacing:.2px;text-shadow:0 1px 4px rgba(0,0,0,.5)}
+.call-actions.answer-row .callbtn{width:74px;height:74px}
+.call-actions.answer-row .callbtn svg{width:30px;height:30px}
+.callbtn.ans-pulse{animation:ansPulse 1.4s ease-in-out infinite}
+@keyframes ansPulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(63,207,142,.5)}50%{transform:scale(1.09);box-shadow:0 0 0 14px rgba(63,207,142,0)}}
 .incoming-ring{animation:ring 1.2s infinite}
 @keyframes ring{0%,100%{transform:translateY(0)}25%{transform:translateY(-6px) rotate(-8deg)}75%{transform:translateY(-6px) rotate(8deg)}}
 
@@ -1410,7 +1418,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 
   <!-- ============ CALL ============ -->
   <section class="screen hidden" id="callScreen">
-    <video id="remoteVideo" autoplay playsinline></video>
+    <video id="remoteVideo" autoplay playsinline muted webkit-playsinline></video>
     <video id="localVideo" autoplay playsinline muted></video>
     <!-- Отдельный аудио-элемент для звука собеседника: видео-элемент в скрытом состоянии на мобильных часто НЕ проигрывает звук -->
     <audio id="remoteAudio" autoplay playsinline></audio>
@@ -1857,7 +1865,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.87', BUILD_ID='2026-07-30-call-buttons-bottom-flipcam';
+const APP_VERSION='4.9.88', BUILD_ID='2026-07-30-call-ui-answer-ios-video';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -5383,7 +5391,7 @@ function stopCallInvite(){ if(callInviteTimer){clearInterval(callInviteTimer);ca
 function _iceToPlain(c){ if(!c)return c; try{ if(typeof c.toJSON==='function')return c.toJSON(); }catch(e){} return {candidate:c.candidate,sdpMid:c.sdpMid,sdpMLineIndex:c.sdpMLineIndex,usernameFragment:c.usernameFragment}; }
 let _pendingRemoteAudio=false, _spkOn=true;
 // Если автоплей звука собеседника заблокирован — включаем по первому касанию экрана звонка
-document.addEventListener('pointerdown',()=>{ if(_pendingRemoteAudio){ const ra=document.getElementById('remoteAudio'); if(ra){ ra.muted=false; const pr=ra.play(); if(pr&&pr.then)pr.then(()=>{_pendingRemoteAudio=false;}).catch(()=>{}); } } },{passive:true});
+document.addEventListener('pointerdown',()=>{ if(_pendingRemoteAudio){ const ra=document.getElementById('remoteAudio'); if(ra){ ra.muted=false; const pr=ra.play(); if(pr&&pr.then)pr.then(()=>{_pendingRemoteAudio=false;}).catch(()=>{}); } } const rvp=document.getElementById('remoteVideo'); if(rvp&&rvp.srcObject){ try{rvp.muted=true;rvp.play&&rvp.play().catch(()=>{});}catch(_){} } },{passive:true});
 /* ICE-серверы. STUN — обнаружение публичного адреса; TURN — РЕЛЕ для звонков между
    разными сетями (мобильный интернет/симметричный NAT), без него звонки часто не проходят.
    Ниже — бесплатные публичные TURN (Open Relay). Для продакшна заведите свой TURN
@@ -5446,7 +5454,7 @@ async function setupPeer(isCaller,kind){
     try{ if(kind==='video'&&pc.getSenders){ const vs=pc.getSenders().find(s=>s.track&&s.track.kind==='video'); if(vs&&vs.getParameters&&vs.setParameters){ const prm=vs.getParameters(); if(prm.encodings&&prm.encodings.length){ prm.degradationPreference='balanced'; vs.setParameters(prm).catch(()=>{}); } } } }catch(e){}   // только предпочтение деградации (под нагрузкой снижать разрешение), битрейт — на адаптации WebRTC. НЕ фабрикуем encodings и НЕ ставим потолок — это мешало и давало нестабильность
     pc.ontrack=ev=>{
       const st=ev.streams&&ev.streams[0]; if(!st)return;
-      const rv=$('#remoteVideo'); if(rv){ rv.srcObject=st; try{rv.play&&rv.play().catch(()=>{});}catch(_){} }   // ВСЕГДА переустанавливаем srcObject — иначе видео-дорожка, пришедшая после аудио, может не отрисоваться (чёрный экран)
+      const rv=$('#remoteVideo'); if(rv){ rv.muted=true; rv.srcObject=st; try{rv.play&&rv.play().catch(()=>{});}catch(_){} }   // muted — иначе iOS блокирует автозапуск видео (звук идёт отдельным #remoteAudio); всегда переустанавливаем srcObject
       // ЗВУК собеседника — через отдельный <audio>, иначе на мобильных при скрытом видео звука нет
       const ra=$('#remoteAudio'); if(ra){ if(ra.srcObject!==st)ra.srcObject=st; ra.muted=false; ra.volume=1; const pr=ra.play(); if(pr&&pr.catch)pr.catch(()=>{ _pendingRemoteAudio=true; }); }
     };
@@ -5595,8 +5603,8 @@ async function switchCamera(fb){
   }catch(e){ if(fb)fb.disabled=false; }
 }
 function renderCallActions(incoming,active,opt){
-  try{const cs=document.getElementById('callScreen');if(cs)cs.classList.toggle('video',callKind==='video');}catch(e){}
-  const a=$('#callActions');a.innerHTML='';
+  try{const cs=document.getElementById('callScreen');if(cs)cs.classList.toggle('video',callKind==='video'&&!!active);}catch(e){}   // видео-раскладку — только когда звонок СОЕДИНЁН; при дозвоне показываем аватар + брендовый фон (не мрачный чёрный)
+  const a=$('#callActions');a.innerHTML='';a.classList.remove('answer-row');
   const btn=(cls,svg,fn)=>{const b=document.createElement('button');b.className='callbtn '+cls;b.innerHTML=svg;b.onclick=fn;return b;};
   const ICON={mic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>',
     cam:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m23 7-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>',
@@ -5606,9 +5614,11 @@ function renderCallActions(incoming,active,opt){
     spkoff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m23 9-6 6M17 9l6 6"/></svg>',
     flip:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>'};
   if(incoming){
-    a.appendChild(btn('end',ICON.end,()=>endCall(false)));
-    if(opt&&opt.unknown){a.appendChild(btn('',"<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><circle cx='12' cy='12' r='10'/><path d='m4.9 4.9 14.2 14.2'/></svg>",()=>{const s=getSec();if(!s.blocked.includes(opt.from))s.blocked.push(opt.from);saveSec(s);logSec('🚫 Заблокирован номер из входящего звонка');toast('Номер заблокирован');emit('call:reject',{to:opt.from,from:me.id,reason:'blocked'});refreshSettings();endCall(true);}));}
-    a.appendChild(btn('accept',ICON.accept,acceptCall));
+    a.classList.add('answer-row');
+    const col=(cls,svg,label,fn,anim)=>{const c=document.createElement('div');c.className='ca-col';const b=document.createElement('button');b.className='callbtn '+cls+(anim?(' '+anim):'');b.innerHTML=svg;b.onclick=fn;const t=document.createElement('span');t.className='ca-label';t.textContent=label;c.appendChild(b);c.appendChild(t);return c;};
+    a.appendChild(col('end',ICON.end,'Отклонить',()=>endCall(false)));
+    if(opt&&opt.unknown){a.appendChild(col('',"<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><circle cx='12' cy='12' r='10'/><path d='m4.9 4.9 14.2 14.2'/></svg>",'Блок',()=>{const s=getSec();if(!s.blocked.includes(opt.from))s.blocked.push(opt.from);saveSec(s);logSec('🚫 Заблокирован номер из входящего звонка');toast('Номер заблокирован');emit('call:reject',{to:opt.from,from:me.id,reason:'blocked'});refreshSettings();endCall(true);}));}
+    a.appendChild(col('accept',ICON.accept,'Ответить',acceptCall,'ans-pulse'));
   }else{
     let muted=false,camOff=false;
     const mb=btn('',ICON.mic,()=>{muted=!muted;mb.classList.toggle('active',muted);if(localStream)localStream.getAudioTracks().forEach(t=>t.enabled=!muted);toast(muted?'Микрофон выключен':'Микрофон включён');});
