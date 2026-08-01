@@ -1852,7 +1852,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.85', BUILD_ID='2026-07-30-video-reliable-vga';
+const APP_VERSION='4.9.86', BUILD_ID='2026-07-30-video-adaptive-render';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -5368,7 +5368,7 @@ $('#vdSend').onclick=()=>stopRec(true);
 $('#vdCancel').onclick=()=>{discardDraft();refreshVoiceDraft();toast('Черновик удалён');};
 
 /* ================== CALLS (реальный WebRTC P2P) ================== */
-let callPeerId=null,callKind='audio',callTimer=null,callStart=0,localStream=null,callIncoming=false,callRingTO=null,callInviteTimer=null,_autoAcceptFrom=null;
+let callPeerId=null,callKind='audio',callTimer=null,callStart=0,localStream=null,callIncoming=false,callRingTO=null,callInviteTimer=null,_autoAcceptFrom=null,_vidWatch=null;
 let pc=null, pendingOffer=null, callPollTimer=null;
 let _callIceBuf=[], _callHasRemote=false;   // trickle ICE: буфер удалённых кандидатов до setRemoteDescription
 function _addRemoteIce(c){ if(!c)return; if(pc&&_callHasRemote){ try{pc.addIceCandidate(c);}catch(e){} } else { _callIceBuf.push(c); } }
@@ -5424,7 +5424,7 @@ async function setupPeer(isCaller,kind){
   // получаем локальные медиа (звук всегда; видео — только для видеозвонка)
   try{
     if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){
-      const _vc=(kind==='video'&&camAllowed())?{width:{ideal:640},height:{ideal:480},frameRate:{ideal:24},facingMode:'user'}:false;   // VGA — надёжно на мобильной сети (UZ LTE через TURN); 720p часто даёт чёрный экран из-за перегрузки релея
+      const _vc=(kind==='video'&&camAllowed())?{width:{ideal:1280},height:{ideal:720},frameRate:{ideal:30},facingMode:'user'}:false;   // качественное видео; битрейт вручную НЕ ограничиваем — WebRTC сам адаптирует под сеть (стабильнее жёсткого потолка)
       localStream=await getMediaWithTimeout({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:_vc},15000);
       if(kind==='video'){const lv=$('#localVideo');if(lv){try{lv.srcObject=localStream;if(lv.play)lv.play().catch(()=>{});}catch(e){}}
         try{const cs=document.getElementById('callScreen');if(cs)cs.classList.add('video');}catch(e){}}   // видео пошло → верстка видеозвонка (аватар скрыт, имя в углу) гарантированно
@@ -5437,10 +5437,10 @@ async function setupPeer(isCaller,kind){
     pc=new RTCPeerConnection(rtcConfig());
     pc.onicecandidate=e=>{ if(e.candidate&&callPeerId)emit('call:ice',{to:callPeerId,from:me.id,candidate:_iceToPlain(e.candidate)}); };   // trickle ICE — кандидаты по мере сбора (в т.ч. TURN relay)
     if(localStream)localStream.getTracks().forEach(t=>{try{pc.addTrack(t,localStream);}catch(e){}});
-    try{ if(kind==='video'&&pc.getSenders){ const vs=pc.getSenders().find(s=>s.track&&s.track.kind==='video'); if(vs&&vs.getParameters&&vs.setParameters){ const prm=vs.getParameters(); prm.encodings=(prm.encodings&&prm.encodings.length)?prm.encodings:[{}]; prm.encodings[0].maxBitrate=900000; try{prm.degradationPreference='balanced';}catch(_){} vs.setParameters(prm).catch(()=>{}); } } }catch(e){}   // потолок ~900 кбит/с + деградация под сеть: надёжнее (лучше ниже качество, чем чёрный экран)
+    try{ if(kind==='video'&&pc.getSenders){ const vs=pc.getSenders().find(s=>s.track&&s.track.kind==='video'); if(vs&&vs.getParameters&&vs.setParameters){ const prm=vs.getParameters(); if(prm.encodings&&prm.encodings.length){ prm.degradationPreference='balanced'; vs.setParameters(prm).catch(()=>{}); } } } }catch(e){}   // только предпочтение деградации (под нагрузкой снижать разрешение), битрейт — на адаптации WebRTC. НЕ фабрикуем encodings и НЕ ставим потолок — это мешало и давало нестабильность
     pc.ontrack=ev=>{
       const st=ev.streams&&ev.streams[0]; if(!st)return;
-      const rv=$('#remoteVideo'); if(rv){ if(rv.srcObject!==st)rv.srcObject=st; if(rv.play)rv.play().catch(()=>{}); }
+      const rv=$('#remoteVideo'); if(rv){ rv.srcObject=st; try{rv.play&&rv.play().catch(()=>{});}catch(_){} }   // ВСЕГДА переустанавливаем srcObject — иначе видео-дорожка, пришедшая после аудио, может не отрисоваться (чёрный экран)
       // ЗВУК собеседника — через отдельный <audio>, иначе на мобильных при скрытом видео звука нет
       const ra=$('#remoteAudio'); if(ra){ if(ra.srcObject!==st)ra.srcObject=st; ra.muted=false; ra.volume=1; const pr=ra.play(); if(pr&&pr.catch)pr.catch(()=>{ _pendingRemoteAudio=true; }); }
     };
@@ -5448,6 +5448,15 @@ async function setupPeer(isCaller,kind){
       if(st==='failed'){ const cs=$('#callStatus'); if(cs)cs.textContent='Не удалось соединиться (сеть/NAT)'; setTimeout(()=>{try{endCall(true);}catch(e){}},1800); }
     };
     pc.oniceconnectionstatechange=()=>{ if(pc&&pc.iceConnectionState==='failed'){ try{pc.restartIce&&pc.restartIce();}catch(e){} } };
+    try{clearInterval(_vidWatch);}catch(e){}
+    _vidWatch=setInterval(()=>{   // сторож отрисовки: видео-дорожка живая, а картинки нет (0×0) → переустановить поток (лечит «чёрный при соединённом»)
+      try{
+        if(!pc){clearInterval(_vidWatch);_vidWatch=null;return;}
+        const rv=$('#remoteVideo'); if(!rv||!rv.srcObject)return;
+        const hasVid=pc.getReceivers&&pc.getReceivers().some(r=>r.track&&r.track.kind==='video'&&r.track.readyState==='live');
+        if(hasVid&&(!rv.videoWidth||rv.videoWidth===0)){ const s=rv.srcObject; try{rv.srcObject=null;rv.srcObject=s;rv.play&&rv.play().catch(()=>{});}catch(_){} }
+      }catch(e){}
+    },2500);
     if(isCaller){
       const offer=await pc.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:(kind==='video')});
       await pc.setLocalDescription(offer);
@@ -5467,7 +5476,7 @@ async function applyOfferAndAnswer(sdp){
     if(pc&&callPeerId)emit('call:answer',{to:callPeerId,from:me.id,sdp:pc.localDescription});   // trickle: answer сразу
   }catch(e){console.error('RTC answer error',e);}
 }
-function closePeer(){ try{if(pc){pc.ontrack=null;pc.onconnectionstatechange=null;pc.onicecandidate=null;pc.close();}}catch(e){} pc=null; pendingOffer=null; _callIceBuf=[]; _callHasRemote=false; stopCallPoll(); }
+function closePeer(){ try{if(pc){pc.ontrack=null;pc.onconnectionstatechange=null;pc.onicecandidate=null;pc.close();}}catch(e){} pc=null; pendingOffer=null; _callIceBuf=[]; _callHasRemote=false; stopCallPoll(); try{clearInterval(_vidWatch);_vidWatch=null;}catch(e){} }
 function startCall(kind){
   if(current&&current.group)return startGroupCall(kind);
   if(!micAllowed()){toast('🎤 Включите доступ к микрофону в Настройках, чтобы звонить');return;}
