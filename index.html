@@ -1852,7 +1852,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.84', BUILD_ID='2026-07-30-native-call-bridge';
+const APP_VERSION='4.9.85', BUILD_ID='2026-07-30-video-reliable-vga';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -5424,7 +5424,7 @@ async function setupPeer(isCaller,kind){
   // получаем локальные медиа (звук всегда; видео — только для видеозвонка)
   try{
     if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){
-      const _vc=(kind==='video'&&camAllowed())?{width:{ideal:1280},height:{ideal:720},frameRate:{ideal:30},facingMode:'user'}:false;   // HD-видео (адаптируется вниз под сеть/камеру)
+      const _vc=(kind==='video'&&camAllowed())?{width:{ideal:640},height:{ideal:480},frameRate:{ideal:24},facingMode:'user'}:false;   // VGA — надёжно на мобильной сети (UZ LTE через TURN); 720p часто даёт чёрный экран из-за перегрузки релея
       localStream=await getMediaWithTimeout({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:_vc},15000);
       if(kind==='video'){const lv=$('#localVideo');if(lv){try{lv.srcObject=localStream;if(lv.play)lv.play().catch(()=>{});}catch(e){}}
         try{const cs=document.getElementById('callScreen');if(cs)cs.classList.add('video');}catch(e){}}   // видео пошло → верстка видеозвонка (аватар скрыт, имя в углу) гарантированно
@@ -5437,7 +5437,7 @@ async function setupPeer(isCaller,kind){
     pc=new RTCPeerConnection(rtcConfig());
     pc.onicecandidate=e=>{ if(e.candidate&&callPeerId)emit('call:ice',{to:callPeerId,from:me.id,candidate:_iceToPlain(e.candidate)}); };   // trickle ICE — кандидаты по мере сбора (в т.ч. TURN relay)
     if(localStream)localStream.getTracks().forEach(t=>{try{pc.addTrack(t,localStream);}catch(e){}});
-    try{ if(kind==='video'&&pc.getSenders){ const vs=pc.getSenders().find(s=>s.track&&s.track.kind==='video'); if(vs&&vs.getParameters&&vs.setParameters){ const prm=vs.getParameters(); prm.encodings=(prm.encodings&&prm.encodings.length)?prm.encodings:[{}]; prm.encodings[0].maxBitrate=2500000; vs.setParameters(prm).catch(()=>{}); } } }catch(e){}   // потолок битрейта видео ~2.5 Мбит/с для чёткого 720p
+    try{ if(kind==='video'&&pc.getSenders){ const vs=pc.getSenders().find(s=>s.track&&s.track.kind==='video'); if(vs&&vs.getParameters&&vs.setParameters){ const prm=vs.getParameters(); prm.encodings=(prm.encodings&&prm.encodings.length)?prm.encodings:[{}]; prm.encodings[0].maxBitrate=900000; try{prm.degradationPreference='balanced';}catch(_){} vs.setParameters(prm).catch(()=>{}); } } }catch(e){}   // потолок ~900 кбит/с + деградация под сеть: надёжнее (лучше ниже качество, чем чёрный экран)
     pc.ontrack=ev=>{
       const st=ev.streams&&ev.streams[0]; if(!st)return;
       const rv=$('#remoteVideo'); if(rv){ if(rv.srcObject!==st)rv.srcObject=st; if(rv.play)rv.play().catch(()=>{}); }
