@@ -1865,7 +1865,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.88', BUILD_ID='2026-07-30-call-ui-answer-ios-video';
+const APP_VERSION='4.9.89', BUILD_ID='2026-07-30-force-vp8-ios-android';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -5452,6 +5452,17 @@ async function setupPeer(isCaller,kind){
     pc.onicecandidate=e=>{ if(e.candidate&&callPeerId)emit('call:ice',{to:callPeerId,from:me.id,candidate:_iceToPlain(e.candidate)}); };   // trickle ICE — кандидаты по мере сбора (в т.ч. TURN relay)
     if(localStream)localStream.getTracks().forEach(t=>{try{pc.addTrack(t,localStream);}catch(e){}});
     try{ if(kind==='video'&&pc.getSenders){ const vs=pc.getSenders().find(s=>s.track&&s.track.kind==='video'); if(vs&&vs.getParameters&&vs.setParameters){ const prm=vs.getParameters(); if(prm.encodings&&prm.encodings.length){ prm.degradationPreference='balanced'; vs.setParameters(prm).catch(()=>{}); } } } }catch(e){}   // только предпочтение деградации (под нагрузкой снижать разрешение), битрейт — на адаптации WebRTC. НЕ фабрикуем encodings и НЕ ставим потолок — это мешало и давало нестабильность
+    try{   // 🔑 iOS Safari ↔ Android: H.264 часто НЕ совместим (видео чёрное, звук ок) → форсируем VP8 (надёжен на обеих платформах). Обе стороны ставят VP8 первым → он и договаривается.
+      if(kind==='video'&&typeof RTCRtpSender!=='undefined'&&RTCRtpSender.getCapabilities&&pc.getTransceivers){
+        const caps=RTCRtpSender.getCapabilities('video');
+        if(caps&&caps.codecs&&caps.codecs.length){
+          const rank=c=>/VP8/i.test(c.mimeType)?0:/VP9/i.test(c.mimeType)?1:/H264/i.test(c.mimeType)?2:3;
+          const pref=caps.codecs.slice().sort((a,b)=>rank(a)-rank(b));
+          const vt=pc.getTransceivers().find(t=>t.sender&&t.sender.track&&t.sender.track.kind==='video');
+          if(vt&&vt.setCodecPreferences){ try{vt.setCodecPreferences(pref);}catch(_){} }
+        }
+      }
+    }catch(e){}
     pc.ontrack=ev=>{
       const st=ev.streams&&ev.streams[0]; if(!st)return;
       const rv=$('#remoteVideo'); if(rv){ rv.muted=true; rv.srcObject=st; try{rv.play&&rv.play().catch(()=>{});}catch(_){} }   // muted — иначе iOS блокирует автозапуск видео (звук идёт отдельным #remoteAudio); всегда переустанавливаем srcObject
