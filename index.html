@@ -635,9 +635,10 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 #callScreen.video .call-info .nm{font-size:18px}
 #callScreen.video .call-info .stat{font-size:13px}
 /* видеозвонок: ВСЕ кнопки — вниз (сверху их перекрывают всплывающие уведомления); ужимаем под 5 кнопок в ряд */
-#callScreen.video .call-actions{position:absolute;left:0;right:0;bottom:34px;justify-content:center;gap:12px;z-index:4}
-#callScreen.video .callbtn{width:56px;height:56px}
-#callScreen.video .callbtn.end{width:62px;height:62px}
+#callScreen.video .call-actions{position:absolute;left:0;right:0;bottom:34px;justify-content:space-evenly;gap:6px;padding:0 8px;flex-wrap:nowrap;box-sizing:border-box;z-index:4}
+#callScreen.video .callbtn{width:52px;height:52px;flex:0 0 auto}
+#callScreen.video .callbtn.end{width:58px;height:58px}
+#callScreen.video .callbtn svg{width:23px;height:23px}
 #callScreen.video::after{content:'';position:absolute;left:0;right:0;bottom:0;height:140px;background:linear-gradient(0deg,rgba(0,0,0,.5),transparent);z-index:2;pointer-events:none}
 .callbtn{width:62px;height:62px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.12);backdrop-filter:blur(8px);transition:transform .1s,background .15s}
 .callbtn:active{transform:scale(.92)}
@@ -1865,7 +1866,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.89', BUILD_ID='2026-07-30-force-vp8-ios-android';
+const APP_VERSION='4.9.90', BUILD_ID='2026-07-30-call-buttons-fit-android';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
