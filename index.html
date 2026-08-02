@@ -1866,7 +1866,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.90', BUILD_ID='2026-07-30-call-buttons-fit-android';
+const APP_VERSION='4.9.91', BUILD_ID='2026-07-30-antispam-contacts-callpush';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -5532,7 +5532,7 @@ function showIncomingCall(p){
   if(callPeerId&&callPeerId!==from){emit('call:reject',{to:from,from:me.id,reason:'busy'});return;}
   if(sec.blocked.includes(from)||(sec.tmp[from]&&sec.tmp[from]>now)){emit('call:reject',{to:from,from:me.id,reason:'blocked'});logSec('🚫 Отклонён звонок от заблокированного: '+(p.name||from));return;}
   const h=(sec.hist[from]||[]).filter(t=>now-t<60000);h.push(now);sec.hist[from]=h.slice(-10);
-  if(h.length>4){sec.tmp[from]=now+600000;saveSec(sec);emit('call:reject',{to:from,from:me.id,reason:'blocked'});logSec('⛔ Анти-спам: авто-блокировка на 10 мин — частые звонки ('+(p.name||from)+')');toast('⛔ Анти-спам: спам-номер заблокирован');return;}
+  if(h.length>4&&!known){sec.tmp[from]=now+600000;saveSec(sec);emit('call:reject',{to:from,from:me.id,reason:'blocked'});logSec('⛔ Анти-спам: авто-блокировка на 10 мин — частые звонки ('+(p.name||from)+')');toast('⛔ Анти-спам: спам-номер заблокирован');return;}   // контакты НЕ блокируем — только чужие номера (иначе при частых звонках блокируется свой же собеседник)
   saveSec(sec);
   if(sec.callsFrom==='contacts'&&!known){emit('call:reject',{to:from,from:me.id,reason:'screen'});logSec('📵 Отклонён звонок (только контакты): '+(p.name||from));toast('📵 Звонок не из контактов отклонён');return;}
   callPeerId=from;callKind=p.kind;callIncoming=true;callStart=0;
