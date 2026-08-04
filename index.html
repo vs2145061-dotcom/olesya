@@ -635,10 +635,12 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 #callScreen.video .call-info .nm{font-size:18px}
 #callScreen.video .call-info .stat{font-size:13px}
 /* видеозвонок: ВСЕ кнопки — вниз (сверху их перекрывают всплывающие уведомления); ужимаем под 5 кнопок в ряд */
-#callScreen.video .call-actions{position:absolute;left:0;right:0;bottom:34px;justify-content:space-evenly;gap:6px;padding:0 8px;flex-wrap:nowrap;box-sizing:border-box;z-index:4}
-#callScreen.video .callbtn{width:52px;height:52px;flex:0 0 auto}
-#callScreen.video .callbtn.end{width:58px;height:58px}
-#callScreen.video .callbtn svg{width:23px;height:23px}
+#callScreen.video .call-actions{position:absolute;left:0;right:0;bottom:34px;z-index:4}
+/* компактный ряд — В ЛЮБОМ состоянии, когда кнопок много (видеозвонок = 5), чтобы не пропадали на узких Android */
+.call-actions.compact{justify-content:space-evenly;gap:6px;padding:0 6px;box-sizing:border-box;flex-wrap:nowrap}
+.call-actions.compact .callbtn{width:50px;height:50px;flex:0 0 auto}
+.call-actions.compact .callbtn.end{width:56px;height:56px}
+.call-actions.compact .callbtn svg{width:22px;height:22px}
 #callScreen.video::after{content:'';position:absolute;left:0;right:0;bottom:0;height:140px;background:linear-gradient(0deg,rgba(0,0,0,.5),transparent);z-index:2;pointer-events:none}
 .callbtn{width:62px;height:62px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.12);backdrop-filter:blur(8px);transition:transform .1s,background .15s}
 .callbtn:active{transform:scale(.92)}
@@ -1866,7 +1868,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.91', BUILD_ID='2026-07-30-antispam-contacts-callpush';
+const APP_VERSION='4.9.92', BUILD_ID='2026-07-30-buttons-allstates-vp8sdp';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -5390,6 +5392,21 @@ function _drainRemoteIce(){ _callHasRemote=true; if(!pc)return; const buf=_callI
 function stopCallInvite(){ if(callInviteTimer){clearInterval(callInviteTimer);callInviteTimer=null;} }
 // RTCIceCandidate нельзя структурно клонировать (BroadcastChannel/localStorage) → шлём простой объект
 function _iceToPlain(c){ if(!c)return c; try{ if(typeof c.toJSON==='function')return c.toJSON(); }catch(e){} return {candidate:c.candidate,sdpMid:c.sdpMid,sdpMLineIndex:c.sdpMLineIndex,usernameFragment:c.usernameFragment}; }
+// Форс VP8: переставляем VP8 первым в m=video (обе стороны → VP8 договаривается). H.264 между iOS Safari и Android часто даёт чёрное видео.
+function _preferVp8(sdp){
+  try{
+    if(!sdp||sdp.indexOf('m=video')<0)return sdp;
+    const lines=sdp.split(/\r\n/);
+    const mi=lines.findIndex(l=>l.indexOf('m=video')===0);
+    if(mi<0)return sdp;
+    const vp8=[];
+    for(const l of lines){ const m=l.match(/^a=rtpmap:(\d+)\s+VP8\/90000/i); if(m)vp8.push(m[1]); }
+    if(!vp8.length)return sdp;
+    const parts=lines[mi].split(' '), head=parts.slice(0,3), pts=parts.slice(3);
+    lines[mi]=head.concat(vp8, pts.filter(p=>vp8.indexOf(p)<0)).join(' ');
+    return lines.join('\r\n');
+  }catch(e){ return sdp; }
+}
 let _pendingRemoteAudio=false, _spkOn=true;
 // Если автоплей звука собеседника заблокирован — включаем по первому касанию экрана звонка
 document.addEventListener('pointerdown',()=>{ if(_pendingRemoteAudio){ const ra=document.getElementById('remoteAudio'); if(ra){ ra.muted=false; const pr=ra.play(); if(pr&&pr.then)pr.then(()=>{_pendingRemoteAudio=false;}).catch(()=>{}); } } const rvp=document.getElementById('remoteVideo'); if(rvp&&rvp.srcObject){ try{rvp.muted=true;rvp.play&&rvp.play().catch(()=>{});}catch(_){} } },{passive:true});
@@ -5485,7 +5502,7 @@ async function setupPeer(isCaller,kind){
     },2500);
     if(isCaller){
       const offer=await pc.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:(kind==='video')});
-      await pc.setLocalDescription(offer);
+      await pc.setLocalDescription({type:offer.type,sdp:_preferVp8(offer.sdp)});   // форс VP8
       if(pc&&callPeerId)emit('call:offer',{to:callPeerId,from:me.id,sdp:pc.localDescription});   // trickle: offer сразу, кандидаты идут отдельно
     }else if(pendingOffer){
       const off=pendingOffer;pendingOffer=null;await applyOfferAndAnswer(off);
@@ -5498,7 +5515,7 @@ async function applyOfferAndAnswer(sdp){
     await pc.setRemoteDescription(sdp);
     _drainRemoteIce();                        // применяем удалённые ICE-кандидаты, накопленные до setRemoteDescription
     const ans=await pc.createAnswer();
-    await pc.setLocalDescription(ans);
+    await pc.setLocalDescription({type:ans.type,sdp:_preferVp8(ans.sdp)});   // форс VP8
     if(pc&&callPeerId)emit('call:answer',{to:callPeerId,from:me.id,sdp:pc.localDescription});   // trickle: answer сразу
   }catch(e){console.error('RTC answer error',e);}
 }
@@ -5645,6 +5662,7 @@ function renderCallActions(incoming,active,opt){
       const fb=btn('',ICON.flip,()=>switchCamera(fb));a.appendChild(fb);   // переключение фронтальная/тыловая
     }
   }
+  a.classList.toggle('compact', a.querySelectorAll('.callbtn').length>=4);   // много кнопок (видеозвонок = 5) → компактный ряд в любом состоянии, чтобы не пропадали на узких Android
 }
 
 /* ================== ГРУППОВЫЕ ЗВОНКИ (mesh WebRTC) ================== */
