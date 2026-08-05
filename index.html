@@ -1868,7 +1868,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='4.9.92', BUILD_ID='2026-07-30-buttons-allstates-vp8sdp';
+const APP_VERSION='4.9.93', BUILD_ID='2026-07-31-camera-switch-fix';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -5615,19 +5615,23 @@ function initLocalVideo(){
 }
 async function switchCamera(fb){
   try{
-    if(callKind!=='video'||!localStream)return;
+    if(callKind!=='video'||!localStream||!pc)return;
     if(fb)fb.disabled=true;
-    const next=(_camFacing==='user')?'environment':'user';
-    let ns=null;
-    try{ ns=await getMediaWithTimeout({audio:false,video:{facingMode:{ideal:next},width:{ideal:1280},height:{ideal:720}}},8000); }
-    catch(e){ toast('Не удалось переключить камеру'); if(fb)fb.disabled=false; return; }
-    const nt=ns&&ns.getVideoTracks&&ns.getVideoTracks()[0];
-    if(!nt){ toast('Вторая камера не найдена'); if(fb)fb.disabled=false; return; }
-    _camFacing=next;
-    try{ if(pc&&pc.getSenders){ const vs=pc.getSenders().find(s=>s.track&&s.track.kind==='video'); if(vs&&vs.replaceTrack)await vs.replaceTrack(nt); } }catch(e){}   // подмена дорожки без пересогласования
-    try{ const old=localStream.getVideoTracks()[0]; if(old){ localStream.removeTrack(old); old.stop(); } }catch(e){}
-    try{ localStream.addTrack(nt); }catch(e){}
-    const lv=$('#localVideo'); if(lv){ lv.srcObject=localStream; try{lv.play&&lv.play().catch(()=>{});}catch(_){} lv.style.transform=(next==='user')?'scaleX(-1)':'none'; }   // фронтальную зеркалим, тыловую — нет
+    const cur=_camFacing, next=(cur==='user')?'environment':'user';
+    const openCam=(face)=>getMediaWithTimeout({audio:false,video:{facingMode:{ideal:face},width:{ideal:1280},height:{ideal:720}}},8000);
+    // ВАЖНО: сначала ОСВОБОЖДАЕМ камеру (стоп старой дорожки) — многие Android не дают открыть 2-ю камеру,
+    // пока 1-я активна → зависание. Потом открываем нужную; если не вышло — возвращаем прежнюю.
+    const old=localStream.getVideoTracks()[0];
+    if(old){ try{localStream.removeTrack(old);}catch(e){} try{old.stop();}catch(e){} }
+    let nt=null;
+    try{ const ns=await openCam(next); nt=ns&&ns.getVideoTracks&&ns.getVideoTracks()[0]||null; }catch(e){ nt=null; }
+    if(nt){ _camFacing=next; }
+    else{ toast('Не удалось переключить камеру'); try{ const rs=await openCam(cur); nt=rs&&rs.getVideoTracks&&rs.getVideoTracks()[0]||null; }catch(e){} }   // откат на прежнюю камеру, чтобы видео не пропало
+    if(nt){
+      try{ const vs=pc.getSenders().find(s=>s.track&&s.track.kind==='video'); if(vs&&vs.replaceTrack)await vs.replaceTrack(nt); }catch(e){}   // подмена дорожки у отправителя (без пересогласования)
+      try{ localStream.addTrack(nt); }catch(e){}
+      const lv=$('#localVideo'); if(lv){ lv.srcObject=localStream; try{lv.play&&lv.play().catch(()=>{});}catch(_){} lv.style.transform=(_camFacing==='user')?'scaleX(-1)':'none'; }   // фронтальную зеркалим, тыловую — нет
+    }
     if(fb)fb.disabled=false;
   }catch(e){ if(fb)fb.disabled=false; }
 }
