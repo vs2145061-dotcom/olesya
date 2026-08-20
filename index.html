@@ -19,6 +19,7 @@
   var dark = p==='dark' || (p!=='light' && sysDark);
   var t = dark ? 'dark' : 'light';
   document.documentElement.setAttribute('data-theme', t);
+  document.documentElement.style.backgroundColor = dark ? '#0C0A14' : '#EEF0F8'; // сразу тёмный фон — без белой вспышки при старте
   var m=document.querySelector('meta[name="theme-color"]'); if(m) m.setAttribute('content', t==='light' ? '#FFFFFF' : '#15121E');
   // Уже вошедшим прячем экран ввода номера ДО первой отрисовки (иначе он мелькает, пока грузится JS);
   // boot() затем сразу откроет PIN или домашнюю. При выходе go('scrPhone') снимает флаг.
@@ -27,7 +28,7 @@
 }catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Kaushan+Script&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Kaushan+Script&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'"><noscript><link href="https://fonts.googleapis.com/css2?family=Kaushan+Script&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
 <link rel="icon" type="image/svg+xml" href="icon.svg" />
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
 <style>
@@ -70,7 +71,7 @@
 :root[data-theme="light"] .demo-pill code{color:var(--primary)}
 :root[data-theme="light"] .spam-badge{color:#b3261e}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;height:100%}
+html,body{margin:0;height:100%;background:var(--bg)}
 body{
   background:
     radial-gradient(1200px 640px at 82% -12%, var(--glow-1), transparent 60%),
