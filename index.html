@@ -53,7 +53,7 @@
 }
 /* ===== СВЕТЛАЯ ТЕМА (день) ===== */
 :root[data-theme="light"]{
-  --bg:#EEF0F8; --surface:#FFFFFF; --raised:#F1F2FB; --raised-2:#E6E8F4;
+  --bg:#EEF0F8; --surface:#FFFFFF; --raised:#F1F2FB; --raised-2:#E6E8F4; --immersive:#EFF1F9; --immersive-2:#DEE3F1;
   --line:#DEE1EF; --line-soft:#EBEDF6;
   --text:#1A1B2E; --muted:#666A82; --faint:#9CA1B6;
   --primary:#5C6AE8; --primary-press:#4B58D6; --primary-soft:rgba(92,106,232,.12);
@@ -1537,7 +1537,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
       <div style="font-family:var(--disp);font-size:20px" id="lockTitle">Введите PIN-код</div>
       <div class="pin-dots" id="pinDots"></div>
       <div class="keypad" id="keypad"></div>
-      <button id="lockBio" style="display:none;margin-top:16px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.22);color:#fff;padding:11px 20px;border-radius:13px;font-size:14.5px;cursor:pointer">👆 Face ID / отпечаток</button>
+      <button id="lockBio" style="display:none;margin-top:16px;background:var(--raised-2);border:1px solid var(--line);color:var(--text);padding:11px 20px;border-radius:13px;font-size:14.5px;cursor:pointer">👆 Face ID / отпечаток</button>
     </div>
   </section>
 
@@ -1653,7 +1653,7 @@ window.olesyaSystemTheme=function(scheme){ try{ window.__OM_SYS_DARK__=(scheme==
 function resolveTheme(pref){pref=pref||getThemePref();return pref==='dark'?'dark':pref==='light'?'light':(systemPrefersDark()?'dark':'light');}
 // Синхронизирует нативный статус-бар/фон APK с темой. Экран блокировки ВСЕГДА тёмный,
 // поэтому на нём принудительно шлём dark:true (иначе тёмный замок под белым статус-баром).
-function omSyncNativeTheme(){ try{ if(!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView))return; var scr=(typeof currentScreenId==='function')?currentScreenId():''; var dark=(scr==='lockScreen')?true:(document.documentElement.getAttribute('data-theme')!=='light'); window.ReactNativeWebView.postMessage(JSON.stringify({type:'theme',dark:dark})); }catch(e){} }
+function omSyncNativeTheme(){ try{ if(!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView))return; var dark=(document.documentElement.getAttribute('data-theme')!=='light'); window.ReactNativeWebView.postMessage(JSON.stringify({type:'theme',dark:dark})); }catch(e){} }
 function applyTheme(pref,_skipNative){
   const t=resolveTheme(pref);
   document.documentElement.setAttribute('data-theme',t);
