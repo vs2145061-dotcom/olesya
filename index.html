@@ -1651,15 +1651,18 @@ function systemPrefersDark(){ if(typeof window!=='undefined'&&window.__OM_SYS_DA
 // нативная оболочка сообщает системную тему устройства (надёжнее matchMedia в WebView)
 window.olesyaSystemTheme=function(scheme){ try{ window.__OM_SYS_DARK__=(scheme==='dark'); if(getThemePref()==='auto')applyTheme('auto'); }catch(e){} };
 function resolveTheme(pref){pref=pref||getThemePref();return pref==='dark'?'dark':pref==='light'?'light':(systemPrefersDark()?'dark':'light');}
-function applyTheme(pref){
+// Синхронизирует нативный статус-бар/фон APK с темой. Экран блокировки ВСЕГДА тёмный,
+// поэтому на нём принудительно шлём dark:true (иначе тёмный замок под белым статус-баром).
+function omSyncNativeTheme(){ try{ if(!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView))return; var scr=(typeof currentScreenId==='function')?currentScreenId():''; var dark=(scr==='lockScreen')?true:(document.documentElement.getAttribute('data-theme')!=='light'); window.ReactNativeWebView.postMessage(JSON.stringify({type:'theme',dark:dark})); }catch(e){} }
+function applyTheme(pref,_skipNative){
   const t=resolveTheme(pref);
   document.documentElement.setAttribute('data-theme',t);
   const m=document.querySelector('meta[name="theme-color"]');
   if(m)m.setAttribute('content', t==='light' ? '#FFFFFF' : '#15121E');
   const bt=document.getElementById('btnTheme');
   if(bt)bt.textContent = (t==='light' ? '🌙' : '☀️'); // показываем, КУДА переключит быстрый тап
-  // сообщаем оболочке тему страницы — статус-бар APK красится в тон
-  try{if(window.__OLESYA_NATIVE__&&window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify({type:'theme',dark:t!=='light'}));}catch(e){}
+  // сообщаем оболочке тему страницы — но НЕ на самом раннем вызове (иначе мелькает белым до показа экрана)
+  if(!_skipNative)omSyncNativeTheme();
   return t;
 }
 // «Авто»: перепроверяем системную тему при каждом возврате в приложение
@@ -1683,7 +1686,7 @@ function toggleThemeQuick(){
     try{mq.addEventListener('change',onChange);}catch(e){try{mq.addListener(onChange);}catch(_){}}
   }
 })();
-applyTheme(); // синхронизируем (ранний скрипт в <head> уже выставил тему до отрисовки)
+applyTheme(undefined,true); // синхронизируем страницу; нативный статус-бар НЕ трогаем тут (его выставит go() по первому экрану — без белой вспышки)
 
 /* ===================== ФОН ЧАТОВ ===================== */
 /* 7 встроенных стилей + загрузка своего фото. Применяется ко всем чатам. */
@@ -2359,7 +2362,7 @@ function handleBus(m){
 /* ================== AUTH FLOW ================== */
 /* ================== AUTH FLOW ================== */
 function showScreen(id){ $$(  '.screen').forEach(s=>{ if(s.id===id){s.classList.remove('hidden','back')} }); }
-function go(id){ try{if(selMode)exitSel();}catch(e){} if(id==='scrPhone'){try{document.documentElement.removeAttribute('data-boot');}catch(e){}} $$('.screen').forEach(s=>s.classList.add('hidden')); const el=$('#'+id); if(el)el.classList.remove('hidden'); else {console.error('go(): экран не найден:',id);return;} if(typeof omPushScreen==='function')omPushScreen(id); try{_deskSync(id);}catch(e){} }
+function go(id){ try{if(selMode)exitSel();}catch(e){} if(id==='scrPhone'){try{document.documentElement.removeAttribute('data-boot');}catch(e){}} $$('.screen').forEach(s=>s.classList.add('hidden')); const el=$('#'+id); if(el)el.classList.remove('hidden'); else {console.error('go(): экран не найден:',id);return;} if(typeof omPushScreen==='function')omPushScreen(id); try{_deskSync(id);}catch(e){} try{omSyncNativeTheme();}catch(e){} }
 /* Двухпанельный десктоп (≥900px): при переписке/списке чатов держим список слева, чат справа. */
 function _isDesk(){ try{return window.matchMedia&&window.matchMedia('(min-width:900px)').matches;}catch(e){return false;} }
 function _ensureDeskEmpty(){ if(document.getElementById('deskEmpty'))return; const d=document.createElement('div'); d.id='deskEmpty';
