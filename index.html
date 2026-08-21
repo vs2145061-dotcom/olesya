@@ -139,7 +139,11 @@ h1.brandname{font-family:var(--brand);font-weight:400;font-size:52px;line-height
 .brandsub{font-family:var(--disp);font-weight:600;font-size:12.5px;letter-spacing:7px;text-transform:uppercase;color:var(--muted);text-align:center;margin:-4px 0 2px;padding-left:7px}
 /* рукописный бренд-знак в шапках */
 .brandmark{font-family:var(--brand);font-weight:400;letter-spacing:0;
-  background:linear-gradient(115deg,#8A6CFF,#C56CFF);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
+  background:linear-gradient(112deg,#9B7CFF 0%,#B36CFF 48%,#D96CFF 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;
+  filter:drop-shadow(0 0 13px rgba(154,108,255,.34))}
+/* в светлой теме берём более насыщенные оттенки — светло-фиолетовый на белом «пропадает» */
+:root[data-theme="light"] .brandmark{background:linear-gradient(112deg,#6B45F0 0%,#8F3FEE 48%,#C13BEA 100%);-webkit-background-clip:text;background-clip:text;
+  filter:drop-shadow(0 0 10px rgba(140,80,240,.20))}
 .tagline{color:var(--muted);text-align:center;font-size:14.5px;margin:0;display:flex;align-items:center;gap:7px;justify-content:center}
 .tagline .lk{color:var(--green)}
 .field-label{font-size:12.5px;color:var(--muted);font-weight:500;margin:18px 4px 7px;letter-spacing:.2px;text-transform:uppercase}
@@ -881,12 +885,14 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 #scrHome.homebg .topbar{position:relative;z-index:1;background:transparent;border-bottom-color:transparent}
 #scrHome.homebg .home-wrap{position:relative;z-index:1}
 #scrHome.homebg .title,#scrHome.homebg .home-hero .greet{color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.55)}
-/* на фото-фоне бренд-надпись — сплошная белая: сбрасываем градиентную заливку текста
-   (иначе -webkit-text-fill-color:transparent перебивает color:#fff → буквы остаются градиентными и «размытыми») */
-#scrHome.homebg .brandmark{background:none;-webkit-background-clip:border-box;background-clip:border-box;
-  -webkit-text-fill-color:#fff;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.8),0 2px 14px rgba(0,0,0,.55)}
+/* на фото-фоне бренд остаётся ФИОЛЕТОВЫМ, но ярче — плюс тёмный ореол по контуру букв.
+   Читаемость даёт drop-shadow (рисует силуэт букв), а не text-shadow: обычная тень
+   просвечивала сквозь прозрачную заливку градиентного текста и «мылила» надпись. */
+#scrHome.homebg .brandmark{background:linear-gradient(112deg,#D3BCFF 0%,#E3AEFF 55%,#F5B4FF 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;text-shadow:none;
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.95)) drop-shadow(0 2px 9px rgba(0,0,0,.7)) drop-shadow(0 0 18px rgba(180,110,255,.5))}
 /* лёгкое затемнение вверху под шапкой — «ZORVELD» и иконки читаются на любом фоне */
-#scrHome.homebg::before{content:'';position:absolute;left:0;right:0;top:0;height:170px;z-index:0;background:linear-gradient(180deg,rgba(0,0,0,.5),rgba(0,0,0,0));pointer-events:none}
+#scrHome.homebg::before{content:'';position:absolute;left:0;right:0;top:0;height:190px;z-index:0;background:linear-gradient(180deg,rgba(0,0,0,.62),rgba(0,0,0,.22) 55%,rgba(0,0,0,0));pointer-events:none}
 #scrHome.homebg .sub,#scrHome.homebg .home-hero .subg{color:rgba(255,255,255,.85);text-shadow:0 1px 4px rgba(0,0,0,.5)}
 #scrHome.homebg .iconbtn{color:#fff}
 #scrHome.homebg .home-foot{color:rgba(255,255,255,.72)}
