@@ -881,7 +881,10 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 #scrHome.homebg .topbar{position:relative;z-index:1;background:transparent;border-bottom-color:transparent}
 #scrHome.homebg .home-wrap{position:relative;z-index:1}
 #scrHome.homebg .title,#scrHome.homebg .home-hero .greet{color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.55)}
-#scrHome.homebg .brandmark{color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+/* на фото-фоне бренд-надпись — сплошная белая: сбрасываем градиентную заливку текста
+   (иначе -webkit-text-fill-color:transparent перебивает color:#fff → буквы остаются градиентными и «размытыми») */
+#scrHome.homebg .brandmark{background:none;-webkit-background-clip:border-box;background-clip:border-box;
+  -webkit-text-fill-color:#fff;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.8),0 2px 14px rgba(0,0,0,.55)}
 /* лёгкое затемнение вверху под шапкой — «ZORVELD» и иконки читаются на любом фоне */
 #scrHome.homebg::before{content:'';position:absolute;left:0;right:0;top:0;height:170px;z-index:0;background:linear-gradient(180deg,rgba(0,0,0,.5),rgba(0,0,0,0));pointer-events:none}
 #scrHome.homebg .sub,#scrHome.homebg .home-hero .subg{color:rgba(255,255,255,.85);text-shadow:0 1px 4px rgba(0,0,0,.5)}
