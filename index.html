@@ -148,6 +148,10 @@ h1.brandname{font-family:var(--brand);font-weight:400;font-size:52px;line-height
   background:linear-gradient(112deg,#9B7CFF 0%,#B36CFF 48%,#D96CFF 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;
   -webkit-text-stroke:.026em #B36CFF;paint-order:stroke fill;
   filter:drop-shadow(0 0 13px rgba(154,108,255,.34))}
+/* Подпись MESSENGER под брендом — заметнее обычных подписей: в тёмной теме светлая, в светлой тёмная.
+   Касается только бренд-подписи (в шапке и на экране входа), остальные подписи в приложении не трогаем. */
+.topbar .brandmark + .sub, .brandsub{color:#DDD9EE;font-weight:600}
+:root[data-theme="light"] .topbar .brandmark + .sub, :root[data-theme="light"] .brandsub{color:#332F4A}
 /* в светлой теме берём более насыщенные оттенки — светло-фиолетовый на белом «пропадает» */
 :root[data-theme="light"] .brandmark, :root[data-theme="light"] h1.brandname{background:linear-gradient(112deg,#6B45F0 0%,#8F3FEE 48%,#C13BEA 100%);-webkit-background-clip:text;background-clip:text;
   -webkit-text-stroke:.026em #8F3FEE;
