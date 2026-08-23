@@ -1684,8 +1684,12 @@ function applyTheme(pref,_skipNative){
   document.documentElement.setAttribute('data-theme',t);
   const m=document.querySelector('meta[name="theme-color"]');
   if(m)m.setAttribute('content', t==='light' ? '#FFFFFF' : '#15121E');
+  // Кнопка в шапке показывает ТЕКУЩИЙ режим (значки те же, что в настройках): 🌗 авто · ☀️ светлая · 🌙 тёмная
   const bt=document.getElementById('btnTheme');
-  if(bt)bt.textContent = (t==='light' ? '🌙' : '☀️'); // показываем, КУДА переключит быстрый тап
+  if(bt){ const p=getThemePref();
+    bt.textContent = p==='auto' ? '🌗' : (p==='light' ? '☀️' : '🌙');
+    bt.title = p==='auto' ? ('Тема: авто · как в системе (сейчас '+(t==='dark'?'тёмная':'светлая')+')') : (p==='light' ? 'Тема: светлая' : 'Тема: тёмная');
+  }
   // сообщаем оболочке тему страницы — но НЕ на самом раннем вызове (иначе мелькает белым до показа экрана)
   if(!_skipNative)omSyncNativeTheme();
   return t;
@@ -1698,10 +1702,14 @@ function setThemePref(pref){
   applyTheme(pref);
   if(typeof refreshSettings==='function'){try{refreshSettings();}catch(e){}}
 }
-// Быстрый тап в шапке: переключает на тему, ПРОТИВОПОЛОЖНУЮ текущей видимой (явный выбор)
+// Быстрый тап в шапке: по кругу три режима — авто → светлая → тёмная → авто (те же, что в настройках).
+// Подсказка-тост называет выбранный режим, чтобы выбор был очевиден.
 function toggleThemeQuick(){
-  const cur=resolveTheme();
-  setThemePref(cur==='dark' ? 'light' : 'dark');
+  const order=['auto','light','dark'];
+  const next=order[(order.indexOf(getThemePref())+1)%order.length];
+  setThemePref(next);
+  try{ toast(next==='auto' ? ('🌗 Тема: авто · как в системе (сейчас '+(resolveTheme('auto')==='dark'?'тёмная':'светлая')+')')
+                          : next==='light' ? '☀️ Тема: светлая' : '🌙 Тема: тёмная'); }catch(e){}
 }
 // В режиме «авто» — реагируем на смену системной темы на лету
 (function(){
