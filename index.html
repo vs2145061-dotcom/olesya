@@ -6774,9 +6774,11 @@ async function buildBusiness(body){
   /* ── Рабочие инструменты (доступ открыт) ── */
   function renderActive(s){
     const d=left(s.until);
-    const bn=el('<div class="note" style="border-left:3px solid var(--green);padding-left:10px">✅ <b>Бизнес-режим активен</b> · до '+dt(s.until)+(d<=5?(' · осталось '+d+' дн.'):'')+'</div>');
+    const bn=el(s.owner
+      ? '<div class="note" style="border-left:3px solid var(--primary);padding-left:10px">👑 <b>Владелец сервиса</b> · полный доступ ко всем возможностям, бессрочно</div>'
+      : '<div class="note" style="border-left:3px solid var(--green);padding-left:10px">✅ <b>Бизнес-режим активен</b> · до '+dt(s.until)+(d<=5?(' · осталось '+d+' дн.'):'')+'</div>');
     wrap.appendChild(bn);
-    if(d<=5){ const rb=el('<button class="btn sub-btn">Продлить подписку</button>'); rb.onclick=()=>{ wrap.innerHTML=''; renderPaywall(Object.assign({},s,{active:false})); }; wrap.appendChild(rb); }
+    if(!s.owner && d<=5){ const rb=el('<button class="btn sub-btn">Продлить подписку</button>'); rb.onclick=()=>{ wrap.innerHTML=''; renderPaywall(Object.assign({},s,{active:false})); }; wrap.appendChild(rb); }
 
     const card=el('<div></div>');
     card.innerHTML='<div class="sec-head">Карточка бизнеса</div><input class="input sub-input" id="bcCompany" placeholder="Компания / проект"/><input class="input sub-input" id="bcRole" placeholder="Роль / услуга"/><input class="input sub-input" id="bcPhone" placeholder="Рабочий телефон"/><input class="input sub-input" id="bcSite" placeholder="Сайт"/><textarea class="input sub-input" id="bcDesc" placeholder="Описание услуг" style="height:90px"></textarea><button class="btn sub-btn" id="bcSave">Сохранить карточку</button>';
