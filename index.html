@@ -6707,14 +6707,130 @@ async function buildServerContacts(body){
   load();
 }
 async function buildBusiness(body){
-  body.appendChild(el('<div class="note">Бизнес-режим превращает ZORVELD в рабочий инструмент: карточка компании, заявки клиентов, статусы, заметки и чек-листы.</div>'));
-  const card=el('<div></div>');card.innerHTML='<div class="sec-head">Карточка бизнеса</div><input class="input sub-input" id="bcCompany" placeholder="Компания / проект"/><input class="input sub-input" id="bcRole" placeholder="Роль / услуга"/><input class="input sub-input" id="bcPhone" placeholder="Рабочий телефон"/><input class="input sub-input" id="bcSite" placeholder="Сайт"/><textarea class="input sub-input" id="bcDesc" placeholder="Описание услуг" style="height:90px"></textarea><button class="btn sub-btn" id="bcSave">Сохранить карточку</button>';body.appendChild(card);
-  const tk=el('<div></div>');tk.innerHTML='<div class="sec-head">Новая заявка</div><input class="input sub-input" id="btClient" placeholder="Клиент"/><input class="input sub-input" id="btPhone" placeholder="Телефон клиента"/><input class="input sub-input" id="btTitle" placeholder="Что нужно сделать"/><textarea class="input sub-input" id="btNote" placeholder="Заметка, чек-лист, фото до/после текстом" style="height:100px"></textarea><button class="btn sub-btn" id="btAdd">Создать заявку</button>';body.appendChild(tk);
-  const list=el('<div class="note">Загружаю заявки...</div>');body.appendChild(list);
-  async function load(){try{const c=await jget(wapi('/business/card'));if(c.card){card.querySelector('#bcCompany').value=c.card.company||'';card.querySelector('#bcRole').value=c.card.role||'';card.querySelector('#bcPhone').value=c.card.phone||'';card.querySelector('#bcSite').value=c.card.website||'';card.querySelector('#bcDesc').value=c.card.description||'';}const r=await jget(wapi('/business/tickets'));list.innerHTML='<div class="sec-head">Заявки</div>';if(!r.tickets||!r.tickets.length){list.appendChild(el('<div class="note">Пока нет заявок.</div>'));return;}r.tickets.forEach(x=>{const row=el('<div class="log-row"><div><b>'+esc(x.title||'Заявка')+'</b> · '+esc(x.status||'new')+'</div><div>'+esc(x.client_name||'')+' '+esc(x.client_phone||'')+'</div><div class="lt">'+new Date(x.updated_at||Date.now()).toLocaleString('ru-RU')+'</div><div style="margin-top:6px">'+esc(x.note||'')+'</div></div>');list.appendChild(row);});}catch(e){list.innerHTML='<div class="note">Бизнес-режим доступен после выкладки API и миграции v4.8.0.</div>';}}
-  card.querySelector('#bcSave').onclick=async()=>{try{await jpost(wapi('/business/card'),{company:card.querySelector('#bcCompany').value,role:card.querySelector('#bcRole').value,phone:card.querySelector('#bcPhone').value,website:card.querySelector('#bcSite').value,description:card.querySelector('#bcDesc').value});toast('Карточка сохранена');}catch(e){toast('Ошибка сохранения');}};
-  tk.querySelector('#btAdd').onclick=async()=>{try{await jpost(wapi('/business/tickets'),{client_name:tk.querySelector('#btClient').value,client_phone:tk.querySelector('#btPhone').value,title:tk.querySelector('#btTitle').value,note:tk.querySelector('#btNote').value,status:'new'});toast('Заявка создана');load();}catch(e){toast('Не удалось создать заявку');}};
-  load();
+  const wrap=el('<div></div>'); body.appendChild(wrap);
+  const dt=(ms)=>{try{return new Date(ms).toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'});}catch(e){return '';}};
+  const left=(ms)=>Math.max(0,Math.ceil((ms-Date.now())/86400000));
+  const openUrl=(url,title)=>{try{ if(window.__OLESYA_NATIVE__&&window.ReactNativeWebView){window.ReactNativeWebView.postMessage(JSON.stringify({type:'open-browser',url:url,title:title||''}));} else window.open(url,'_blank','noopener'); }catch(e){location.href=url;}};
+
+  async function render(){
+    wrap.innerHTML='<div class="note">Загружаю…</div>';
+    let s=null;
+    try{ s=await jget(wapi('/biz/status')); }
+    catch(e){ wrap.innerHTML='<div class="note">Нет связи с сервером — откройте позже.</div>'; return; }
+    wrap.innerHTML='';
+    if(s&&s.active) renderActive(s); else renderPaywall(s||{});
+  }
+
+  /* ── Экран подписки (доступ закрыт) ── */
+  function renderPaywall(s){
+    wrap.appendChild(el('<div class="note">Бизнес-режим превращает ZORVELD в рабочий инструмент: клиенты и заявки живут прямо там, где вы с ними переписываетесь — отдельная программа не нужна.</div>'));
+    wrap.appendChild(el('<div class="sec-head">Что входит</div>'));
+    wrap.appendChild(el('<div class="note">💼 <b>Карточка компании</b> — визитка с услугами и контактами.<br>📋 <b>Заявки клиентов</b> — что в работе, что готово, что оплачено.<br>👤 <b>Клиенты</b> — телефон, заметки, история обращений.<br>✅ <b>Чек-листы и заметки</b> по каждой заявке.<br>🧠 <b>Олеся помогает</b> — резюме переписки и задачи из чата.</div>'));
+
+    const trialDays=s.trialDays||7;
+    if(!s.trialUsed){
+      const b=el('<button class="btn sub-btn">🎁 Попробовать '+trialDays+' дней бесплатно</button>');
+      b.onclick=async()=>{ b.disabled=true;
+        try{ const r=await jpost(wapi('/biz/trial'),{}); toast('Бизнес-режим включён на '+(r.days||trialDays)+' дней'); render(); }
+        catch(e){ b.disabled=false; toast(String(e&&e.message)==='trial_used'?'Пробный период уже был':'Не удалось включить'); } };
+      wrap.appendChild(b);
+      wrap.appendChild(el('<div class="note" style="margin-top:6px">Без карты и без автосписаний. Через '+trialDays+' дней доступ закроется, данные останутся.</div>'));
+    }else{
+      wrap.appendChild(el('<div class="note">Пробный период уже использован'+(s.until?(' · закончился '+dt(s.until)):'')+'. Чтобы продолжить — оформите подписку.</div>'));
+    }
+
+    const pr=s.prices||{};
+    wrap.appendChild(el('<div class="sec-head">Подписка</div>'));
+    wrap.appendChild(el('<div class="note">Месяц — <b>'+esc(String(pr.month||'—'))+' ₽</b> · Год — <b>'+esc(String(pr.year||'—'))+' ₽</b> (выгоднее)</div>'));
+
+    if(s.autoPay){
+      const pay=(plan)=>async()=>{ try{ const r=await jpost(wapi('/biz/checkout'),{plan:plan}); if(r&&r.url) openUrl(r.url,'Оплата'); else toast('Оплата недоступна'); }catch(e){ toast('Оплата недоступна'); } };
+      const bm=el('<button class="btn sub-btn">💳 Оплатить месяц</button>'); bm.onclick=pay('month'); wrap.appendChild(bm);
+      const by=el('<button class="btn sub-btn">💳 Оплатить год</button>'); by.onclick=pay('year'); wrap.appendChild(by);
+    }
+
+    const links=Array.isArray(s.links)?s.links:[];
+    if(links.length){
+      wrap.appendChild(el('<div class="sec-head">Способы оплаты</div>'));
+      links.forEach(L=>{ if(!L||!L.url)return;
+        const b=el('<button class="btn sub-btn">'+esc(String(L.title||'Оплатить'))+(L.note?(' · '+esc(String(L.note))):'')+'</button>');
+        b.onclick=()=>openUrl(L.url,String(L.title||'Оплата')); wrap.appendChild(b); });
+      wrap.appendChild(el('<div class="note" style="margin-top:6px">После оплаты пришлём промокод — введите его ниже, доступ откроется сразу.</div>'));
+    }else if(!s.autoPay){
+      wrap.appendChild(el('<div class="note">Оплата картой скоро появится. Сейчас доступ открывается по промокоду.</div>'));
+    }
+
+    wrap.appendChild(el('<div class="sec-head">Промокод</div>'));
+    const inp=el('<input class="input sub-input" placeholder="Например, BIZ2026" />');
+    wrap.appendChild(inp);
+    const rb=el('<button class="btn sub-btn">Активировать промокод</button>');
+    rb.onclick=async()=>{ const c=(inp.value||'').trim(); if(!c){toast('Введите промокод');return;} rb.disabled=true;
+      try{ const r=await jpost(wapi('/biz/redeem'),{code:c}); toast('Готово · доступ до '+dt(r.until)); render(); }
+      catch(e){ rb.disabled=false; const m=String(e&&e.message||'');
+        toast(m==='bad_code'?'Такого промокода нет':m==='code_exhausted'?'Промокод уже использован':'Не удалось активировать'); } };
+    wrap.appendChild(rb);
+  }
+
+  /* ── Рабочие инструменты (доступ открыт) ── */
+  function renderActive(s){
+    const d=left(s.until);
+    const bn=el('<div class="note" style="border-left:3px solid var(--green);padding-left:10px">✅ <b>Бизнес-режим активен</b> · до '+dt(s.until)+(d<=5?(' · осталось '+d+' дн.'):'')+'</div>');
+    wrap.appendChild(bn);
+    if(d<=5){ const rb=el('<button class="btn sub-btn">Продлить подписку</button>'); rb.onclick=()=>{ wrap.innerHTML=''; renderPaywall(Object.assign({},s,{active:false})); }; wrap.appendChild(rb); }
+
+    const card=el('<div></div>');
+    card.innerHTML='<div class="sec-head">Карточка бизнеса</div><input class="input sub-input" id="bcCompany" placeholder="Компания / проект"/><input class="input sub-input" id="bcRole" placeholder="Роль / услуга"/><input class="input sub-input" id="bcPhone" placeholder="Рабочий телефон"/><input class="input sub-input" id="bcSite" placeholder="Сайт"/><textarea class="input sub-input" id="bcDesc" placeholder="Описание услуг" style="height:90px"></textarea><button class="btn sub-btn" id="bcSave">Сохранить карточку</button>';
+    wrap.appendChild(card);
+
+    const tk=el('<div></div>');
+    tk.innerHTML='<div class="sec-head">Новая заявка</div><input class="input sub-input" id="btClient" placeholder="Клиент"/><input class="input sub-input" id="btPhone" placeholder="Телефон клиента"/><input class="input sub-input" id="btTitle" placeholder="Что нужно сделать"/><textarea class="input sub-input" id="btNote" placeholder="Заметка, чек-лист, фото до/после текстом" style="height:100px"></textarea><button class="btn sub-btn" id="btAdd">Создать заявку</button>';
+    wrap.appendChild(tk);
+
+    const list=el('<div class="note">Загружаю заявки…</div>');
+    wrap.appendChild(list);
+
+    const STAGES=[['new','🆕 Новая'],['work','🔧 В работе'],['done','✅ Готово'],['paid','💰 Оплачено']];
+    const stageName=(v)=>{const f=STAGES.find(x=>x[0]===v);return f?f[1]:('🆕 Новая');};
+
+    async function load(){
+      try{
+        const c=await jget(wapi('/business/card'));
+        if(c.card){ card.querySelector('#bcCompany').value=c.card.company||''; card.querySelector('#bcRole').value=c.card.role||''; card.querySelector('#bcPhone').value=c.card.phone||''; card.querySelector('#bcSite').value=c.card.website||''; card.querySelector('#bcDesc').value=c.card.description||''; }
+        const r=await jget(wapi('/business/tickets'));
+        list.innerHTML='<div class="sec-head">Заявки</div>';
+        const rows=(r&&r.tickets)||[];
+        if(!rows.length){ list.appendChild(el('<div class="note">Пока нет заявок. Создайте первую выше.</div>')); return; }
+        rows.forEach(x=>{
+          const row=el('<div class="log-row"><div><b>'+esc(x.title||'Заявка')+'</b></div><div>'+esc(x.client_name||'')+' '+esc(x.client_phone||'')+'</div><div class="lt">'+new Date(x.updated_at||Date.now()).toLocaleString('ru-RU')+'</div>'+(x.note?('<div style="margin-top:6px">'+esc(x.note)+'</div>'):'')+'</div>');
+          const b=el('<button class="btn sub-btn" style="margin-top:8px">'+stageName(x.status)+' · нажмите, чтобы сменить</button>');
+          b.onclick=async()=>{
+            const i=STAGES.findIndex(z=>z[0]===(x.status||'new'));
+            const next=STAGES[(i<0?0:(i+1))%STAGES.length][0];
+            b.disabled=true;
+            try{ await jpost(wapi('/business/tickets/update'),{id:x.id,client_name:x.client_name,client_phone:x.client_phone,title:x.title,status:next,note:x.note,photos:[],checklist:[]});
+                 x.status=next; b.textContent=stageName(next)+' · нажмите, чтобы сменить'; toast('Статус: '+stageName(next).replace(/^\S+\s/,'')); }
+            catch(e){ toast('Не удалось изменить'); }
+            b.disabled=false;
+          };
+          row.appendChild(b);
+          list.appendChild(row);
+        });
+      }catch(e){
+        if(String(e&&e.message)==='http_402'){ wrap.innerHTML=''; render(); return; }
+        list.innerHTML='<div class="note">Не удалось загрузить заявки.</div>';
+      }
+    }
+
+    card.querySelector('#bcSave').onclick=async()=>{ try{ await jpost(wapi('/business/card'),{company:card.querySelector('#bcCompany').value,role:card.querySelector('#bcRole').value,phone:card.querySelector('#bcPhone').value,website:card.querySelector('#bcSite').value,description:card.querySelector('#bcDesc').value}); toast('Карточка сохранена'); }catch(e){ toast(String(e&&e.message)==='biz_required'?'Подписка закончилась':'Ошибка сохранения'); } };
+    tk.querySelector('#btAdd').onclick=async()=>{ const t=tk.querySelector('#btTitle').value.trim(); if(!t){toast('Напишите, что нужно сделать');return;}
+      try{ await jpost(wapi('/business/tickets'),{client_name:tk.querySelector('#btClient').value,client_phone:tk.querySelector('#btPhone').value,title:t,note:tk.querySelector('#btNote').value,status:'new'});
+           toast('Заявка создана'); tk.querySelector('#btClient').value=''; tk.querySelector('#btPhone').value=''; tk.querySelector('#btTitle').value=''; tk.querySelector('#btNote').value=''; load(); }
+      catch(e){ toast(String(e&&e.message)==='biz_required'?'Подписка закончилась':'Не удалось создать заявку'); } };
+
+    load();
+  }
+
+  render();
 }
 async function aiCurrentChatText(limit){try{const c=getChat();return (c&&c.messages?c.messages:[]).slice(-(limit||80)).map(m=>((m.from===me.id?'Я':'Собеседник')+': '+(m.text||m.transcript||m.name||''))).filter(Boolean).join('\n');}catch(e){return '';}}
 async function summarizeCurrentChat(){const txt=await aiCurrentChatText(80);if(!txt){pushLocalNote('Нет текста для резюме.');return;}pushLocalNote('🧠 Делаю резюме переписки…');try{const r=await jpost(wapi('/ai/summarize'),{text:txt});replaceLastNote('🧠 Резюме:\n'+(r.text||'Пустой ответ'));}catch(e){const r=await aiChat([{role:'user',content:txt}],{system:'Сделай краткое резюме переписки на русском: договорённости, факты, вопросы.'});replaceLastNote(r&&r.text?('🧠 Резюме:\n'+r.text):'ИИ недоступен.');}}
