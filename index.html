@@ -2482,7 +2482,10 @@ const otpInput=$('#otpInput');
    • если код уже пришёл уведомлением — посторонние подстановки сами не отправляем.
    Кнопка «Подтвердить» работает как раньше, без ограничений. */
 let otpTried=null, otpPushCode='', otpUserTyped=false, otpAutoAllow=false;
-function resetOtp(){otpInput.value='';otpInput.disabled=false;otpFails=0;otpLocked=false;otpTried=new Set();otpPushCode='';otpUserTyped=false;otpAutoAllow=false;otpVerifying=false;otpDone=false;}
+// Счётчик запросов кода: подстановка из СТАРОГО уведомления, ожидавшая открытия экрана,
+// должна отмениться, как только запрошен новый код (иначе она подставит протухший код).
+let otpReqSeq=0, _otpInjectTimer=null, otpSendPending=false;
+function resetOtp(){otpInput.value='';otpInput.disabled=false;otpFails=0;otpLocked=false;otpTried=new Set();otpPushCode='';otpUserTyped=false;otpAutoAllow=false;otpVerifying=false;otpDone=false;otpReqSeq++;otpSendPending=true;if(_otpInjectTimer){clearInterval(_otpInjectTimer);_otpInjectTimer=null;}}
 function checkOtp(){
   if(otpLocked)return;
   const L=(otpInput&&otpInput.maxLength>0)?otpInput.maxLength:6;
@@ -2490,6 +2493,7 @@ function checkOtp(){
   if(v.length!==L)return;
   // Значение подставила система (Android достаёт код из СТАРЫХ SMS) — сами не отправляем,
   // иначе сгорает попытка ещё до прихода настоящего кода. Ждём набора вручную или кода из уведомления.
+  if(otpSendPending&&!otpUserTyped)return;   // код ещё в пути — не проверяем старое значение
   if(!(otpAutoAllow||otpUserTyped))return;
   if(otpPushCode&&v!==otpPushCode)return;      // есть код из уведомления — чужое автоматически не шлём
   if(!otpTried)otpTried=new Set();
@@ -2928,6 +2932,7 @@ async function verifyOtpRaw(raw){
 
 /* Экран кода под канал: flash-call → 4 цифры «последние цифры номера»; push/SMS → 6 цифр. Обновляет подсказку, подпись и длину поля. */
 function otpChannelUI(info,phone){
+  try{ if(arguments[0]) otpSendPending=false; }catch(e){}   // сервер ответил — код в базе есть, автопроверка разрешена
   const ch=info&&info.channel; const pend=info&&(info.delivery==='pending'||info.sms==='pending');
   const oh=document.getElementById('otpHint'); const tag=document.querySelector('#scrOtp .tagline'); const oi=document.getElementById('otpInput');
   // Канал ещё неизвестен (запрос к серверу в пути). Молчим про количество цифр: раньше
@@ -7682,8 +7687,13 @@ window.olesyaOtpCode=function(code){
       return true;
     }catch(e){ return false; }
   };
+  const mySeq=otpReqSeq;                     // ожидание принадлежит ТЕКУЩЕМУ запросу кода
   if(apply())return;
-  const t=setInterval(()=>{ tries++; if(apply()||tries>30)clearInterval(t); },500);
+  if(_otpInjectTimer)clearInterval(_otpInjectTimer);
+  _otpInjectTimer=setInterval(()=>{ tries++;
+    // запросили новый код → это ожидание устарело, иначе подставится протухший код
+    if(mySeq!==otpReqSeq||apply()||tries>30){ clearInterval(_otpInjectTimer); _otpInjectTimer=null; }
+  },500);
 };
 try{ if(window.__OLESYA_PUSH_TOKEN__)registerExpoPush(window.__OLESYA_PUSH_TOKEN__); }catch(e){}
 function appHidden(){ try{return document.hidden || !document.hasFocus();}catch(e){return document.hidden;} }
