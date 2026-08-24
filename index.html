@@ -3056,6 +3056,7 @@ function enterApp(){
   try{sessionStorage.setItem(SS,me.id);}catch(e){}
   {const d=db();if(!d.users[me.id]){d.users[me.id]=me;save(d);}}
   loadBusSeq();
+  try{settingsPull();}catch(e){}   // настройки из аккаунта
   startOutboxWatch();   // досылка сообщений, не ушедших из-за связи
   ensureBot();
   setOnline(true);
@@ -7769,6 +7770,42 @@ async function checkForUpdate(silent){
   return false;
 }
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'){ const _s=document.getElementById('scrPhone'); if(!me || (_s&&!_s.classList.contains('hidden'))) checkForUpdate(true); } });
+/* ─── Настройки хранятся в аккаунте ────────────────────────────────────────────
+   Раньше все настройки жили только на телефоне, поэтому при выходе из учётки или
+   переустановке приложения сбрасывались. Теперь предпочтения сохраняются на сервере
+   и возвращаются при входе — на любом устройстве.
+   НЕ синхронизируем: токен сессии, ключи шифрования, PIN-код и служебные метки
+   (это привязано к конкретному устройству), а также фон Главной (тяжёлая картинка). */
+const SETTINGS_SYNC_KEYS=['om_theme','om_tapfx','om_tapsnd','om_tapsnd_name','om_tapsnd_vol','om_tapvib','om_ai','om_proaccent','om_gifkey','om_pinned','om_hidden_chats','om_cc_iso','om_username'];
+const SETTINGS_SYNC_RE=[/^om_lang_/,/^om_tr_/];
+function _settingsSyncable(k){ return !!k && (SETTINGS_SYNC_KEYS.indexOf(k)>=0 || SETTINGS_SYNC_RE.some(re=>re.test(k))); }
+const _lsSetRaw=localStorage.setItem.bind(localStorage);   // запись без обратного вызова синхронизации
+let _setTimer=null,_setBusy=false,_setPulled=false;
+function settingsSyncReady(){ try{ return !!(me&&sessionToken&&isCloudReady()); }catch(e){ return false; } }
+function settingsPushSoon(){ if(!settingsSyncReady()||!_setPulled)return; clearTimeout(_setTimer); _setTimer=setTimeout(settingsPush,1500); }
+async function settingsPush(){
+  if(!settingsSyncReady()||_setBusy)return; _setBusy=true;
+  try{
+    const out={};
+    for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(_settingsSyncable(k)){ try{ const v=localStorage.getItem(k); if(typeof v==='string'&&v.length<8000)out[k]=v; }catch(e){} } }
+    await jpost(wapi('/settings'),{settings:out});
+  }catch(e){}
+  _setBusy=false;
+}
+async function settingsPull(){
+  if(!settingsSyncReady())return;
+  try{
+    const r=await jget(wapi('/settings'));
+    const s=(r&&r.settings)||{}; let applied=0;
+    Object.keys(s).forEach(k=>{ if(!_settingsSyncable(k))return; const v=s[k]; if(typeof v!=='string')return;
+      try{ if(localStorage.getItem(k)!==v){ _lsSetRaw(k,v); applied++; } }catch(e){} });
+    _setPulled=true;
+    if(applied){ try{applyTheme();}catch(e){} try{refreshSettings();}catch(e){} try{renderChats();}catch(e){} try{renderHome();}catch(e){} }
+    settingsPushSoon();   // досылаем то, чего на сервере ещё нет
+  }catch(e){ _setPulled=true; }
+}
+try{ localStorage.setItem=function(k,v){ _lsSetRaw(k,v); if(_settingsSyncable(k))settingsPushSoon(); }; }catch(e){}
+
 async function boot(){
   checkForUpdate();
   setTimeout(maybeShowIosInstallHint, 1200);   // подсказка iOS «на экран Домой» (если открыт в Safari, не с иконки)
