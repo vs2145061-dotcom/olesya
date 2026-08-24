@@ -2485,7 +2485,7 @@ let otpTried=null, otpPushCode='', otpUserTyped=false, otpAutoAllow=false;
 // Счётчик запросов кода: подстановка из СТАРОГО уведомления, ожидавшая открытия экрана,
 // должна отмениться, как только запрошен новый код (иначе она подставит протухший код).
 let otpReqSeq=0, _otpInjectTimer=null, otpSendPending=false;
-function resetOtp(){otpInput.value='';otpInput.disabled=false;otpFails=0;otpLocked=false;otpTried=new Set();otpPushCode='';otpUserTyped=false;otpAutoAllow=false;otpVerifying=false;otpDone=false;otpReqSeq++;otpSendPending=true;if(_otpInjectTimer){clearInterval(_otpInjectTimer);_otpInjectTimer=null;}}
+function resetOtp(){otpInput.value='';otpInput.disabled=false;{const _bv=document.getElementById('btnVerifyOtp');if(_bv)_bv.disabled=false;}otpFails=0;otpLocked=false;otpTried=new Set();otpPushCode='';otpUserTyped=false;otpAutoAllow=false;otpVerifying=false;otpDone=false;otpReqSeq++;otpSendPending=true;if(_otpInjectTimer){clearInterval(_otpInjectTimer);_otpInjectTimer=null;}}
 function checkOtp(){
   if(otpLocked)return;
   const L=(otpInput&&otpInput.maxLength>0)?otpInput.maxLength:6;
@@ -2494,7 +2494,7 @@ function checkOtp(){
   // Значение подставила система (Android достаёт код из СТАРЫХ SMS) — сами не отправляем,
   // иначе сгорает попытка ещё до прихода настоящего кода. Ждём набора вручную или кода из уведомления.
   if(otpSendPending&&!otpUserTyped)return;   // код ещё в пути — не проверяем старое значение
-  if(!(otpAutoAllow||otpUserTyped))return;
+  if(!(otpAutoAllow||otpUserTyped||(otpPushCode&&v===otpPushCode)))return;
   if(otpPushCode&&v!==otpPushCode)return;      // есть код из уведомления — чужое автоматически не шлём
   if(!otpTried)otpTried=new Set();
   if(otpTried.has(v))return;                   // уже пробовали это значение — попытку не тратим
@@ -2932,7 +2932,7 @@ async function verifyOtpRaw(raw){
 
 /* Экран кода под канал: flash-call → 4 цифры «последние цифры номера»; push/SMS → 6 цифр. Обновляет подсказку, подпись и длину поля. */
 function otpChannelUI(info,phone){
-  try{ if(arguments[0]) otpSendPending=false; }catch(e){}   // сервер ответил — код в базе есть, автопроверка разрешена
+  try{ if(arguments[0]&&otpSendPending){ otpSendPending=false; setTimeout(()=>{try{checkOtp();}catch(e){}},0); } }catch(e){}   // сервер ответил — код в базе есть, автопроверка разрешена
   const ch=info&&info.channel; const pend=info&&(info.delivery==='pending'||info.sms==='pending');
   const oh=document.getElementById('otpHint'); const tag=document.querySelector('#scrOtp .tagline'); const oi=document.getElementById('otpInput');
   // Канал ещё неизвестен (запрос к серверу в пути). Молчим про количество цифр: раньше
