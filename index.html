@@ -2939,7 +2939,7 @@ function otpChannelUI(info,phone){
   // экран успевал сказать «Введите 6-значный код», а после ответа про звонок менялся на 4.
   if(!info){
     if(oh)oh.textContent='Отправляем код на '+phone+'…';
-    if(tag)tag.textContent='Ожидаем код';
+    if(tag)tag.textContent='Отправляем код…';
     if(oi){ oi.maxLength=6; oi.setAttribute('maxlength','6'); oi.placeholder=''; }
     return;
   }
