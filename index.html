@@ -2828,7 +2828,7 @@ async function verifyOtpRaw(raw){
         /* Обмениваем Firebase-токен на наш session_token */
         const data=await exchangeFirebaseToken(idToken);
         if(!data){otpInput.disabled=false;$('#btnVerifyOtp').disabled=false;toast('Ошибка сервера при верификации Firebase-токена');return;}
-        otpDone=true;saveSessionToken(data.session_token);
+        otpDone=true;try{if(window.__OLESYA_NATIVE__&&window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify({type:'otp-done'}));}catch(e){}saveSessionToken(data.session_token);
         if(data.status==='existing'&&data.user){
           const d=db();d.users[data.user.id]=Object.assign(d.users[data.user.id]||{},data.user,{online:1,bot:false});save(d);
           me=data.user;localStorage.setItem('om_me',JSON.stringify(me));
@@ -2872,7 +2872,7 @@ async function verifyOtpRaw(raw){
       }
       if(data.error){otpInput.disabled=false;$('#btnVerifyOtp').disabled=false;toast(data.message||data.error);return;}
       // Успех
-      otpDone=true;saveSessionToken(data.session_token);
+      otpDone=true;try{if(window.__OLESYA_NATIVE__&&window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify({type:'otp-done'}));}catch(e){}saveSessionToken(data.session_token);
       if(data.status==='existing'&&data.user){
         // пользователь уже зарегистрирован — сразу в мессенджер
         const d=db();d.users[data.user.id]=Object.assign(d.users[data.user.id]||{},data.user,{online:1,bot:false});save(d);
