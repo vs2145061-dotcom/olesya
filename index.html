@@ -2475,8 +2475,25 @@ function localMode(){return !isCloudReady();}
   const DEMO_MODE = (()=>{ try{ return new URLSearchParams(location.search).get('demo')==='1'; }catch(e){ return false; } })();
 
 const otpInput=$('#otpInput');
-function resetOtp(){otpInput.value='';otpInput.disabled=false;otpFails=0;otpLocked=false;}
-function checkOtp(){if(otpLocked)return;const L=(otpInput&&otpInput.maxLength>0)?otpInput.maxLength:6;if(otpInput.value.length===L){verifyOtp(otpInput.value);}}
+/* Автоотправка кода. Раньше ЛЮБОЕ автозаполнение уходило на проверку сразу — в том числе
+   СТАРЫЙ код, который Android подставляет из прошлых SMS. Попытка сгорала («Неверный код»),
+   хотя пользователь ничего не вводил. Теперь:
+   • одно и то же значение автоматически отправляем не больше одного раза;
+   • если код уже пришёл уведомлением — посторонние подстановки сами не отправляем.
+   Кнопка «Подтвердить» работает как раньше, без ограничений. */
+let otpTried=null, otpPushCode='';
+function resetOtp(){otpInput.value='';otpInput.disabled=false;otpFails=0;otpLocked=false;otpTried=new Set();otpPushCode='';}
+function checkOtp(){
+  if(otpLocked)return;
+  const L=(otpInput&&otpInput.maxLength>0)?otpInput.maxLength:6;
+  const v=otpInput.value;
+  if(v.length!==L)return;
+  if(otpPushCode&&v!==otpPushCode)return;      // есть код из уведомления — чужое автоматически не шлём
+  if(!otpTried)otpTried=new Set();
+  if(otpTried.has(v))return;                   // уже пробовали это значение — попытку не тратим
+  otpTried.add(v);
+  verifyOtp(v);
+}
 // Обрезаем по фактической длине кода (4 у звонка, 6 у push/SMS), а не по зашитой шестёрке.
 otpInput.addEventListener('input',()=>{const L=(otpInput.maxLength>0)?otpInput.maxLength:6;otpInput.value=otpInput.value.replace(/\D/g,'').slice(0,L);checkOtp();});
 otpInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();verifyOtp(otpInput.value);}});
@@ -7631,7 +7648,28 @@ function registerExpoPush(token){
 window.olesyaNativePush=registerExpoPush;
 window.olesyaOpenChat=function(peer){ try{window.focus();}catch(e){} if(peer&&me){try{openConv(peer);}catch(e){}} };
 /* OTP-код из push-уведомления (нативка зовёт это при получении push с data.type==='otp') — авто-подставляем на экране кода. */
-window.olesyaOtpCode=function(code){ try{ const oi=document.getElementById('otpInput'); const scr=document.getElementById('scrOtp'); if(oi&&scr&&!scr.classList.contains('hidden')){ oi.value=String(code||'').replace(/\D/g,'').slice(0,6); const oh=document.getElementById('otpHint'); if(oh)oh.textContent='Код получен из уведомления'; try{oi.dispatchEvent(new Event('input',{bubbles:true}));}catch(e){} try{oi.focus();}catch(e){} } }catch(e){} };
+/* Код из уведомления. Экран ввода мог ещё не открыться в момент прихода — тогда ждём его
+   (до 15 с) и подставляем, как только он появится. Раньше такой код просто терялся. */
+window.olesyaOtpCode=function(code){
+  const c=String(code||'').replace(/\D/g,'');
+  if(!c)return;
+  let tries=0;
+  const apply=()=>{
+    try{
+      const oi=document.getElementById('otpInput'), scr=document.getElementById('scrOtp');
+      if(!oi||!scr||scr.classList.contains('hidden'))return false;
+      const L=(oi.maxLength>0)?oi.maxLength:6;
+      try{ otpPushCode=c.slice(0,L); }catch(e){}
+      oi.value=c.slice(0,L);
+      const oh=document.getElementById('otpHint'); if(oh)oh.textContent='Код получен из уведомления';
+      try{oi.dispatchEvent(new Event('input',{bubbles:true}));}catch(e){}
+      try{oi.focus();}catch(e){}
+      return true;
+    }catch(e){ return false; }
+  };
+  if(apply())return;
+  const t=setInterval(()=>{ tries++; if(apply()||tries>30)clearInterval(t); },500);
+};
 try{ if(window.__OLESYA_PUSH_TOKEN__)registerExpoPush(window.__OLESYA_PUSH_TOKEN__); }catch(e){}
 function appHidden(){ try{return document.hidden || !document.hasFocus();}catch(e){return document.hidden;} }
 function fallbackNotif(title,opts){ try{ const n=new Notification(title,opts); n.onclick=()=>{try{window.focus();}catch(e){} if(opts.data&&opts.data.peer&&me){try{openConv(opts.data.peer);}catch(_){}} n.close();}; }catch(e){} }
