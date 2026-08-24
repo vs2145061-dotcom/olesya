@@ -2482,7 +2482,7 @@ const otpInput=$('#otpInput');
    • если код уже пришёл уведомлением — посторонние подстановки сами не отправляем.
    Кнопка «Подтвердить» работает как раньше, без ограничений. */
 let otpTried=null, otpPushCode='', otpUserTyped=false, otpAutoAllow=false;
-function resetOtp(){otpInput.value='';otpInput.disabled=false;otpFails=0;otpLocked=false;otpTried=new Set();otpPushCode='';otpUserTyped=false;otpAutoAllow=false;}
+function resetOtp(){otpInput.value='';otpInput.disabled=false;otpFails=0;otpLocked=false;otpTried=new Set();otpPushCode='';otpUserTyped=false;otpAutoAllow=false;otpVerifying=false;otpDone=false;}
 function checkOtp(){
   if(otpLocked)return;
   const L=(otpInput&&otpInput.maxLength>0)?otpInput.maxLength:6;
@@ -2804,7 +2804,17 @@ try{
 }catch(e){}
 try{ autodetectCC(); }catch(e){}
 
+/* Защита от ДВОЙНОЙ отправки кода: автоподстановка и нажатие «Подтвердить» могли уйти
+   почти одновременно. Первый запрос проходил успешно (сервер удаляет коды), а второй
+   возвращал «Код устарел» — хотя вход уже выполнен. Теперь проверка идёт строго по одному разу. */
+let otpVerifying=false, otpDone=false;
 async function verifyOtp(raw){
+  if(otpVerifying||otpDone)return;
+  otpVerifying=true;
+  try{ return await verifyOtpRaw(raw); }
+  finally{ otpVerifying=false; }
+}
+async function verifyOtpRaw(raw){
   const code=raw.replace(/\D/g,'').slice(0,6);
   {const L=(otpInput&&otpInput.maxLength>0)?otpInput.maxLength:6; if(code.length!==L){toast('Введите '+L+' цифр');return;}}
   if(otpLocked)return;
@@ -2818,7 +2828,7 @@ async function verifyOtp(raw){
         /* Обмениваем Firebase-токен на наш session_token */
         const data=await exchangeFirebaseToken(idToken);
         if(!data){otpInput.disabled=false;$('#btnVerifyOtp').disabled=false;toast('Ошибка сервера при верификации Firebase-токена');return;}
-        saveSessionToken(data.session_token);
+        otpDone=true;saveSessionToken(data.session_token);
         if(data.status==='existing'&&data.user){
           const d=db();d.users[data.user.id]=Object.assign(d.users[data.user.id]||{},data.user,{online:1,bot:false});save(d);
           me=data.user;localStorage.setItem('om_me',JSON.stringify(me));
@@ -2862,7 +2872,7 @@ async function verifyOtp(raw){
       }
       if(data.error){otpInput.disabled=false;$('#btnVerifyOtp').disabled=false;toast(data.message||data.error);return;}
       // Успех
-      saveSessionToken(data.session_token);
+      otpDone=true;saveSessionToken(data.session_token);
       if(data.status==='existing'&&data.user){
         // пользователь уже зарегистрирован — сразу в мессенджер
         const d=db();d.users[data.user.id]=Object.assign(d.users[data.user.id]||{},data.user,{online:1,bot:false});save(d);
