@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
 <meta name="theme-color" content="#0E1014" />
 <meta name="description" content="ZORVELD — кроссплатформенный мессенджер с ИИ-переводом, анти-спамом и защитой аккаунта" />
 <link rel="manifest" href="manifest.webmanifest" />
@@ -1905,7 +1905,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.0', BUILD_ID='2026-08-08-zorveld';
+const APP_VERSION='5.0.1', BUILD_ID='2026-08-26-security-1';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -2075,7 +2075,7 @@ async function cloudResolveUsername(name){
   try{ const r=await jget(wapi('/resolve?username='+encodeURIComponent(clean))); return (r&&r.user)||null; }catch(e){ return null; }
 }
 async function cloudRegister(row){
-  if(CFG.provider==='worker'){await jpost(wapi('/register'),row);return;}
+  if(CFG.provider==='worker'){return await jpost(wapi('/register'),row);}
   const c=sbClient();if(c){const {error}=await c.from('om_users').insert(row);if(error)throw new Error(/dupl/i.test(error.message)?'taken':error.message);}}
 /* (cloudLogin удалена — эндпоинта /login в воркере нет; облачный вход идёт через Firebase/OTP) */
 /* Возвращает true, только если сервер ДЕЙСТВИТЕЛЬНО принял сообщение.
@@ -2248,7 +2248,8 @@ async function trMemory(text,target){
 function trDict(text,target){const k=String(text||'').trim().toLowerCase().replace(/[!?.,。！？\s]+$/,'');const p=PIDX[k];return(p&&p[target])?{text:p[target],engine:'Мини-словарь'}:null;}
 async function translate(text,target){
  const key=target+'||'+text;if(trCache.has(key))return trCache.get(key);
- let res=null;for(const e of [trClaude,trGoogle,trMemory]){try{res=await e(text,target);break;}catch(_){}}
+ let res=null;
+ for(const e of [trClaude,trGoogle,trMemory]){ try{ const r=await e(text,target); if(r&&r.text){ res=r; break; } }catch(_){} }
  if(!res)res=trDict(text,target);if(res)trCache.set(key,res);return res;}
 async function sha(s){try{if(typeof crypto!=='undefined'&&crypto.subtle){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(String(s)));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');}}catch(e){}
  let h=5381;for(const c of String(s))h=((h*33)^c.charCodeAt(0))>>>0;return 'x'+h.toString(16);}
@@ -2326,7 +2327,7 @@ function db(){try{return JSON.parse(localStorage.getItem(LS))||fresh()}catch(e){
 function fresh(){return{users:{},chats:{},seq:0}}
 function save(d){try{localStorage.setItem(LS,JSON.stringify(d));}catch(e){toast('⚠️ Хранилище устройства переполнено — медиа может не сохраниться');}}
 function uid(){return 'u'+Math.random().toString(36).slice(2,9)}
-function mid(){const d=db();d.seq=(d.seq||0)+1;save(d);return 'm'+Date.now().toString(36)+d.seq}
+function mid(){return 'm'+Date.now().toString(36)+crypto.randomUUID().slice(0,8);}
 let me=null;                       // current user object
 function loadMe(){let id=sessionStorage.getItem(SS);
   if(!id){try{const m=JSON.parse(localStorage.getItem('om_me'));if(m&&m.id)id=m.id;}catch(e){}}
@@ -2472,7 +2473,7 @@ async function exchangeFirebaseToken(idToken){
   return (await r.json());
 }
 function localMode(){return !isCloudReady();}
-  const DEMO_MODE = (()=>{ try{ return new URLSearchParams(location.search).get('demo')==='1'; }catch(e){ return false; } })();
+  const DEMO_MODE = false;   // убран: пускал в локально сохранённый аккаунт по номеру телефона
 
 const otpInput=$('#otpInput');
 /* Автоотправка кода. Раньше ЛЮБОЕ автозаполнение уходило на проверку сразу — в том числе
@@ -3045,7 +3046,8 @@ $('#btnFinish').onclick=async()=>{
     }
     const row={id,phone:pendingPhone,name,avatar:chosenGlyph,color:chosenColor,
       pass_hash,pass_hint,online:1,last_seen:Date.now(),created_at:Date.now()};
-    try{await cloudRegister(row);}catch(e){
+    let _reg=null;
+    try{_reg=await cloudRegister(row);}catch(e){
       if(String(e&&e.message)==='already_registered'||String(e&&e.message)==='taken'){
         // Пользователь уже зарегистрирован — просто входим
         b.disabled=false;
@@ -3070,9 +3072,10 @@ $('#btnFinish').onclick=async()=>{
       }
       b.disabled=false;toast('Ошибка сервера: '+(e&&e.message||e));return;}
     b.disabled=false;
-    me={id,name,phone:pendingPhone,avatar:chosenGlyph,color:chosenColor,cloud:true,online:true,lastSeen:Date.now()};
-    d.users[id]=me;save(d);sessionStorage.setItem(SS,id);
-    if(sessionToken)cloudCfgUpdate({uid:id});cloudOn=true;
+    const _id=(_reg&&_reg.user&&_reg.user.id)||id;   // сервер вправе назначить свой id
+    me={id:_id,name,phone:pendingPhone,avatar:chosenGlyph,color:chosenColor,cloud:true,online:true,lastSeen:Date.now()};
+    d.users[_id]=me;save(d);sessionStorage.setItem(SS,_id);
+    if(sessionToken)cloudCfgUpdate({uid:_id});cloudOn=true;
     enterApp();logSec('✅ Аккаунт создан в облаке');return;
   }
   me={id,name,phone:pendingPhone,avatar:chosenGlyph,color:chosenColor,online:true,lastSeen:Date.now()};
@@ -3572,7 +3575,10 @@ function renderBubble(m){
   // reactions
   if(m.reactions&&m.reactions.length){const rc=document.createElement('div');rc.className='reacts';
     const grp={};m.reactions.forEach(r=>grp[r.emoji]=(grp[r.emoji]||0)+1);
-    Object.entries(grp).forEach(([e,n])=>{const el=document.createElement('span');el.className='react';el.innerHTML=e+(n>1?` <span class="n">${n}</span>`:'');rc.appendChild(el);});
+    Object.entries(grp).forEach(([e,n])=>{const el=document.createElement('span');el.className='react';
+      el.textContent=e;
+      if(n>1){const c=document.createElement('span');c.className='n';c.textContent=String(n);el.append(' ',c);}
+      rc.appendChild(el);});
     b.appendChild(rc);}
   row.appendChild(b);
   // Мультивыбор: долгое нажатие входит в режим выбора; тап в режиме — переключает сообщение.
@@ -3825,7 +3831,11 @@ function addReaction(m,emoji){
   if(current&&current.group){ current.members.filter(x=>x!==me.id).forEach(uidT=>emit('react',{to:uidT,from:me.id,gid:current.id,msgId:m.id,emoji,reactions:mm.reactions})); }
   else emit('react',{to:current.id,from:me.id,msgId:m.id,emoji,reactions:mm.reactions});
 }
-function applyRemoteReact(p){const d=db();const c=p.gid?d.chats[p.gid]:d.chats[chatKey(me.id,p.from)];if(!c)return;const mm=c.messages.find(x=>x.id===p.msgId);if(mm){mm.reactions=p.reactions;save(d);if(current&&((p.gid&&current.group&&current.id===p.gid)||(!p.gid&&current.id===p.from)))renderMessages();}}
+const EMOJI_OK=/^[\p{Extended_Pictographic}\p{Emoji_Component}]{1,8}$/u;
+function applyRemoteReact(p){
+  if(!p||!Array.isArray(p.reactions)||p.reactions.length>50)return;
+  const clean=p.reactions.filter(r=>r&&typeof r.emoji==='string'&&EMOJI_OK.test(r.emoji)&&typeof r.by==='string'&&r.by.length<=64).map(r=>({emoji:r.emoji,by:r.by}));
+  const d=db();const c=p.gid?d.chats[p.gid]:d.chats[chatKey(me.id,p.from)];if(!c)return;const mm=c.messages.find(x=>x.id===p.msgId);if(mm){mm.reactions=clean;save(d);if(current&&((p.gid&&current.group&&current.id===p.gid)||(!p.gid&&current.id===p.from)))renderMessages();}}
 
 /* ---------- sending ---------- */
 /* Тяжёлое медиа (видео/крупные файлы) НЕЛЬЗЯ класть base64 в localStorage: квота ~5-10 МБ,
@@ -4073,7 +4083,7 @@ function markMyDeliveredByPeer(p){
 /* ================== ГРУППОВЫЕ ЧАТЫ ================== */
 const _SENDER_COLORS=['#6C7BFF','#FF6CAB','#22C55E','#F59E0B','#06B6D4','#A855F7','#EF4444','#14B8A6','#E879F9','#84CC16'];
 function senderColor(id){let h=0;const s=String(id||'');for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return _SENDER_COLORS[h%_SENDER_COLORS.length];}
-function genGid(){const d=db();d.seq=(d.seq||0)+1;save(d);return 'g'+Date.now().toString(36)+d.seq.toString(36);}
+function genGid(){return 'g'+crypto.randomUUID().replace(/-/g,'').slice(0,20);}
 function groupById(gid){const c=db().chats[gid];return (c&&c.group)?c:null;}
 function groupCurrent(g){return {id:g.id,name:g.name,group:true,members:g.members,avatar:(typeof g.avatar==='string'&&/^(https?:|data:|blob:)/i.test(g.avatar))?g.avatar:'group',color:g.color||'#6C7BFF'};}
 function rosterFor(members){const d=db();return members.map(id=>{const u=d.users[id]||(id===me.id?me:null)||{};return {id,name:u.name||(id===me.id?(me.name||'Вы'):'Участник'),color:u.color||'#6C7BFF',avatar:(typeof u.avatar==='string'&&/^(https?:|data:|blob:)/i.test(u.avatar))?u.avatar:(u.avatar||null),phone:u.phone||''};});}
@@ -4092,7 +4102,10 @@ function createGroup(name,memberIds){
   return g;
 }
 function applyGroupInvite(p){
-  if(!p||!p.gid)return;const d=db();const gid=p.gid;
+  if(!p||!p.gid)return;
+  { const _ex=db().chats[p.gid]; const _by=p.by||p.from;
+    if(_ex&&_ex.group&&!(_ex.members||[]).includes(_by))return; }
+  const d=db();const gid=p.gid;
   (p.roster||[]).forEach(u=>{ if(u&&u.id&&u.id!==me.id){const ex=d.users[u.id]||{};
     d.users[u.id]=Object.assign({id:u.id,online:false,lastSeen:Date.now()},ex,{
       name:u.name||ex.name||'Участник',
@@ -4296,7 +4309,9 @@ function addGroupMembers(gid,ids){
 }
 function applyGroupUpdate(p){
   const d=db();const g=d.chats[p.gid];if(!g||!g.group)return;
-  if(p.removed===me.id){ const nm=g.name;delete d.chats[p.gid];save(d); if(current&&current.group&&current.id===p.gid){current=null;go('scrChats');} renderChats();toast('Вас удалили из группы «'+(nm||'')+'»');return; }
+  // Команду об изменении группы принимаем только от владельца или администратора
+  { const by=p.by||p.from; if(!(by&&(g.owner===by||(g.admins||[]).includes(by))))return; }
+  if(p.removed===me.id){ g.left=true; g.leftAt=Date.now(); save(d); if(current&&current.group&&current.id===p.gid){current=null;go('scrChats');} renderChats();toast('Вас удалили из группы «'+(g.name||'')+'»');return; }
   if(p.name)g.name=p.name;
   if(typeof p.avatar==='string')g.avatar=p.avatar;
   if(Array.isArray(p.members))g.members=Array.from(new Set(p.members));
@@ -4405,7 +4420,9 @@ function unpinMessage(){
 function emitChatPin(c){ if(current&&!current.group)emit('chat:pin',{to:current.id,from:me.id,pinned:c.pinned||null}); }
 function groupBroadcastPin(g){ g.members.filter(x=>x!==me.id).forEach(uidT=>emit('group:pin',{to:uidT,gid:g.id,pinned:g.pinned||null,by:me.id})); }
 function applyChatPin(p){ const d=db();const c=d.chats[chatKey(me.id,p.from)];if(!c)return;c.pinned=p.pinned||null;save(d);if(current&&!current.group&&current.id===p.from)renderPinnedBar(); }
-function applyGroupPin(p){ const d=db();const g=d.chats[p.gid];if(!g)return;g.pinned=p.pinned||null;save(d);if(current&&current.group&&current.id===p.gid)renderPinnedBar(); }
+function applyGroupPin(p){ const d=db();const g=d.chats[p.gid];if(!g)return;
+  { const by=p.by||p.from; if(!(by&&(g.owner===by||(g.admins||[]).includes(by))))return; }
+  g.pinned=p.pinned||null;save(d);if(current&&current.group&&current.id===p.gid)renderPinnedBar(); }
 function renderPinnedBar(){
   const bar=$('#pinnedBar');if(!bar)return;
   if(!current){bar.style.display='none';bar.innerHTML='';return;}
@@ -4639,7 +4656,7 @@ async function editMessage(m){
   const d=db();const c=d.chats[curChatKey()];if(!c)return;const mm=c.messages.find(x=>x.id===m.id);if(!mm)return;
   mm.text=nt;mm.edited=true;save(d);renderMessages();
   const ev={id:m.id,text:nt,gid:current.group?current.id:undefined};
-  if(current.group)current.members.filter(x=>x!==me.id).forEach(u=>emit('msg:edit',Object.assign({to:u},ev)));
+  if(current.group)current.members.filter(x=>x!==me.id).forEach(u=>emit('msg:edit',Object.assign({to:u,from:me.id},ev)));
   else emit('msg:edit',Object.assign({to:current.id,from:me.id},ev));
   if(cloudOn&&!current.group&&!isIncognito(current.id)){try{cloudSend({id:m.id,chat_key:chatKey(me.id,current.id),from_id:me.id,to_id:current.id,type:'text',text:nt,t:mm.t,edited:1});}catch(e){}}
   toast('Сообщение изменено');
@@ -4649,18 +4666,22 @@ async function deleteMessage(m){
   const okk=await appConfirm('Удалить это сообщение у всех?',{okText:'Удалить',danger:true});if(!okk)return;
   const d=db();const c=d.chats[curChatKey()];if(!c)return;const mm=c.messages.find(x=>x.id===m.id);if(!mm)return;
   mm.deleted=true;mm.text='';delete mm.src;delete mm.audio;save(d);renderMessages();renderChats();
-  if(current.group)current.members.filter(x=>x!==me.id).forEach(u=>emit('msg:del',{to:u,gid:current.id,id:m.id}));
+  if(current.group)current.members.filter(x=>x!==me.id).forEach(u=>emit('msg:del',{to:u,from:me.id,gid:current.id,id:m.id}));
   else emit('msg:del',{to:current.id,from:me.id,id:m.id});
   toast('Удалено');
 }
 function applyMsgEdit(p){
   const d=db();const c=p.gid?d.chats[p.gid]:d.chats[chatKey(me.id,p.from)];if(!c)return;
-  const mm=c.messages.find(x=>x.id===p.id);if(!mm)return;mm.text=p.text;mm.edited=true;save(d);
+  const mm=c.messages.find(x=>x.id===p.id);if(!mm)return;
+  if(mm.from!==p.from)return;                      // чужое сообщение править нельзя
+  mm.text=String(p.text||'').slice(0,20000);mm.edited=true;save(d);
   if(current&&((p.gid&&current.group&&current.id===p.gid)||(!p.gid&&current.id===p.from))){renderMessages();}renderChats();
 }
 function applyMsgDelete(p){
   const d=db();const c=p.gid?d.chats[p.gid]:d.chats[chatKey(me.id,p.from)];if(!c)return;
-  const mm=c.messages.find(x=>x.id===p.id);if(!mm)return;mm.deleted=true;mm.text='';delete mm.src;delete mm.audio;save(d);
+  const mm=c.messages.find(x=>x.id===p.id);if(!mm)return;
+  if(mm.from!==p.from)return;                      // чужое сообщение удалять нельзя
+  mm.deleted=true;mm.text='';delete mm.src;delete mm.audio;save(d);
   if(current&&((p.gid&&current.group&&current.id===p.gid)||(!p.gid&&current.id===p.from))){renderMessages();}renderChats();
 }
 
@@ -5367,6 +5388,7 @@ function stopRec(send){
   const finish=dataUrl=>{
     resetVoiceState();
     if(!send||finalDur<0.6||!peerId)return;
+    if(!dataUrl){ toast('Не удалось сохранить запись — попробуйте ещё раз'); return; }
     try{
       const msg=(kind==='video')?{type:'videonote',dur:Math.round(finalDur),src:dataUrl||null,shape:shp}
                                 :{type:'voice',dur:Math.round(finalDur),audio:dataUrl||null};
@@ -7839,7 +7861,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==
    и возвращаются при входе — на любом устройстве.
    НЕ синхронизируем: токен сессии, ключи шифрования, PIN-код и служебные метки
    (это привязано к конкретному устройству), а также фон Главной (тяжёлая картинка). */
-const SETTINGS_SYNC_KEYS=['om_theme','om_tapfx','om_tapsnd','om_tapsnd_name','om_tapsnd_vol','om_tapvib','om_ai','om_proaccent','om_gifkey','om_pinned','om_hidden_chats','om_cc_iso','om_username'];
+const SETTINGS_SYNC_KEYS=['om_theme','om_tapfx','om_tapsnd','om_tapsnd_name','om_tapsnd_vol','om_tapvib','om_proaccent','om_pinned','om_hidden_chats','om_cc_iso','om_username'];   // om_ai и om_gifkey убраны: в них ключи API пользователя
 const SETTINGS_SYNC_RE=[/^om_lang_/,/^om_tr_/];
 function _settingsSyncable(k){ return !!k && (SETTINGS_SYNC_KEYS.indexOf(k)>=0 || SETTINGS_SYNC_RE.some(re=>re.test(k))); }
 const _lsSetRaw=localStorage.setItem.bind(localStorage);   // запись без обратного вызова синхронизации
@@ -7867,7 +7889,9 @@ async function settingsPull(){
     settingsPushSoon();   // досылаем то, чего на сервере ещё нет
   }catch(e){ _setPulled=true; }
 }
+const _lsDelRaw=localStorage.removeItem.bind(localStorage);
 try{ localStorage.setItem=function(k,v){ _lsSetRaw(k,v); if(_settingsSyncable(k))settingsPushSoon(); }; }catch(e){}
+try{ localStorage.removeItem=function(k){ _lsDelRaw(k); if(_settingsSyncable(k))settingsPushSoon(); }; }catch(e){}
 
 async function boot(){
   checkForUpdate();
@@ -7908,7 +7932,8 @@ async function boot(){
   if(restored){me=restored;enterApp();refreshLockToggle();return;}
   go('scrPhone');
 }
-window.__om={translate,detectLang,sha,db,save,bus:handleBus,TAB,outboxAll,outboxCount,outboxFlush,setMsgStatus,getSec,saveSec,trCfgFor,setTrCfg,sessionsMap,cloudCfg,saveCloudCfg,cloudCfgUpdate,refreshSettings,get me(){return me;},forceLogout,startPinLock,gifSearch,sendGif,setGifKey,gifKey,startRec,pauseRecForCall,resumeRec,stopRec,discardDraft,endCall,startVnote,saveToFaves,openFwd,doForward,refreshLivePanel,liveTick,saveSessionToken,apiHeaders,checkApiRoute,isFirebaseReady,initFirebase,applyChatBg,setChatBgPreset,chatBgCfg,setVnoteShape:(s)=>{vnoteShape=s;},get vnoteShape(){return vnoteShape;},openVnoteRecorder,cycleVnoteShape,renderHome,renderContacts,renderCalls,callContact,getBook,getCalls,knownContacts,importDeviceContacts,applyHomeBg,removeHomeBg,autosaveEnabled,setAutosave,rememberEnabled,setRemember,sendDocument,startCall,acceptCall,hasRTC,callInfo:()=>({peer:callPeerId,kind:callKind,pc:!!pc,signaling:pc?pc.signalingState:null}),notifPref,notifGranted,ensureNotif,showNotif,fitViewport,get mediaReady(){return mediaReady;},recInfo:()=>({state:recState,kind:recKind,accum:recAccum,peer:recPeerId,elapsed:recElapsed()}),renderNews,renderSocial,openReader,openWebview,aiAsk,openTgChannel,renderTgFeed,openTgChannels,renderTgChannels,createGroup,openGroup,applyGroupInvite,onIncomingGroupMessage,markReadGroup,groupById,startGroupCall,leaveGroupCall,gcallInfo:()=>(gcall?{gid:gcall.gid,kind:gcall.kind,peers:Object.keys(gcall.peers),incoming:!!gcall.incoming}:null),get current(){return current;},processImportedContacts,getPhonebook,savePhonebook,matchPhonebook,parsePastedContacts,submitPastedContacts,importDeviceContacts,inviteContact,openGroupInfo,renameGroup,addGroupMembers,removeGroupMember,leaveGroup,applyGroupUpdate,applyGroupLeave,applyGroupRead,emitGroupRead,botReply,botReplyRuleBased,botAction,botHelp,botWelcomeIfEmpty,pinMessage,unpinMessage,promoteAdmin,demoteAdmin,isGroupAdmin,parseMentions,appendTextWithMentions,applyChatPin,applyGroupPin,renderPinnedBar,updateMentionPop,aiChat,aiPublic,olesyaRespond,olesyaTranslateOnce,aiCfg,saveAiCfg,aiEnabled,aiWantsWeb,setTranslateTarget,clearTranslateTarget,openLangPicker,langCodeFromName,editMessage,deleteMessage,applyMsgEdit,applyMsgDelete,getChatOpts,setChatOpt,chatTTL,isIncognito,sweepExpired,handleSlash,isSlash,openConvSearch,closeConvSearch,runConvSearch,openConv,transcribeVoice,pushSubscribe,urlB64ToU8,createChannel,openChannel,openChannelsScreen,renderChannelsScreen,onChannelPost,subscribeCurrentChannel,unsubscribeCurrentChannel,postChannelMessage,chIsAdmin,channelCurrent,isPro,proUntil,maxFileMB,setProUntil,redeemProCode,proCheckout,openPro,renderPro,refreshProUI,cloudProStatus,setProAccent,proAccentVal,isSecret,toggleSecret,e2eAvailable,e2eEnsureKeys,e2eEncryptFor,e2eDecryptFrom,e2eSharedKey,updateE2eeBanner,e2ePublishKey,_e2eSetPeerPub:(id,jwk)=>{_e2ePubCache[id]=jwk;},_e2eMyPub:async()=>{const k=await e2eEnsureKeys();return k&&k.pub;},checkForUpdate,openAiImg,closeAiImg,aiGenImage,socialLoginUrl,cloudSyncChats,isBlocked,toggleBlock,reportUser,hidePhoneEnabled,setHidePhone,openPeerActions,olesyaVoiceToggle,speakText,micAllowed,camAllowed,mediaPerm,setMediaPerm,requestMediaPermsOnce,get searchTerm(){return searchTerm;}};
+const __OM_TEST=(()=>{try{return /(^|[?&])__omtest=1(&|$)/.test(location.search)||/jsdom/i.test(navigator.userAgent||'')||location.hostname==='localhost';}catch(e){return false;}})();
+if(__OM_TEST) window.__om={translate,detectLang,sha,db,save,bus:handleBus,TAB,outboxAll,outboxCount,outboxFlush,setMsgStatus,getSec,saveSec,trCfgFor,setTrCfg,sessionsMap,cloudCfg,saveCloudCfg,cloudCfgUpdate,refreshSettings,get me(){return me;},forceLogout,startPinLock,gifSearch,sendGif,setGifKey,gifKey,startRec,pauseRecForCall,resumeRec,stopRec,discardDraft,endCall,startVnote,saveToFaves,openFwd,doForward,refreshLivePanel,liveTick,saveSessionToken,apiHeaders,checkApiRoute,isFirebaseReady,initFirebase,applyChatBg,setChatBgPreset,chatBgCfg,setVnoteShape:(s)=>{vnoteShape=s;},get vnoteShape(){return vnoteShape;},openVnoteRecorder,cycleVnoteShape,renderHome,renderContacts,renderCalls,callContact,getBook,getCalls,knownContacts,importDeviceContacts,applyHomeBg,removeHomeBg,autosaveEnabled,setAutosave,rememberEnabled,setRemember,sendDocument,startCall,acceptCall,hasRTC,callInfo:()=>({peer:callPeerId,kind:callKind,pc:!!pc,signaling:pc?pc.signalingState:null}),notifPref,notifGranted,ensureNotif,showNotif,fitViewport,get mediaReady(){return mediaReady;},recInfo:()=>({state:recState,kind:recKind,accum:recAccum,peer:recPeerId,elapsed:recElapsed()}),renderNews,renderSocial,openReader,openWebview,aiAsk,openTgChannel,renderTgFeed,openTgChannels,renderTgChannels,createGroup,openGroup,applyGroupInvite,onIncomingGroupMessage,markReadGroup,groupById,startGroupCall,leaveGroupCall,gcallInfo:()=>(gcall?{gid:gcall.gid,kind:gcall.kind,peers:Object.keys(gcall.peers),incoming:!!gcall.incoming}:null),get current(){return current;},processImportedContacts,getPhonebook,savePhonebook,matchPhonebook,parsePastedContacts,submitPastedContacts,importDeviceContacts,inviteContact,openGroupInfo,renameGroup,addGroupMembers,removeGroupMember,leaveGroup,applyGroupUpdate,applyGroupLeave,applyGroupRead,emitGroupRead,botReply,botReplyRuleBased,botAction,botHelp,botWelcomeIfEmpty,pinMessage,unpinMessage,promoteAdmin,demoteAdmin,isGroupAdmin,parseMentions,appendTextWithMentions,applyChatPin,applyGroupPin,renderPinnedBar,updateMentionPop,aiChat,aiPublic,olesyaRespond,olesyaTranslateOnce,aiCfg,saveAiCfg,aiEnabled,aiWantsWeb,setTranslateTarget,clearTranslateTarget,openLangPicker,langCodeFromName,editMessage,deleteMessage,applyMsgEdit,applyMsgDelete,getChatOpts,setChatOpt,chatTTL,isIncognito,sweepExpired,handleSlash,isSlash,openConvSearch,closeConvSearch,runConvSearch,openConv,transcribeVoice,pushSubscribe,urlB64ToU8,createChannel,openChannel,openChannelsScreen,renderChannelsScreen,onChannelPost,subscribeCurrentChannel,unsubscribeCurrentChannel,postChannelMessage,chIsAdmin,channelCurrent,isPro,proUntil,maxFileMB,setProUntil,redeemProCode,proCheckout,openPro,renderPro,refreshProUI,cloudProStatus,setProAccent,proAccentVal,isSecret,toggleSecret,e2eAvailable,e2eEnsureKeys,e2eEncryptFor,e2eDecryptFrom,e2eSharedKey,updateE2eeBanner,e2ePublishKey,_e2eSetPeerPub:(id,jwk)=>{_e2ePubCache[id]=jwk;},_e2eMyPub:async()=>{const k=await e2eEnsureKeys();return k&&k.pub;},checkForUpdate,openAiImg,closeAiImg,aiGenImage,socialLoginUrl,cloudSyncChats,isBlocked,toggleBlock,reportUser,hidePhoneEnabled,setHidePhone,openPeerActions,olesyaVoiceToggle,speakText,micAllowed,camAllowed,mediaPerm,setMediaPerm,requestMediaPermsOnce,get searchTerm(){return searchTerm;}};
 if('serviceWorker'in navigator&&location.protocol.indexOf('http')===0){
   window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js?v='+encodeURIComponent(APP_VERSION),{updateViaCache:'none'}).then(r=>{_swReg=r;try{r.update();}catch(e){}}).catch(()=>{});});
   navigator.serviceWorker.addEventListener('message',e=>{ if(e.data&&e.data.type==='open-chat'&&e.data.peer&&me){ try{window.focus();}catch(_){ } try{openConv(e.data.peer);}catch(_){ } } });
