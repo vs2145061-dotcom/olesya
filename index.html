@@ -1533,7 +1533,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
       <div class="sec-head">Данные</div>
       <div class="setting" id="btnClearAll" style="cursor:pointer"><div class="ic" style="color:var(--red)">🗑️</div><div class="lbl"><div class="t" style="color:var(--red)">Очистить все данные</div><div class="d">Удалить аккаунт и историю на этом устройстве</div></div></div>
       <div class="setting" id="btnLogout" style="cursor:pointer"><div class="ic">🚪</div><div class="lbl"><div class="t">Выйти</div></div></div>
-      <div style="text-align:center;color:var(--faint);font-size:12px;padding:24px">ZORVELD v4.8.0<br>Две темы (день/ночь) · Облако · ИИ-перевод · Анти-спам · 2FA · PWA</div>
+      <div style="text-align:center;color:var(--faint);font-size:12px;padding:24px"><span id="appVerLine">ZORVELD</span><br>Две темы (день/ночь) · Облако · ИИ-перевод · Анти-спам · 2FA · PWA</div>
     </div>
   </div>
 
@@ -1905,7 +1905,10 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.2', BUILD_ID='2026-08-26-security-1c';
+const APP_VERSION='5.0.3', BUILD_ID='2026-08-26-storage-1';
+/* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
+   какая версия реально загружена. Теперь берётся из APP_VERSION. */
+try{const _vl=document.getElementById('appVerLine'); if(_vl)_vl.textContent='ZORVELD v'+APP_VERSION;}catch(e){}
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -2323,9 +2326,83 @@ function logSec(text){if(!me)return;let a;try{a=JSON.parse(localStorage.getItem(
 function relTime(t){const d=Date.now()-t;if(d<60000)return 'только что';if(d<3600000)return Math.floor(d/60000)+' мин назад';if(d<86400000)return Math.floor(d/3600000)+' ч назад';return new Date(t).toLocaleDateString('ru-RU');}
 
 /* ---------- store ---------- */
-function db(){try{return JSON.parse(localStorage.getItem(LS))||fresh()}catch(e){return fresh()}}
+/* ЛОКАЛЬНОЕ ХРАНИЛИЩЕ.
+   Правило: повреждённые данные НИКОГДА не подменяются пустыми молча. Раньше любая
+   ошибка разбора возвращала пустую базу, и следующая же запись затирала ею остатки —
+   человек видел «все переписки пропали», восстановить было нечего. */
+let _dbBroken=false, _bakAt=0;
+function db(){
+  const raw=localStorage.getItem(LS);
+  if(raw==null)return fresh();                       // первый запуск — это норма
+  try{
+    const p=JSON.parse(raw);
+    if(!p||typeof p!=='object')throw new Error('shape');
+    if(!p.users)p.users={};                          // недостающее чиним, а не считаем поломкой
+    if(!p.chats)p.chats={};
+    return p;
+  }catch(e){
+    if(!_dbBroken){                                  // предупреждаем и откладываем сырое — один раз
+      _dbBroken=true;
+      try{localStorage.setItem(LS+'_corrupt_'+Date.now(),raw);}catch(_){}
+      try{console.error('om: локальная база не разобралась',e);}catch(_){}
+      try{toast('⚠️ Локальные данные повреждены. Копия сохранена, переписка подтянется с сервера.');}catch(_){}
+    }
+    try{                                             // пробуем резервную копию
+      const bak=localStorage.getItem(LS+'_bak');
+      if(bak){const b=JSON.parse(bak);
+        if(b&&typeof b==='object'){ if(!b.users)b.users={}; if(!b.chats)b.chats={}; return b; }}
+    }catch(_){}
+    return fresh();
+  }
+}
 function fresh(){return{users:{},chats:{},seq:0}}
-function save(d){try{localStorage.setItem(LS,JSON.stringify(d));}catch(e){toast('⚠️ Хранилище устройства переполнено — медиа может не сохраниться');}}
+/* Выбросить base64-вложения из сообщений старше N дней: сами файлы уже лежат в облаке
+   по ссылке, а в памяти телефона занимают больше всего места. Вернёт освобождённые символы. */
+function dropOldInlineMedia(d,days){
+  const cutoff=Date.now()-days*86400000; let freed=0;
+  try{ Object.keys(d.chats||{}).forEach(k=>{ const c=d.chats[k]; if(!c||!c.messages)return;
+    c.messages.forEach(m=>{ if(!m||(m.t||0)>cutoff)return;
+      ['src','audio'].forEach(f=>{ const v=m[f];
+        if(typeof v==='string'&&v.indexOf('data:')===0){ freed+=v.length; delete m[f]; m.mediaDropped=1; } }); }); }); }catch(e){}
+  return freed;
+}
+/* Возвращает true, только если запись ДЕЙСТВИТЕЛЬНО прошла. Раньше при переполнении
+   молча терялось всё сообщение, а тост говорил про «медиа» — это вводило в заблуждение. */
+function save(d){
+  let s; try{ s=JSON.stringify(d); }
+  catch(e){ try{toast('⚠️ Не удалось подготовить данные к сохранению');}catch(_){} return false; }
+  let written=false, tight=false;                    // tight — место пришлось освобождать
+  try{ localStorage.setItem(LS,s); written=true; }
+  catch(e){
+    tight=true;
+    try{                                             // 1) освобождаем служебное: копию и слепки
+      localStorage.removeItem(LS+'_bak');
+      const _del=[];                                 // сначала собираем, потом удаляем:
+      for(let i=0;i<localStorage.length;i++){        // удаление на ходу сдвигает индексы
+        const k=localStorage.key(i);
+        if(k&&k.indexOf(LS+'_corrupt_')===0)_del.push(k);
+      }
+      _del.forEach(k=>localStorage.removeItem(k));
+      localStorage.setItem(LS,s); written=true;
+    }catch(_){
+      try{                                           // 2) выбрасываем старые вложения
+        if(dropOldInlineMedia(d,90)){
+          localStorage.setItem(LS,JSON.stringify(d)); written=true;
+          toast('Освободили место: старые вложения убраны из памяти телефона');
+        }
+      }catch(__){}
+    }
+  }
+  if(!written){ try{toast('⚠️ Память устройства переполнена — сообщение не сохранено');}catch(_){} return false; }
+  /* Резервная копия — только когда с местом свободно. Если ради этой записи пришлось
+     освобождать память, копию НЕ пишем: иначе мы бы тут же вернули на место то, что
+     секунду назад удалили ради места, и на следующей записи повторили бы всё заново. */
+  try{ const now=Date.now();
+    if(tight){ _bakAt=now; }                         // отложить попытку на 10 минут
+    else if(now-_bakAt>600000){ _bakAt=now; localStorage.setItem(LS+'_bak',s); }
+  }catch(_){}
+  return true;
+}
 function uid(){return 'u'+Math.random().toString(36).slice(2,9)}
 function mid(){return 'm'+Date.now().toString(36)+crypto.randomUUID().slice(0,8);}
 let me=null;                       // current user object
