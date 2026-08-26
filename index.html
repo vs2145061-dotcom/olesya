@@ -1905,7 +1905,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.1', BUILD_ID='2026-08-26-security-1';
+const APP_VERSION='5.0.2', BUILD_ID='2026-08-26-security-1c';
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
@@ -3774,7 +3774,7 @@ async function selDelete(){ const ms=_selMsgs(); const mine=ms.filter(m=>m.from=
   const ok=await appConfirm('Удалить '+mine.length+' сообщ. у всех?',{okText:'Удалить',danger:true}); if(!ok)return;
   const d=db(); const c=d.chats[curChatKey()];
   if(c){ mine.forEach(m=>{ const mm=c.messages.find(x=>x.id===m.id); if(mm){mm.deleted=true;mm.text='';delete mm.src;delete mm.audio;}
-    if(current&&current.group)current.members.filter(x=>x!==me.id).forEach(u=>emit('msg:del',{to:u,gid:current.id,id:m.id}));
+    if(current&&current.group)current.members.filter(x=>x!==me.id).forEach(u=>emit('msg:del',{to:u,from:me.id,gid:current.id,id:m.id}));
     else if(current)emit('msg:del',{to:current.id,from:me.id,id:m.id}); }); save(d); }
   exitSel(); renderMessages(); renderChats(); toast('Удалено: '+mine.length);
 }
@@ -4303,7 +4303,7 @@ function addGroupMembers(gid,ids){
   g.members=Array.from(new Set([...g.members,...fresh]));save(d);
   const roster=rosterFor(g.members);
   fresh.forEach(uidT=>emit('group:invite',{to:uidT,gid,name:g.name,members:g.members,roster,by:me.id}));
-  g.members.filter(x=>x!==me.id&&fresh.indexOf(x)<0).forEach(uidT=>emit('group:update',{to:uidT,gid,members:g.members.slice(),roster}));
+  g.members.filter(x=>x!==me.id&&fresh.indexOf(x)<0).forEach(uidT=>emit('group:update',{to:uidT,gid,members:g.members.slice(),roster,by:me.id}));
   if(current&&current.group&&current.id===gid){current.members=g.members;updateConvStatus();}
   renderChats();toast('Добавлено участников: '+fresh.length);
 }
