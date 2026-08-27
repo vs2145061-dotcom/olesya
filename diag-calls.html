@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="ru"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ZORVELD — проверка звонков</title>
+<style>
+  :root{--bg:#0e0f13;--card:#171922;--line:#2a2d3a;--tx:#e9eaf0;--dim:#9aa0b4;
+        --ok:#3ecf8e;--bad:#ff6b6b;--warn:#ffb454;--acc:#7c6cff}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);
+       font:16px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+       padding:18px 14px 40px}
+  h1{font-size:20px;margin:0 0 4px}
+  .sub{color:var(--dim);font-size:13px;margin-bottom:16px}
+  .sub b{color:var(--tx)}
+  button{width:100%;padding:16px;border:0;border-radius:14px;background:var(--acc);color:#fff;
+         font-size:17px;font-weight:600;cursor:pointer}
+  button:disabled{opacity:.5}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:12px 0}
+  .row{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}
+  .row:first-child{border-top:0}
+  .ic{flex:0 0 22px;font-size:17px;line-height:1.4}
+  .k{font-weight:600}
+  .v{color:var(--dim);font-size:14px}
+  .ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+  #verdict{font-size:17px;line-height:1.55;padding:16px;border-radius:14px;margin:14px 0;display:none}
+  #verdict.good{background:rgba(62,207,142,.12);border:1px solid var(--ok)}
+  #verdict.fail{background:rgba(255,107,107,.12);border:1px solid var(--bad)}
+  #verdict b{display:block;font-size:19px;margin-bottom:6px}
+  pre{background:#0a0b0f;border:1px solid var(--line);border-radius:12px;padding:12px;
+      font-size:11px;line-height:1.45;color:var(--dim);white-space:pre-wrap;word-break:break-word;
+      max-height:320px;overflow:auto}
+  .muted{color:var(--dim);font-size:12px;margin-top:14px}
+</style></head><body>
+
+<h1>Проверка звонков</h1>
+<div class="sub"><b>Хватит одного телефона.</b> Второй не нужен — проверка целиком
+идёт внутри этой страницы. Откройте её <b>без VPN</b>, по обычному мобильному
+интернету, и нажмите кнопку.</div>
+
+<button id="go">Начать проверку</button>
+
+<div class="card" id="steps" style="display:none"></div>
+<div id="verdict"></div>
+<pre id="log" style="display:none"></pre>
+<button id="copy" style="display:none;background:#2a2d3a;margin-top:10px">Скопировать отчёт</button>
+
+<div class="muted">Проверка ничего не меняет в приложении и никуда не отправляет.
+Пароли и ключи в отчёт не попадают.</div>
+
+<script>
+/* Диагностика звонков ZORVELD. Хватает ОДНОГО телефона.
+   Два телефона нужны, чтобы звонить. Чтобы понять, ПОЧЕМУ звонок не соединяется,
+   второй не нужен: узкое место — не «между телефонами», а «между телефоном и
+   промежуточным узлом» (ретранслятором). Проверяется с одной стороны.
+   Приём: поднимаем два соединения ВНУТРИ страницы и запрещаем им ходить напрямую.
+   Связаться они могут только через ретранслятор — то есть трафик реально уходит
+   с телефона в сеть, до узла и обратно. Это ровно тот путь, по которому идёт звонок. */
+
+const log = [];
+const L = (s) => { log.push(s); };
+const $ = (id) => document.getElementById(id);
+const steps = $('steps');
+
+function row(icon, key, val, cls){
+  const d = document.createElement('div');
+  d.className = 'row';
+  d.innerHTML = '<div class="ic ' + (cls||'') + '">' + icon + '</div>' +
+                '<div><div class="k">' + key + '</div><div class="v">' + val + '</div></div>';
+  steps.appendChild(d);
+  L((cls === 'bad' ? '[!] ' : cls === 'warn' ? '[?] ' : '[+] ') + key + ' — ' + String(val).replace(/<[^>]+>/g, ''));
+  return d;
+}
+function dropLast(){ try{ steps.removeChild(steps.lastChild); }catch(e){} log.pop(); }
+
+/* Тот же адрес, что использует само приложение: страница лежит на том же домене. */
+function apiBase(){
+  try{
+    const act = localStorage.getItem('om_active_api');
+    if (act) return String(act).replace(/\/$/, '');
+    const c = JSON.parse(localStorage.getItem('om_cloud') || '{}');
+    if (c.workerUrl) return String(c.workerUrl).replace(/\/$/, '');
+  }catch(e){}
+  return 'https://d5d5j7dqdhjflpo07rpo.iwzqm34r.apigw.yandexcloud.net';
+}
+/* Показываем только имя узла и вид связи — без логина и пароля. */
+function describeUrls(list){
+  const out = [];
+  (list||[]).forEach(s => {
+    const u = Array.isArray(s.urls) ? s.urls : [s.urls];
+    u.forEach(x => out.push(String(x).replace(/^(turns?|stun):([^?]*).*$/, '$1:$2')));
+  });
+  return out.join(', ') || '—';
+}
+
+async function turnCreds(base){
+  const r = await fetch(base + '/turn?d=' + Date.now(), { cache: 'no-store' });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return await r.json();
+}
+
+/* Сбор адресов. host — свой в локальной сети (есть всегда); srflx — виден внешний
+   адрес, значит STUN отработал; relay — выделен канал на ретрансляторе. */
+function gather(servers, ms){
+  return new Promise((resolve) => {
+    const out = { host:0, srflx:0, prflx:0, relay:0, proto:new Set(), ports:new Set(), err:null };
+    let pc;
+    try{ pc = new RTCPeerConnection({ iceServers: servers, iceCandidatePoolSize: 0 }); }
+    catch(e){ out.err = String((e&&e.message)||e); return resolve(out); }
+    const done = () => { try{ pc.close(); }catch(e){} resolve(out); };
+    pc.onicecandidate = (e) => {
+      if (!e.candidate) return done();
+      const c = e.candidate.candidate || '';
+      const t = (c.match(/ typ (\w+)/) || [])[1];
+      if (t && out[t] !== undefined) out[t]++;
+      if (t === 'relay'){
+        const pr = (c.match(/ (udp|tcp) /i) || [])[1];
+        if (pr) out.proto.add(pr.toLowerCase());
+        const rp = (c.match(/ (\d+) typ relay/) || [])[1];
+        if (rp) out.ports.add(rp);
+      }
+    };
+    pc.onicecandidateerror = (e) => {
+      if (!out.err && e && (e.errorCode || e.errorText))
+        out.err = 'код ' + e.errorCode + (e.errorText ? ' ' + e.errorText : '');
+    };
+    try{
+      pc.createDataChannel('d');
+      pc.createOffer().then(o => pc.setLocalDescription(o)).catch(e => { out.err = String((e&&e.message)||e); done(); });
+    }catch(e){ out.err = String((e&&e.message)||e); return done(); }
+    setTimeout(done, ms);
+  });
+}
+
+/* РЕШАЮЩАЯ ПРОБА, одному телефону её достаточно.
+   Два соединения на этой же странице, обоим ЗАПРЕЩЕНО ходить напрямую.
+   Связаться могут только через ретранслятор. Дальше — не просто «связались»,
+   а гоняем через него данные: соединиться и не уметь передавать — тоже беда,
+   и снаружи она выглядит точно так же, как «идёт соединение» и тишина. */
+function relayLoopback(servers, msConnect, msData){
+  return new Promise((resolve) => {
+    /* Два РАЗНЫХ факта, и путать их нельзя:
+       связались — путь до ретранслятора открыт;
+       прошли данные — он ещё и работает. */
+    const res = { связались:false, ok:false, why:'', kb:0, kbps:0, путь:'' };
+    let a, b, finished = false, dc = null, got = 0, t0 = 0, sendTO = null;
+    const fin = (why) => {
+      if (finished) return; finished = true;
+      clearTimeout(sendTO);
+      try{ a && a.close(); b && b.close(); }catch(e){}
+      if (why) res.why = why;
+      resolve(res);
+    };
+    try{
+      const cfg = { iceServers: servers, iceTransportPolicy: 'relay' };
+      a = new RTCPeerConnection(cfg);
+      b = new RTCPeerConnection(cfg);
+    }catch(e){ return fin(String((e&&e.message)||e)); }
+
+    a.onicecandidate = e => { if (e.candidate && b.addIceCandidate) b.addIceCandidate(e.candidate).catch(()=>{}); };
+    b.onicecandidate = e => { if (e.candidate && a.addIceCandidate) a.addIceCandidate(e.candidate).catch(()=>{}); };
+
+    /* Приёмная сторона. Присваиваем без предварительной проверки: у части движков
+       свойства нет до присваивания, и проверка «есть ли оно» отсекала бы приём. */
+    try{
+      b.ondatachannel = (ev) => {
+        const ch = ev && ev.channel;
+        if (!ch) return;
+        ch.onmessage = (m) => { got += (m && m.data && m.data.length) ? m.data.length : 0; };
+      };
+    }catch(e){}
+
+    const качаем = () => {
+      const кусок = 'x'.repeat(8 * 1024);
+      t0 = Date.now();
+      const шаг = () => {
+        if (finished) return;
+        try{
+          for (let i = 0; i < 8; i++){
+            if (!dc || dc.readyState !== 'open') break;
+            if (dc.bufferedAmount > 256 * 1024) break;
+            dc.send(кусок);
+          }
+        }catch(e){}
+        if (Date.now() - t0 >= msData){
+          const сек = (Date.now() - t0) / 1000;
+          res.kb = Math.round(got / 1024);
+          res.kbps = сек > 0 ? Math.round(res.kb / сек) : 0;
+          res.ok = res.kb > 0;
+          статистика().then(() => fin(''));
+          return;
+        }
+        sendTO = setTimeout(шаг, 40);
+      };
+      шаг();
+    };
+
+    /* Через какой узел и по какому протоколу реально пошёл трафик. */
+    async function статистика(){
+      try{
+        if (!a.getStats) return;
+        const s = await a.getStats();
+        let пара = null;
+        s.forEach(r => { if (r.type === 'candidate-pair' && (r.state === 'succeeded' || r.nominated) && !пара) пара = r; });
+        if (!пара) return;
+        let лок = null;
+        s.forEach(r => { if (r.id === пара.localCandidateId) лок = r; });
+        if (лок) res.путь = (лок.relayProtocol || лок.protocol || '?') + ', порт ' + (лок.port || '?');
+      }catch(e){}
+    }
+
+    const check = () => {
+      if (finished) return;
+      if (a.connectionState === 'connected' && b.connectionState === 'connected'){
+        res.связались = true;                       // главное уже известно
+        if (dc && dc.readyState === 'open') качаем();
+        else if (!dc) качаем();
+        return;
+      }
+      if (a.connectionState === 'failed' || b.connectionState === 'failed')
+        fin('соединение не установилось');
+    };
+    a.onconnectionstatechange = check;
+    b.onconnectionstatechange = check;
+
+    try{
+      dc = a.createDataChannel('t');
+      dc.onopen = () => { if (a.connectionState === 'connected') check(); };
+    }catch(e){ dc = null; }
+
+    Promise.resolve()
+      .then(() => a.createOffer())
+      .then(o => a.setLocalDescription(o).then(() => b.setRemoteDescription(o)))
+      .then(() => b.createAnswer())
+      .then(ans => b.setLocalDescription(ans).then(() => a.setRemoteDescription(ans)))
+      .catch(e => fin(String((e&&e.message)||e)));
+
+    setTimeout(() => fin(res.связались ? 'данные за отведённое время не прошли'
+                                        : 'не уложились в ' + Math.round((msConnect+msData)/1000) + ' с'),
+               msConnect + msData + 1500);
+  });
+}
+
+async function micTest(){
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)
+    return { ok:false, why:'браузер не даёт доступ к микрофону' };
+  try{
+    const s = await navigator.mediaDevices.getUserMedia({ audio:true });
+    const n = s.getAudioTracks().length;
+    s.getTracks().forEach(t => t.stop());
+    return { ok: n > 0, why: n ? (n + ' звуковая дорожка получена') : 'дорожек нет' };
+  }catch(e){
+    return { ok:false, why: (e && e.name) === 'NotAllowedError' ? 'доступ запрещён' : String((e&&e.name)||e) };
+  }
+}
+
+$('go').onclick = async () => {
+  $('go').disabled = true;
+  $('go').textContent = 'Проверяю…';
+  steps.style.display = 'block';
+  steps.innerHTML = '';
+  $('verdict').style.display = 'none';
+  $('log').style.display = 'none';
+  $('copy').style.display = 'none';
+  log.length = 0;
+
+  L('ZORVELD, проверка звонков (хватает одного телефона)');
+  L('время: ' + new Date().toISOString());
+  L('устройство: ' + navigator.userAgent);
+  L('');
+
+  const finish = (ok, t) => {
+    const v = $('verdict');
+    v.className = ok ? 'good' : 'fail';
+    v.innerHTML = '<b>' + (ok ? 'Отсюда всё работает' : 'Вот в чём дело') + '</b>' + t;
+    v.style.display = 'block';
+    L(''); L('ВЫВОД: ' + t);
+    $('log').textContent = log.join('\n');
+    $('log').style.display = 'block';
+    $('copy').style.display = 'block';
+    $('go').disabled = false;
+    $('go').textContent = 'Проверить ещё раз';
+  };
+
+  const base = apiBase();
+  row('🌐', 'Адрес сервера', base.replace(/^https:\/\//, ''));
+
+  if (typeof RTCPeerConnection === 'undefined')
+    return finish(false, 'В этом браузере звонков не будет вовсе: нет поддержки WebRTC.');
+
+  /* 1. Доступ к ретранслятору */
+  let servers = [{ urls: ['stun:stun.l.google.com:19302'] }];
+  let turnOk = false;
+  try{
+    const d = await turnCreds(base);
+    const extra = (d && Array.isArray(d.iceServers)) ? d.iceServers.filter(s => s && s.urls) : [];
+    if (extra.length){
+      turnOk = true;
+      servers = servers.concat(extra);
+      row('✔', 'Сервер выдал доступ к ретранслятору', describeUrls(extra), 'ok');
+    } else {
+      row('✖', 'Сервер НЕ выдал доступ к ретранслятору',
+          (d && d.configured === false) ? 'ретранслятор не настроен на сервере' :
+          ((d && d.error) ? ('ошибка: ' + String(d.error).slice(0,120)) : 'пустой список'), 'bad');
+    }
+  }catch(e){
+    row('✖', 'Не удалось запросить доступ к ретранслятору', String((e&&e.message)||e), 'bad');
+  }
+
+  /* 2. Какие адреса удаётся собрать */
+  row('⏳', 'Собираю сетевые адреса', 'до 10 секунд…');
+  const g = await gather(servers, 9000);
+  dropLast();
+  row(g.srflx ? '✔' : '✖', 'Внешний адрес виден (STUN)',
+      g.srflx ? (g.srflx + ' шт.') : 'ноль — STUN-серверы недоступны из этой сети',
+      g.srflx ? 'ok' : 'bad');
+  row(g.relay ? '✔' : '✖', 'Канал на ретрансляторе выделен (TURN)',
+      g.relay ? (g.relay + ' шт. · ' + [...g.proto].join(', ') + ' · порты ' + [...g.ports].join(', '))
+              : ('ноль' + (g.err ? ' · сеть ответила: ' + g.err : '')),
+      g.relay ? 'ok' : 'bad');
+  row('•', 'Свой адрес в сети', g.host + ' шт.', 'warn');
+
+  /* 3. Решающая проба */
+  let loop = { связались:false, ok:false, why:'проба не запускалась — нет доступа к ретранслятору', kb:0, kbps:0, путь:'' };
+  if (turnOk){
+    row('⏳', 'Гоняю данные только через ретранслятор', 'до 20 секунд, это главная проба…');
+    loop = await relayLoopback(servers, 15000, 5000);
+    dropLast();
+    row(loop.связались ? '✔' : '✖', 'Связь через ретранслятор',
+        loop.связались ? ('установлена' + (loop.путь ? ' · ' + loop.путь : ''))
+                       : ('НЕ установлена' + (loop.why ? ' — ' + loop.why : '')),
+        loop.связались ? 'ok' : 'bad');
+    if (loop.связались)
+      row(loop.ok ? '✔' : '✖', 'Данные через него идут',
+          loop.ok ? ('прошло ' + loop.kb + ' КБ, около ' + loop.kbps + ' КБ/с')
+                  : 'канал открылся, но не передал ничего',
+          loop.ok ? 'ok' : 'bad');
+  }
+
+  /* 4. Микрофон */
+  const mic = await micTest();
+  row(mic.ok ? '✔' : '✖', 'Микрофон', mic.ok ? mic.why : ('недоступен — ' + mic.why), mic.ok ? 'ok' : 'bad');
+
+  /* Приговор */
+  if (!turnOk)
+    return finish(false,
+      'Сервер не выдаёт доступ к ретранслятору. Пока это не поправят на сервере, ' +
+      'звонок между двумя мобильными интернетами не соединится в принципе — приложение ни при чём.');
+  if (!loop.связались)
+    return finish(false,
+      'Доступ сервер выдал, но связаться через ретранслятор с этого телефона не получилось. ' +
+      'Значит путь до него закрыт — сетью оператора или самим узлом. Правки в приложении тут ' +
+      'ничего не изменят: нужен ретранслятор, доступный из российских мобильных сетей.');
+  if (!loop.ok)
+    return finish(false,
+      'Связь через ретранслятор устанавливается, а данные через него не идут. Так бывает, когда ' +
+      'узел доступен, но сеть режет сам поток. Для звонка это то же самое, что недоступный узел: ' +
+      'нужен другой ретранслятор.');
+  if (!mic.ok)
+    return finish(false,
+      'Сеть в порядке: данные через ретранслятор идут. А микрофон приложению не отдаётся — ' +
+      'поэтому и звука нет. Проверьте разрешение на микрофон в настройках телефона для приложения.');
+  return finish(true,
+    'С этого телефона и этой сети всё нужное работает: ретранслятор доступен, данные через него ' +
+    'идут, микрофон отдаётся. Значит причина не в сети, а в самом приложении — ищем в коде. ' +
+    'Пришлите отчёт целиком.');
+};
+
+$('copy').onclick = () => {
+  const t = log.join('\n');
+  const done = () => { $('copy').textContent = 'Скопировано ✓'; setTimeout(() => $('copy').textContent = 'Скопировать отчёт', 1800); };
+  const fallback = () => {
+    const ta = document.createElement('textarea');
+    ta.value = t; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); done(); }catch(e){ alert('Выделите текст отчёта и скопируйте вручную'); }
+    try{ ta.remove(); }catch(e){}
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText)
+    navigator.clipboard.writeText(t).then(done).catch(fallback);
+  else fallback();
+};
+</script>
+</body></html>
