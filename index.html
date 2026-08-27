@@ -1905,7 +1905,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.7', BUILD_ID='2026-08-27-timers-1';
+const APP_VERSION='5.0.8', BUILD_ID='2026-08-27-net-1';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 try{const _vl=document.getElementById('appVerLine'); if(_vl)_vl.textContent='ZORVELD v'+APP_VERSION;}catch(e){}
@@ -1942,7 +1942,7 @@ const FIREBASE_CONFIG = {
   appId:             '1:6622521938:web:6c7e6bf6f81b563b81cd8b',
   measurementId:     'G-N6RYG92F4S'
 };
-const CLOUD_DEFAULT={ provider:'worker', workerUrl:'https://d5d5j7dqdhjflpo07rpo.iwzqm34r.apigw.yandexcloud.net', backupUrls:['https://api.zorveld.pro','https://backup-api.zorveld.pro','https://olesya-api.vs2145061.workers.dev'], supabaseUrl:'', supabaseKey:'' };
+const CLOUD_DEFAULT={ provider:'worker', workerUrl:'https://d5d5j7dqdhjflpo07rpo.iwzqm34r.apigw.yandexcloud.net', backupUrls:['https://api.zorveld.pro','https://olesya-api.vs2145061.workers.dev'], supabaseUrl:'', supabaseKey:'' };
 /* v4.8.0: диагностика нестабильного входа через мобильных операторов (Т2/без VPN).
    Если через VPN вход стабильный, проблема чаще всего в маршруте/доступе к workers.dev,
    а не в коде OTP. Эти функции дают понятную ошибку и сохраняют последнюю диагностику. */
@@ -1986,19 +1986,46 @@ function apiPathFromUrl(url){
   try{const u=new URL(url);const bases=apiBaseList().map(b=>new URL(b).origin);if(bases.includes(u.origin))return u.pathname+u.search;}catch(e){}
   return null;
 }
+/* Какие POST можно безопасно повторить на другом адресе.
+   Повтор происходит, когда сервер ответил 502/503/504/52x либо запрос вовсе не
+   дошёл. Беда в том, что шлюз способен вернуть 502 УЖЕ ПОСЛЕ того, как воркер
+   обработал запрос. Для отправки сообщения это безобидно — на сервере стоит
+   INSERT OR IGNORE по клиентскому id. Для погашения кода или оплаты — нет:
+   человек мог бы потерять код или заплатить дважды.
+   Поэтому список разрешительный: чего в нём нет — не повторяем.
+   Добавляя сюда новый путь, отвечайте на один вопрос: что будет, если сервер
+   выполнит его ДВАЖДЫ? Если ответ не «ровно то же самое» — не добавлять. */
+const RETRY_SAFE_POST=new Set([
+  '/send','/bus','/push/subscribe','/push/expo','/profile','/settings',
+  '/key/publish','/media/presign','/contacts/add','/contacts/remove',
+  '/username/set','/privacy/phone','/logout','/sessions/revoke','/sessions/revoke_all'
+]);
+const BACKUP_TIMEOUT_MS=6000;   // резерв либо отвечает быстро, либо не отвечает вовсе
+
 async function apiFetchAny(url,opts){
   const path=apiPathFromUrl(url);
   if(!path)return apiFetch(url,opts);
+  const method=String((opts&&opts.method)||'GET').toUpperCase();
+  const clean=path.split('?')[0];
+  const mozhnoPovtorit = (method==='GET'||method==='HEAD') || RETRY_SAFE_POST.has(clean);
   const bases=apiBaseList();let lastErr=null;
-  for(const base of bases){
+  for(let i=0;i<bases.length;i++){
+    const base=bases[i];
     try{
       const o=Object.assign({},opts||{});
+      /* Основному адресу — полный срок ожидания, резервам короткий: смысл резерва
+         в том, чтобы быстро подхватить, а не заставлять ждать ещё 25 секунд. */
+      if(i>0&&!o.timeout)o.timeout=BACKUP_TIMEOUT_MS;
       const r=await apiFetch(base+path,o);
       if(r.ok){try{localStorage.setItem('om_active_api',base);}catch(e){};return r;}
       // Ошибки авторизации/валидации не лечатся резервным сервером — сразу отдаём ответ.
       if(![502,503,504,520,521,522,523,524].includes(r.status)){try{localStorage.setItem('om_active_api',base);}catch(e){};return r;}
       lastErr=new Error('http_'+r.status+' @ '+base);
-    }catch(e){lastErr=e;}
+      if(!mozhnoPovtorit)return r;      // повторять нельзя — отдаём как есть, пусть решает человек
+    }catch(e){
+      lastErr=e;
+      if(!mozhnoPovtorit)throw e;
+    }
   }
   throw lastErr||new Error('api_unreachable');
 }
@@ -2030,7 +2057,12 @@ function cloudCfg(){try{
   // одноразово: сбросить закреплённый Cloudflare-адрес, чтобы переехать на шлюз
   try{ if(localStorage.getItem('om_apimig')!=='yc1'){ const aa=localStorage.getItem('om_active_api'); if(aa&&/zemex\.pro|workers\.dev/.test(aa))localStorage.removeItem('om_active_api'); localStorage.setItem('om_apimig','yc1'); } }catch(e){}
   if(!Array.isArray(c.backupUrls)||!c.backupUrls.length)c.backupUrls=CLOUD_DEFAULT.backupUrls.slice();
-  c.backupUrls=[...new Set(c.backupUrls.concat(CLOUD_DEFAULT.backupUrls))].filter(Boolean);
+  /* Адреса, которых не существует. Их держали в списке резервов, и каждый сбой
+     приводил к лишней попытке достучаться в никуда. Вычищаем и из сохранённого
+     у пользователя списка — иначе он тянулся бы за ним вечно. */
+  const DEAD_API=/^https:\/\/backup-api\.(zorveld|zemex)\.pro$/i;
+  c.backupUrls=[...new Set(c.backupUrls.concat(CLOUD_DEFAULT.backupUrls))].filter(Boolean).filter(u=>!DEAD_API.test(u));
+  try{ const _aa=localStorage.getItem('om_active_api'); if(_aa&&DEAD_API.test(normalizeApiBase(_aa)))localStorage.removeItem('om_active_api'); }catch(e){}
   if(!c.provider&&c.workerUrl)c.provider='worker';
   return c;
 }catch(e){return Object.assign({},CLOUD_DEFAULT)}}
