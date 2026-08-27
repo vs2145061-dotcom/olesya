@@ -1905,7 +1905,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.4', BUILD_ID='2026-08-26-calls-1';
+const APP_VERSION='5.0.5', BUILD_ID='2026-08-27-races-1';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 try{const _vl=document.getElementById('appVerLine'); if(_vl)_vl.textContent='ZORVELD v'+APP_VERSION;}catch(e){}
@@ -2165,6 +2165,16 @@ async function cloudLoadHistory(peerId,lookbackMs){
     if(lookbackMs)since=Math.max(0,since-lookbackMs);   // подтянуть и недавние — чтобы заполнить медиа лёгких стабов
     const r=await jget(getApiUrl()+'/messages?chat_key='+encodeURIComponent(k)+'&since='+since);
     const rows=(r&&r.messages)||[];if(!rows.length)return;
+    /* Расшифровка — это ожидание. Делаем её ДО снимка базы: иначе между чтением
+       и записью успевает вклиниться входящее сообщение, и наш save() его затрёт. */
+    const _decs=new Map();
+    for(const row of rows){
+      if(row.type!=='e2e')continue;
+      const _pid=(row.from_id===me.id)?row.to_id:row.from_id;
+      let _enc=null;try{_enc=JSON.parse(row.text||'null');}catch(e){}
+      _decs.set(row.id,{partnerId:_pid,dec:_enc?await e2eDecryptFrom(_pid,_enc):null});
+    }
+    /* Дальше и до save(d) — ни одного ожидания. */
     const d=db();if(!d.chats[k])d.chats[k]={id:k,members:[me.id,peerId],messages:[]};
     const byId=new Map(d.chats[k].messages.map(x=>[x.id,x]));let added=false;
     const _newIn=[];   // что пришло от собеседника — подтвердим ему доставку
@@ -2179,10 +2189,9 @@ async function cloudLoadHistory(peerId,lookbackMs){
         continue;
       }
       if(row.type==='e2e'){
-        const partnerId=(row.from_id===me.id)?row.to_id:row.from_id;
-        let enc=null;try{enc=JSON.parse(row.text||'null');}catch(e){}
-        const dec=enc?await e2eDecryptFrom(partnerId,enc):null;
-        if(!isSecret(partnerId))setChatOpt(partnerId,{secret:1});
+        const _e=_decs.get(row.id)||{};
+        const partnerId=_e.partnerId,dec=_e.dec;
+        if(partnerId&&!isSecret(partnerId))setChatOpt(partnerId,{secret:1});
         d.chats[k].messages.push(Object.assign({id:row.id,from:row.from_id,to:row.to_id,t:row.t,readBy:[row.from_id],e2e:1},
           dec?{type:dec.mtype||'text',text:dec.text||'',src:dec.src,audio:dec.audio,dur:dec.dur,orig:dec.orig,origLang:dec.origLang}
              :{type:'text',text:'🔒 Зашифрованное сообщение (не удалось расшифровать)',undecrypted:1}));
@@ -3109,7 +3118,7 @@ $('#btnFinish').onclick=async()=>{
   // («Notification is not defined»). В обёртке уведомления и так идут через Expo.
   if(typeof Notification!=='undefined'&&Notification.permission==='default'){ const p=await permWait(requestNotifPermission(),6000); if(p)setNotifPref(p==='granted'); }
   await permWait(requestMediaPermsOnce(),6000);   // разовый запрос микрофона/камеры (дальше не спрашиваем)
-  const d=db();const id=uid();
+  const id=uid();
   // Пароль нужен только если блок виден (не Firebase-путь)
   const pwVisible=$('#setupPwBlock').style.display!=='none';
   if(cloudOn){
@@ -3151,12 +3160,12 @@ $('#btnFinish').onclick=async()=>{
     b.disabled=false;
     const _id=(_reg&&_reg.user&&_reg.user.id)||id;   // сервер вправе назначить свой id
     me={id:_id,name,phone:pendingPhone,avatar:chosenGlyph,color:chosenColor,cloud:true,online:true,lastSeen:Date.now()};
-    d.users[_id]=me;save(d);sessionStorage.setItem(SS,_id);
+    const dReg=db();dReg.users[_id]=me;save(dReg);sessionStorage.setItem(SS,_id);   // перечитать после регистрации на сервере
     if(sessionToken)cloudCfgUpdate({uid:_id});cloudOn=true;
     enterApp();logSec('✅ Аккаунт создан в облаке');return;
   }
   me={id,name,phone:pendingPhone,avatar:chosenGlyph,color:chosenColor,online:true,lastSeen:Date.now()};
-  d.users[id]=me;save(d);sessionStorage.setItem(SS,id);emit('directory',{});enterApp();
+  const d=db();d.users[id]=me;save(d);sessionStorage.setItem(SS,id);emit('directory',{});enterApp();
  }catch(e){
   // Молчаливый сбой недопустим: раньше любое исключение здесь просто «ничего не делало»,
   // и человек оставался на экране ввода имени без единой подсказки.
@@ -4320,10 +4329,14 @@ function groupUpdateBroadcast(gid,patch){
   g.members.filter(x=>x!==me.id).forEach(uidT=>emit('group:update',Object.assign({to:uidT,gid,by:me.id},patch)));
 }
 async function renameGroup(){
-  if(!(current&&current.group))return;const d=db();const g=d.chats[current.id];if(!g)return;
-  if(!isGroupAdmin(g)){toast('Переименовать может только администратор');return;}
-  let nm=await appPrompt('',g.name,{title:'Название группы',okText:'Сохранить',maxLength:60});
+  if(!(current&&current.group))return;
+  const g0=db().chats[current.id];if(!g0)return;
+  if(!isGroupAdmin(g0)){toast('Переименовать может только администратор');return;}
+  let nm=await appPrompt('',g0.name,{title:'Название группы',okText:'Сохранить',maxLength:60});
   if(nm===null)return;nm=nm.trim();if(!nm)return;
+  /* Снимок базы берём ПОСЛЕ диалога. Пока человек печатал название, могли прийти
+     сообщения и записаться; снимок «как было до диалога» стёр бы их. */
+  const d=db();const g=d.chats[current.id];if(!g)return;
   g.name=nm;save(d);groupUpdateBroadcast(g.id,{name:nm});
   current.name=nm;$('#convName').textContent=nm;
   renderGroupInfo(g);renderChats();toast('Группа переименована');
@@ -4340,11 +4353,12 @@ function setGroupAvatarFromFile(file){
   });
 }
 async function removeGroupMember(gid,uid){
-  const d=db();const g=d.chats[gid];if(!g)return;
-  if(!isGroupAdmin(g)){toast('Удалять участников может только администратор');return;}
-  if(uid===g.owner){toast('Нельзя удалить создателя группы');return;}
+  const g0=db().chats[gid];if(!g0)return;
+  if(!isGroupAdmin(g0)){toast('Удалять участников может только администратор');return;}
+  if(uid===g0.owner){toast('Нельзя удалить создателя группы');return;}
   const ok=await appConfirm('Удалить участника из группы?',{okText:'Удалить',danger:true});
   if(!ok)return;
+  const d=db();const g=d.chats[gid];if(!g)return;   // перечитать после диалога
   g.members=g.members.filter(x=>x!==uid);save(d);
   emit('group:update',{to:uid,gid,members:g.members,removed:uid,by:me.id});
   groupUpdateBroadcast(gid,{members:g.members.slice()});
@@ -4352,11 +4366,15 @@ async function removeGroupMember(gid,uid){
   renderGroupInfo(g);renderChats();toast('Участник удалён');
 }
 async function leaveGroup(){
-  if(!(current&&current.group))return;const d=db();const g=d.chats[current.id];if(!g)return;
-  const own=isGroupOwner(g);
-  const ok=await appConfirm(own?('Удалить группу «'+g.name+'» у себя?'):('Выйти из группы «'+g.name+'»?'),{okText:own?'Удалить':'Выйти',danger:true});
+  if(!(current&&current.group))return;
+  const g0=db().chats[current.id];if(!g0)return;
+  const own=isGroupOwner(g0);
+  const ok=await appConfirm(own?('Удалить группу «'+g0.name+'» у себя?'):('Выйти из группы «'+g0.name+'»?'),{okText:own?'Удалить':'Выйти',danger:true});
   if(!ok)return;
-  const gid=g.id;
+  const gid=g0.id;
+  /* Снимок ПОСЛЕ диалога: иначе удаление чата уносит с собой всё, что пришло,
+     пока висел вопрос «выйти из группы?». */
+  const d=db();const g=d.chats[gid];if(!g)return;
   g.members.filter(x=>x!==me.id).forEach(uidT=>emit('group:leave',{to:uidT,gid,from:me.id}));
   delete d.chats[gid];save(d);
   closeGroupInfo();current=null;go('scrChats');renderChats();toast(own?'Группа удалена у вас':'Вы вышли из группы');
@@ -7134,7 +7152,9 @@ function buildTwoFA(body){
   const hint=el('<input class="input sub-input" placeholder="Подсказка (необязательно)" />');
   const b=el('<button class="btn sub-btn">Включить пароль</button>');
   b.onclick=async()=>{if(p1.value.length<4){toast('Минимум 4 символа');return;}if(p1.value!==p2.value){toast('Пароли не совпадают');return;}
-    const d=db();d.users[me.id].twoFA={hash:await sha(p1.value),hint:hint.value.trim()||null};me=d.users[me.id];save(d);logSec('🔑 Включён облачный пароль (2FA)');refreshSettings();buildSubRefresh();toast('Пароль включён');};
+    const _hash=await sha(p1.value);                       // хешируем ДО снимка базы
+    const d=db();if(!d.users[me.id])d.users[me.id]=Object.assign({},me);
+    d.users[me.id].twoFA={hash:_hash,hint:hint.value.trim()||null};me=d.users[me.id];save(d);logSec('🔑 Включён облачный пароль (2FA)');refreshSettings();buildSubRefresh();toast('Пароль включён');};
   body.appendChild(p1);body.appendChild(p2);body.appendChild(hint);body.appendChild(b);}
 
 function buildSessions(body){
