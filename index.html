@@ -1905,7 +1905,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.3', BUILD_ID='2026-08-26-storage-1';
+const APP_VERSION='5.0.4', BUILD_ID='2026-08-26-calls-1';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 try{const _vl=document.getElementById('appVerLine'); if(_vl)_vl.textContent='ZORVELD v'+APP_VERSION;}catch(e){}
@@ -2442,9 +2442,9 @@ function handleBus(m){
     case 'presence': refreshIfPresence(); break;
     case 'call:invite': if(me&&m.payload.to===me.id)showIncomingCall(m.payload); break;
     case 'call:accept': if(me&&callPeerId===m.payload.from)onCallAccepted(); break;
-    case 'call:offer': if(me&&callPeerId===m.payload.from){ if(pc&&pc.signalingState!=='closed'){applyOfferAndAnswer(m.payload.sdp);} else {pendingOffer=m.payload.sdp;} } break;
+    case 'call:offer': _onCallOffer(m.payload); break;
     case 'call:answer': if(me&&callPeerId===m.payload.from&&pc){ Promise.resolve(pc.setRemoteDescription(m.payload.sdp)).then(()=>_drainRemoteIce()).catch(e=>console.error('setRemote',e)); } break;
-    case 'call:ice': if(me&&callPeerId===m.payload.from){ _addRemoteIce(m.payload.candidate); } break;
+    case 'call:ice': if(me){ if(callPeerId===m.payload.from){ _addRemoteIce(m.payload.candidate); } else { _preCallPut(m.payload.from,'ice',m.payload.candidate); } } break;
     case 'call:end': if(me&&callPeerId===m.payload.from)endCall(true); break;
     case 'call:reject': if(me&&callPeerId===m.payload.from){clearTimeout(callRingTO);stopCallInvite();const rr=m.payload.reason;$('#callStatus').textContent=rr==='busy'?'Занято':(rr==='blocked'?'Абонент недоступен':(rr==='screen'?'Вызов отклонён':'Вызов отклонён'));setTimeout(()=>endCall(true),1300);} break;
     case 'session:kill': if(me&&m.payload.uid===me.id&&m.payload.sid===TAB){forceLogout('⚠️ Сеанс завершён с другого устройства');} break;
@@ -5559,6 +5559,43 @@ $('#vdCancel').onclick=()=>{discardDraft();refreshVoiceDraft();toast('Черно
 let callPeerId=null,callKind='audio',callTimer=null,callStart=0,localStream=null,callIncoming=false,callRingTO=null,callInviteTimer=null,_autoAcceptFrom=null,_vidWatch=null,_camFacing='user';
 let pc=null, pendingOffer=null, callPollTimer=null;
 let _callIceBuf=[], _callHasRemote=false;   // trickle ICE: буфер удалённых кандидатов до setRemoteDescription
+/* callAnswered — «трубку сняли», callStart — «связь реально установилась». Раньше это была
+   одна переменная, из-за чего секундомер шёл ещё до соединения и человек говорил в пустоту. */
+let callAnswered=false, _connectTO=null, _lastInviteAt=0, _inviteWatch=null;
+/* Ранние call:offer и call:ice приходят ДО того, как получатель узнал, кто звонит
+   (приглашение могло задержаться). Раньше такие сигналы отбрасывались навсегда:
+   повторяется только call:invite, offer второй раз не присылают. Теперь копим по отправителю. */
+const _preCall={}, _declined={};
+function _preCallPut(from,kind,val){
+  if(!from)return; const now=Date.now();
+  for(const k in _preCall){ if(now-_preCall[k].t>60000)delete _preCall[k]; }   // мусор старше минуты не нужен
+  const e=_preCall[from]||(_preCall[from]={offer:null,ice:[],t:now});
+  e.t=now;
+  if(kind==='offer')e.offer=val; else if(e.ice.length<60)e.ice.push(val);
+}
+function _preCallTake(from){
+  const e=_preCall[from]; if(!e)return; delete _preCall[from];
+  if(e.offer&&!pendingOffer)pendingOffer=e.offer;
+  if(e.ice.length)_callIceBuf=_callIceBuf.concat(e.ice);
+}
+/* Обработка call:offer вынесена сюда: помимо обычного случая надо разобрать
+   встречный вызов — когда двое позвонили друг другу одновременно (E-5). */
+function _onCallOffer(p){
+  if(!me||!p||!p.from)return;
+  const from=p.from;
+  if(callPeerId!==from){ _preCallPut(from,'offer',p.sdp); return; }
+  if(!callIncoming && pc && pc.signalingState==='have-local-offer'){
+    // Оба позвонили навстречу. Уступает тот, у кого id больше — то же правило,
+    // что уже работает в групповом звонке (onGroupPeerJoin).
+    if(String(me.id)>String(from)){
+      closePeer(); callIncoming=true; pendingOffer=p.sdp;
+      emit('call:accept',{to:from,from:me.id});
+      onCallAccepted(); startCallPoll(); setupPeer(false,callKind);
+    }
+    return;   // иначе ждём, что он ответит на наш offer
+  }
+  if(pc&&pc.signalingState!=='closed'){ applyOfferAndAnswer(p.sdp); } else { pendingOffer=p.sdp; }
+}
 function _addRemoteIce(c){ if(!c)return; if(pc&&_callHasRemote){ try{pc.addIceCandidate(c);}catch(e){} } else { _callIceBuf.push(c); } }
 function _drainRemoteIce(){ _callHasRemote=true; if(!pc)return; const buf=_callIceBuf; _callIceBuf=[]; for(const c of buf){ try{pc.addIceCandidate(c);}catch(e){} } }
 function stopCallInvite(){ if(callInviteTimer){clearInterval(callInviteTimer);callInviteTimer=null;} }
@@ -5638,6 +5675,7 @@ async function setupPeer(isCaller,kind){
   try{
     await ensureTurn();                       // подтягиваем TURN-креды (Cloudflare) перед соединением
     _callIceBuf=[]; _callHasRemote=false;     // сброс trickle-состояния под новый звонок
+    if(callPeerId)_preCallTake(callPeerId);   // и только теперь — offer/ICE, пришедшие раньше времени
     pc=new RTCPeerConnection(rtcConfig());
     pc.onicecandidate=e=>{ if(e.candidate&&callPeerId)emit('call:ice',{to:callPeerId,from:me.id,candidate:_iceToPlain(e.candidate)}); };   // trickle ICE — кандидаты по мере сбора (в т.ч. TURN relay)
     if(localStream)localStream.getTracks().forEach(t=>{try{pc.addTrack(t,localStream);}catch(e){}});
@@ -5660,7 +5698,10 @@ async function setupPeer(isCaller,kind){
       const ra=$('#remoteAudio'); if(ra){ if(ra.srcObject!==st)ra.srcObject=st; ra.muted=false; ra.volume=1; const pr=ra.play(); if(pr&&pr.catch)pr.catch(()=>{ _pendingRemoteAudio=true; }); }
     };
     pc.onconnectionstatechange=()=>{ if(!pc)return; const st=pc.connectionState;
-      if(st==='failed'){ const cs=$('#callStatus'); if(cs)cs.textContent='Не удалось соединиться (сеть/NAT)'; setTimeout(()=>{try{endCall(true);}catch(e){}},1800); }
+      if(st==='connected'){ try{onCallConnected();}catch(e){} }
+      // endCall(false), а не (true): завершаем МЫ, и собеседник должен об этом узнать,
+      // иначе у него экран вызова висит, пока он сам не нажмёт отбой.
+      if(st==='failed'){ const cs=$('#callStatus'); if(cs)cs.textContent='Не удалось соединиться (сеть/NAT)'; setTimeout(()=>{try{endCall(false);}catch(e){}},1800); }
     };
     pc.oniceconnectionstatechange=()=>{ if(pc&&pc.iceConnectionState==='failed'){ try{pc.restartIce&&pc.restartIce();}catch(e){} } };
     try{clearInterval(_vidWatch);}catch(e){}
@@ -5697,18 +5738,21 @@ function startCall(kind){
   if(!micAllowed()){toast('🎤 Включите доступ к микрофону в Настройках, чтобы звонить');return;}
   if(kind==='video'&&!camAllowed()){kind='audio';toast('📷 Камера выключена — звоню только со звуком');}
   if(recState==='recording')pauseRecForCall();
-  if(!current)return;callKind=kind;callPeerId=current.id;callIncoming=false;callStart=0;
+  if(!current)return;callKind=kind;callPeerId=current.id;callIncoming=false;callStart=0;callAnswered=false;
   av($('#callAvatar'),current);$('#callName').textContent=current.name;$('#callStatus').textContent='Вызов…';
   go('callScreen');try{window.__omResetLocalVid&&window.__omResetLocalVid();}catch(e){}renderCallActions(false);
   closePeer();pendingOffer=null;
   emit('call:invite',{to:current.id,from:me.id,name:me.name,kind});   // сервер /bus сам шлёт пуш получателю (с антиспам-дедупом)
   clearTimeout(callRingTO);
-  if(current.bot){setTimeout(()=>{onCallAccepted();},1800);} // бот отвечает (симуляция, без реального WebRTC)
-  else{ startCallPoll(); setupPeer(true,kind); callRingTO=setTimeout(()=>{$('#callStatus').textContent='Не отвечает';setTimeout(()=>endCall(true),1200);},30000);
+  if(current.bot){setTimeout(()=>{onCallAccepted();onCallConnected();},1800);} // бот отвечает (симуляция, без реального WebRTC)
+  else{ startCallPoll(); setupPeer(true,kind);
+    // endCall(false): по таймауту трубку кладём МЫ — собеседника надо известить,
+    // иначе у него продолжает звонить телефон от того, кто уже ушёл.
+    callRingTO=setTimeout(()=>{$('#callStatus').textContent='Не отвечает';setTimeout(()=>endCall(false),1200);},30000);
     // Надёжная доставка приглашения: облачная шина best-effort, одна отправка может не дойти →
     // повторяем call:invite каждые 2с, пока не ответят (callStart>0) или звонок не завершится.
     stopCallInvite();
-    callInviteTimer=setInterval(()=>{ if(callPeerId&&callStart===0){ emit('call:invite',{to:callPeerId,from:me.id,name:me.name,kind}); } else { stopCallInvite(); } },2000);
+    callInviteTimer=setInterval(()=>{ if(callPeerId&&!callAnswered){ emit('call:invite',{to:callPeerId,from:me.id,name:me.name,kind}); } else { stopCallInvite(); } },2000);
   }
 }
 $('#btnAudioCall').onclick=()=>startCall('audio');
@@ -5717,14 +5761,30 @@ $('#favEntry').onclick=()=>{if(me)openConv(me.id);};
 
 function showIncomingCall(p){
   const sec=getSec();const from=p.from;const known=isContact(from);const now=Date.now();
-  if(callPeerId===from)return;   // уже звоним/в звонке с этим абонентом — повтор приглашения игнорируем (надёжная доставка шлёт его несколько раз; иначе антиспам примет за спам)
+  // Повтор приглашения — это ПУЛЬС: пока он идёт, звонящий на линии (см. сторож ниже).
+  if(callPeerId===from){ _lastInviteAt=now; return; }
+  // Только что отклонили этого абонента — не открываем экран заново, пока идут
+  // остаточные повторы приглашения (они летят ещё до 30 секунд).
+  if(_declined[from]>now){ emit('call:reject',{to:from,from:me.id,reason:'busy'}); return; }
   if(callPeerId&&callPeerId!==from){emit('call:reject',{to:from,from:me.id,reason:'busy'});return;}
   if(sec.blocked.includes(from)||(sec.tmp[from]&&sec.tmp[from]>now)){emit('call:reject',{to:from,from:me.id,reason:'blocked'});logSec('🚫 Отклонён звонок от заблокированного: '+(p.name||from));return;}
   const h=(sec.hist[from]||[]).filter(t=>now-t<60000);h.push(now);sec.hist[from]=h.slice(-10);
   if(h.length>4&&!known){sec.tmp[from]=now+600000;saveSec(sec);emit('call:reject',{to:from,from:me.id,reason:'blocked'});logSec('⛔ Анти-спам: авто-блокировка на 10 мин — частые звонки ('+(p.name||from)+')');toast('⛔ Анти-спам: спам-номер заблокирован');return;}   // контакты НЕ блокируем — только чужие номера (иначе при частых звонках блокируется свой же собеседник)
   saveSec(sec);
   if(sec.callsFrom==='contacts'&&!known){emit('call:reject',{to:from,from:me.id,reason:'screen'});logSec('📵 Отклонён звонок (только контакты): '+(p.name||from));toast('📵 Звонок не из контактов отклонён');return;}
-  callPeerId=from;callKind=p.kind;callIncoming=true;callStart=0;
+  callPeerId=from;callKind=p.kind;callIncoming=true;callStart=0;callAnswered=false;
+  _lastInviteAt=Date.now();
+  try{clearInterval(_inviteWatch);}catch(e){}
+  /* Сторож: звонящий повторяет приглашение каждые 2 секунды. Замолчал дольше 8 —
+     значит он уже положил трубку, а его call:end до нас не дошёл. Раньше экран
+     входящего висел до тех пор, пока человек сам не нажмёт отбой. */
+  _inviteWatch=setInterval(()=>{
+    if(!callIncoming||callAnswered||!callPeerId){ clearInterval(_inviteWatch); _inviteWatch=null; return; }
+    if(Date.now()-_lastInviteAt>8000){
+      clearInterval(_inviteWatch); _inviteWatch=null;
+      toast('Вызов отменён'); try{endCall(true);}catch(e){}
+    }
+  },2000);
   const u=userById(from)||{name:p.name||'Неизвестный номер',avatar:'🙂',color:'#FF6B6B'};
   av($('#callAvatar'),u);$('#callName').textContent=u.name;$('#callStatus').textContent=(p.kind==='video'?'Входящий видеозвонок':'Входящий звонок');
   $('#callSpamBadge').style.display=known?'none':'flex';
@@ -5734,13 +5794,29 @@ function showIncomingCall(p){
   if(appHidden())showNotif('📞 Входящий '+(p.kind==='video'?'видеозвонок':'звонок'),(u.name||p.name||'Неизвестный номер'),from);
   if(_autoAcceptFrom&&_autoAcceptFrom===from){ _autoAcceptFrom=null; setTimeout(()=>{try{acceptCall();}catch(e){}},150); }   // нативная оболочка нажала «Ответить» на полноэкранном звонке
 }
+/* «Трубку сняли» — это ещё не «соединились». Показываем «Соединение…» и ждём,
+   когда WebRTC реально свяжется; секундомер запускает onCallConnected(). */
 function onCallAccepted(){
   clearTimeout(callRingTO);stopCallInvite();
+  callAnswered=true;
   callIncoming=false;$('#callAvatar').classList.remove('incoming-ring');$('#callSpamBadge').style.display='none';
-  $('#callStatus').textContent='00:00';callStart=Date.now();
+  try{clearInterval(_inviteWatch);}catch(e){} _inviteWatch=null;
+  $('#callStatus').textContent='Соединение…';
+  renderCallActions(false,true);
+  clearTimeout(_connectTO);
+  _connectTO=setTimeout(()=>{                       // не соединились за 20 с — говорим честно
+    if(!callStart&&callPeerId){
+      $('#callStatus').textContent='Не удалось соединиться';
+      setTimeout(()=>{try{endCall(false);}catch(e){}},1500);
+    }
+  },20000);
+}
+function onCallConnected(){
+  if(callStart)return;
+  clearTimeout(_connectTO); _connectTO=null;
+  callStart=Date.now();
   if(callTimer)clearInterval(callTimer);
   callTimer=setInterval(()=>{$('#callStatus').textContent=fmtDur((Date.now()-callStart)/1000,true);},500);
-  renderCallActions(false,true);
 }
 function acceptCall(){
   $('#callAvatar').classList.remove('incoming-ring');
@@ -5762,6 +5838,11 @@ window.olesyaCallAction=function(action,from,kind,name){
 };
 function endCall(remote){
   stopCallInvite();
+  clearTimeout(_connectTO); _connectTO=null;
+  try{clearInterval(_inviteWatch);}catch(e){} _inviteWatch=null;
+  // Отклонили входящий сами — запоминаем на полминуты, чтобы остаточные повторы
+  // приглашения не открыли экран вызова заново.
+  if(!remote&&callIncoming&&!callAnswered&&callPeerId)_declined[callPeerId]=Date.now()+30000;
   // запись в историю звонков
   try{ if(me&&callPeerId){ const connected=callStart>0; const dur=connected?(Date.now()-callStart)/1000:0; const dir=callIncoming?(connected?'in':'missed'):'out'; logCall(callPeerId,callKind,dir,dur); } }catch(e){}
   if(callTimer){clearInterval(callTimer);callTimer=null;}
@@ -5773,7 +5854,7 @@ function endCall(remote){
   $('#callAvatar').classList.remove('incoming-ring');
   const fromHub=!!_callOrigin; const dest=_callOrigin||(current?'scrConv':'scrChats'); _callOrigin=null;
   if(fromHub)current=null;
-  callPeerId=null;callStart=0;clearTimeout(callRingTO);$('#callSpamBadge').style.display='none';
+  callPeerId=null;callStart=0;callAnswered=false;clearTimeout(callRingTO);$('#callSpamBadge').style.display='none';
   go(dest);
   if(dest==='scrChats')renderChats();
   else if(dest==='scrContacts')renderContacts();
