@@ -1905,7 +1905,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.6', BUILD_ID='2026-08-27-poll-1';
+const APP_VERSION='5.0.7', BUILD_ID='2026-08-27-timers-1';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 try{const _vl=document.getElementById('appVerLine'); if(_vl)_vl.textContent='ZORVELD v'+APP_VERSION;}catch(e){}
@@ -3255,7 +3255,30 @@ function sessionsMap(){const d=db();return (d.users[me.id]&&d.users[me.id].sessi
 function registerSession(){const d=db();if(!d.users[me.id])return;const s=d.users[me.id].sessions||{};const isNew=!s[TAB];
   s[TAB]={device:deviceName(),started:s[TAB]?s[TAB].started:Date.now(),last:Date.now()};d.users[me.id].sessions=s;me=d.users[me.id];save(d);
   if(isNew){logSec('🔓 Вход с устройства: '+deviceName());emit('security:login',{uid:me.id,device:deviceName(),sid:TAB});}}
-function heartbeatSession(){const d=db();if(d.users[me.id]&&d.users[me.id].sessions&&d.users[me.id].sessions[TAB]){d.users[me.id].sessions[TAB].last=Date.now();save(d);}}
+/* ОТМЕТКИ АКТИВНОСТИ.
+   Раньше два таймера по 15 секунд каждый раз читали и переписывали ВСЮ базу
+   целиком — ради одного числа. На телефоне, где в переписке накопились
+   вложения, это мегабайты JSON восемь раз в минуту, синхронно, в главном
+   потоке: приложение заметно подёргивалось на ровном месте.
+   Само число нужно с точностью до минут («был(а) 5 мин назад»), поэтому
+   пишем его не чаще раза в пять минут. При закрытии вкладки запись идёт
+   принудительно — там уже есть dropSession() и setOnline(false). */
+const PERSIST_EVERY=300000;
+let _hbAt=0, _lsAt=0;
+function heartbeatSession(force){
+  const now=Date.now();
+  if(!force&&now-_hbAt<PERSIST_EVERY)return;   // ничего не читаем и не пишем
+  _hbAt=now;
+  const d=db();const u=d.users[me.id];
+  if(u&&u.sessions&&u.sessions[TAB]){u.sessions[TAB].last=now;save(d);}
+}
+/* Своё «был(а) в сети» — то же самое: в базу не чаще раза в пять минут. */
+function touchLastSeen(force){
+  const now=Date.now();
+  if(!force&&now-_lsAt<PERSIST_EVERY)return;
+  _lsAt=now;
+  const d=db();if(d.users[me.id]){d.users[me.id].lastSeen=now;save(d);}
+}
 function dropSession(){const d=db();if(d.users[me.id]&&d.users[me.id].sessions){delete d.users[me.id].sessions[TAB];save(d);}}
 function killSession(sid){if(sid===TAB)return;emit('session:kill',{uid:me.id,sid});const d=db();if(d.users[me.id]&&d.users[me.id].sessions){delete d.users[me.id].sessions[sid];save(d);}logSec('🔒 Завершён сеанс другого устройства');toast('Сеанс завершён');refreshSettings();}
 let pollerStarted=false;
@@ -3264,7 +3287,7 @@ function startPollers(){if(pollerStarted)return;pollerStarted=true;
   setInterval(()=>{if(me)heartbeatSession();},15000);
   setInterval(()=>{if(me)try{sweepExpired();}catch(e){}},15000);}   // удаляем исчезающие сообщения по таймеру
 function setOnline(on){const d=db();if(d.users[me.id]){d.users[me.id].online=on;d.users[me.id].lastSeen=Date.now();me=d.users[me.id];save(d);}emit('presence',{});}
-window.addEventListener('beforeunload',()=>{if(me){setOnline(false);dropSession();}});
+window.addEventListener('beforeunload',()=>{if(me){try{heartbeatSession(true);touchLastSeen(true);}catch(e){}setOnline(false);dropSession();}});
 window.addEventListener('focus',()=>{if(me)setOnline(true);});
 
 function paintMe(){
@@ -7549,7 +7572,7 @@ function refreshPresenceDots(){
   });
 }
 function refreshIfPresence(){if($('#scrChats')&&!$('#scrChats').classList.contains('hidden'))refreshPresenceDots();if(current){const u=userById(current.id);if(u){current=u;updateConvStatus();const dot=$('#convAvatar .dot');if(dot)dot.classList.toggle('on',u.online);}}}
-setInterval(()=>{if(me){const d=db();if(d.users[me.id]){d.users[me.id].lastSeen=Date.now();save(d);}refreshIfPresence();}},15000);
+setInterval(()=>{if(me){touchLastSeen();refreshIfPresence();}},15000);
 
 /* ===== История экранов И ШТОРОК: аппаратная/жестовая «назад» закрывает верхний слой
    (диалог → шторка → подэкран), а не выходит из приложения.
