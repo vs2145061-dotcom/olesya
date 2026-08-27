@@ -1696,7 +1696,7 @@ function applyTheme(pref,_skipNative){
 }
 // «Авто»: перепроверяем системную тему при каждом возврате в приложение
 // (смена темы устройства, пока приложение свёрнуто, может не дать событие matchMedia)
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'){ if(getThemePref()==='auto'){try{applyTheme('auto');}catch(e){}} try{if(me&&typeof cloudPoll==='function')cloudPoll();}catch(e){} } });   // при возврате на экран сразу опрашиваем входящие (быстрее ловим звонок после тапа по уведомлению)
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'){ if(getThemePref()==='auto'){try{applyTheme('auto');}catch(e){}} try{if(me&&typeof pollSoon==='function')pollSoon(0);}catch(e){} } });   // при возврате на экран сразу опрашиваем входящие (быстрее ловим звонок после тапа по уведомлению)
 function setThemePref(pref){
   try{localStorage.setItem(THEME_KEY,pref);}catch(e){}
   applyTheme(pref);
@@ -1905,7 +1905,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.5', BUILD_ID='2026-08-27-races-1';
+const APP_VERSION='5.0.6', BUILD_ID='2026-08-27-poll-1';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 try{const _vl=document.getElementById('appVerLine'); if(_vl)_vl.textContent='ZORVELD v'+APP_VERSION;}catch(e){}
@@ -2061,8 +2061,8 @@ function apiHeaders(){return{'content-type':'application/json','x-session-token'
 async function jpost(url,body){
   const r=await apiFetchAny(url,{method:'POST',headers:{'Content-Type':'application/json','x-session-token':sessionToken||''},body:JSON.stringify(body),timeout:API_TIMEOUT_MS});
   if(!r.ok){let e='http_'+r.status;try{const d=await r.json();e=d.message||d.error||e;}catch(_){}throw new Error(e);}return r.json();}
-async function jget(url){
-  const r=await apiFetchAny(url,{headers:{'x-session-token':sessionToken||''},timeout:API_TIMEOUT_MS});
+async function jget(url,timeout){
+  const r=await apiFetchAny(url,{headers:{'x-session-token':sessionToken||''},timeout:timeout||API_TIMEOUT_MS});
   if(!r.ok)throw new Error('http_'+r.status);return r.json();}
 /* lookup/register/login + message+bus sync (worker & supabase) */
 async function cloudLookup(phone){
@@ -2139,17 +2139,67 @@ async function cloudBusSend(msg){
     const c=sbClient();if(c)await c.from('om_bus').insert({to_id:(msg.payload&&msg.payload.to)||'*',payload:JSON.stringify(msg),t:Date.now()});
   }catch(e){}
 }
+/* ОПРОС ШИНЫ — как приходят чужие сообщения.
+   Раньше опрос стоял на setInterval(1200) и не ждал, чем кончился предыдущий
+   запрос. На плохой сети это складывалось лавиной: если сервер не отвечает,
+   один запрос перебирает четыре адреса по 25 секунд каждый и живёт до ста
+   секунд, а таймер за это время запускает ещё восемь десятков таких же.
+   Телефон уходил в сотни висящих запросов и переставал отзываться.
+   Во время звонка к этому добавлялся ВТОРОЙ таймер на 800 мс — оба работали
+   одновременно.
+
+   Теперь цикл сам назначает следующий заход после того, как закончился
+   предыдущий: наложение невозможно по построению. При ошибках пауза растёт,
+   при пришедших событиях — сокращается, чтобы очередь разбиралась быстрее. */
+const POLL_BASE=1200;        // обычная пауза между опросами
+const POLL_HOT=800;          // во время звонка — чаще, сигналы WebRTC ждать нельзя
+const POLL_DRAIN=250;        // очередь не пуста — забираем остаток почти сразу
+const POLL_MAX=20000;        // потолок паузы при недоступном сервере
+const POLL_TIMEOUT_MS=8000;  // опрос, который идёт раз в секунду, не может ждать 25
+let _pollBusy=false, _pollFail=0, _pollTO=null, _pollHot=false;
+
+/* Один заход. Возвращает число разобранных событий, либо -1 при ошибке. */
 async function cloudPoll(){
-  if(!cloudOn||!me)return;
+  if(!cloudOn||!me)return 0;
+  if(_pollBusy)return 0;                       // страховка сверх самого цикла
+  _pollBusy=true;
   try{
+    let n=0;
     if(CFG.provider==='worker'){
-      const d=await jget(wapi('/poll?uid='+encodeURIComponent(me.id)+'&since='+busSeq));
-      (d.events||[]).forEach(ev=>{busSeq=Math.max(busSeq,ev.seq||busSeq);try{handleBus(ev.payload);}catch(_){}});
-      if(d.events&&d.events.length)saveBusSeq();
+      const d=await jget(wapi('/poll?uid='+encodeURIComponent(me.id)+'&since='+busSeq),POLL_TIMEOUT_MS);
+      const evs=d.events||[];n=evs.length;
+      evs.forEach(ev=>{busSeq=Math.max(busSeq,ev.seq||busSeq);try{handleBus(ev.payload);}catch(_){}});
+      if(n)saveBusSeq();
     }else{const c=sbClient();if(c){const {data}=await c.from('om_bus').select('*').or('to_id.eq.'+me.id+',to_id.eq.*').gt('seq',busSeq).order('seq').limit(100);
-      (data||[]).forEach(ev=>{busSeq=Math.max(busSeq,ev.seq||busSeq);try{handleBus(JSON.parse(ev.payload));}catch(_){}});
-      if(data&&data.length)saveBusSeq();}}
-  }catch(e){}
+      const evs=data||[];n=evs.length;
+      evs.forEach(ev=>{busSeq=Math.max(busSeq,ev.seq||busSeq);try{handleBus(JSON.parse(ev.payload));}catch(_){}});
+      if(n)saveBusSeq();}}
+    _pollFail=0;
+    return n;
+  }catch(e){ _pollFail=Math.min(_pollFail+1,8); return -1; }
+  finally{ _pollBusy=false; }
+}
+
+/* Через сколько идти в следующий раз. Разброс в паузе нужен, чтобы после
+   общего сбоя все устройства не пошли на сервер одной волной. */
+function pollDelay(got){
+  if(_pollFail>0){
+    const d=Math.min(POLL_MAX,POLL_BASE*Math.pow(1.8,_pollFail));
+    return Math.round(d*(0.85+Math.random()*0.3));
+  }
+  if(got>0)return POLL_DRAIN;
+  return _pollHot?POLL_HOT:POLL_BASE;
+}
+function pollSoon(ms){ if(_pollTO)clearTimeout(_pollTO); _pollTO=setTimeout(pollTick,Math.max(0,ms)); }
+async function pollTick(){
+  _pollTO=null;
+  if(!me){ pollSoon(POLL_BASE); return; }
+  /* Свёрнуто — не опрашиваем (экономия батареи и трафика), но цикл не гасим:
+     иначе после возвращения из фона он бы уже не завёлся. Во время звонка
+     опрашиваем и в фоне — иначе разговор оборвётся. */
+  if(document.hidden&&!_pollHot){ pollSoon(POLL_BASE); return; }
+  const got=await cloudPoll();
+  pollSoon(pollDelay(got));
 }
 function cacheUser(u){if(!u||!u.id)return;const d=db();d.users[u.id]={id:u.id,name:u.name||'Пользователь',phone:u.phone||'',avatar:u.avatar||'🙂',color:u.color||'#6C7BFF',cloud:true,online:true,lastSeen:Date.now()};save(d);}
 /* Подтянуть историю переписки из облака (синхронизация между устройствами).
@@ -3210,7 +3260,7 @@ function dropSession(){const d=db();if(d.users[me.id]&&d.users[me.id].sessions){
 function killSession(sid){if(sid===TAB)return;emit('session:kill',{uid:me.id,sid});const d=db();if(d.users[me.id]&&d.users[me.id].sessions){delete d.users[me.id].sessions[sid];save(d);}logSec('🔒 Завершён сеанс другого устройства');toast('Сеанс завершён');refreshSettings();}
 let pollerStarted=false;
 function startPollers(){if(pollerStarted)return;pollerStarted=true;
-  setInterval(()=>{if(me&&!document.hidden)cloudPoll();},1200);   // быстрее доставка; не опрашиваем, когда свёрнуто (экономия)
+  pollSoon(0);   // цикл сам назначает следующий заход — наложения запросов быть не может
   setInterval(()=>{if(me)heartbeatSession();},15000);
   setInterval(()=>{if(me)try{sweepExpired();}catch(e){}},15000);}   // удаляем исчезающие сообщения по таймеру
 function setOnline(on){const d=db();if(d.users[me.id]){d.users[me.id].online=on;d.users[me.id].lastSeen=Date.now();me=d.users[me.id];save(d);}emit('presence',{});}
@@ -5664,11 +5714,11 @@ async function ensureTurn(force){
 function rtcConfig(){ return {iceServers:_iceServers, iceCandidatePoolSize:6}; }
 try{ ensureTurn(); }catch(e){}   // прогрев на старте
 function hasRTC(){return typeof RTCPeerConnection!=='undefined';}
-function startCallPoll(){ // ускоряем доставку сигналов WebRTC во время звонка
-  if(callPollTimer)return;
-  if(CFG.provider==='worker'||CFG.provider==='supabase'){callPollTimer=setInterval(()=>{if(me)cloudPoll();},800);}
-}
-function stopCallPoll(){if(callPollTimer){clearInterval(callPollTimer);callPollTimer=null;}}
+/* Во время звонка сигналы WebRTC ждать нельзя. Раньше здесь заводился ВТОРОЙ
+   таймер, и два опроса шли одновременно. Теперь просто переключаем шаг общего
+   цикла на более частый — запрос по-прежнему ровно один за раз. */
+function startCallPoll(){ _pollHot=true; pollSoon(0); }
+function stopCallPoll(){ _pollHot=false; }
 function iceComplete(p,ms){
   return new Promise(res=>{
     if(!p||p.iceGatheringState==='complete')return res();
