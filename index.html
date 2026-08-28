@@ -1913,7 +1913,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.13', BUILD_ID='2026-08-28-backlock-1';
+const APP_VERSION='5.0.14', BUILD_ID='2026-08-28-biolock-1';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 try{const _vl=document.getElementById('appVerLine'); if(_vl)_vl.textContent='ZORVELD v'+APP_VERSION;}catch(e){}
@@ -7629,6 +7629,17 @@ function refreshLockToggle(){const c=lockCfg();$('#lockToggle').classList.toggle
 let pinBuffer='',pinMode='check',pinFirst='',pinFails=0,pinLockUntil=0,pinLockInt=null,hidAt=0,_preLockScreen='';
 // Куда вернуться после разблокировки (экран, на котором были до блокировки). Возврат вместо Главной.
 function _unlockReturn(){
+  /* Разблокировались, пока поверх замка шёл звонок — возвращаемся НА ЗВОНОК.
+     Человек вошёл по-настоящему, поэтому «поверх замка» снимаем: после
+     разговора запирать заново не нужно, замка под звонком больше нет. */
+  if(_callOverLock&&typeof callPeerId!=='undefined'&&callPeerId){
+    _callOverLock=false;
+    const _cs=document.getElementById('callScreen');
+    if(_cs)_cs.classList.remove('over-lock');
+    _preLockScreen='';
+    try{go('callScreen');}catch(e){}
+    return;
+  }
   let dst=_preLockScreen||'scrHome';
   if(dst==='scrConv' && !current) dst='scrHome';   // переписка потеряна — безопасно на Главную
   if(dst!=='scrConv') current=null;
