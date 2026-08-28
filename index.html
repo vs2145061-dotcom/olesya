@@ -637,6 +637,8 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 #gcallActions{padding:18px 24px 40px;flex:none}
 .call-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:60px 24px 44px;position:relative}
 #remoteVideo,#localVideo{position:absolute;object-fit:cover;background:#000}
+/* В голосовом звонке видео не нужно: пустые окошки давали чёрный прямоугольник. */
+#callScreen:not(.video) #remoteVideo,#callScreen:not(.video) #localVideo{display:none}
 #remoteVideo{inset:0;width:100%;height:100%}
 #localVideo{width:108px;height:150px;right:18px;top:54px;border-radius:16px;border:2px solid rgba(255,255,255,.25);z-index:3;transform:scaleX(-1);touch-action:none;cursor:grab}
 #localVideo.dragging{cursor:grabbing;box-shadow:0 10px 28px -8px rgba(0,0,0,.6)}
@@ -1905,7 +1907,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.10', BUILD_ID='2026-08-28-ice-1';
+const APP_VERSION='5.0.11', BUILD_ID='2026-08-28-callui-1';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 try{const _vl=document.getElementById('appVerLine'); if(_vl)_vl.textContent='ZORVELD v'+APP_VERSION;}catch(e){}
@@ -5988,6 +5990,8 @@ function showIncomingCall(p){
    когда WebRTC реально свяжется; секундомер запускает onCallConnected(). */
 function onCallAccepted(){
   _ringStop();
+  try{ if(window.__OLESYA_NATIVE__&&window.ReactNativeWebView)
+        window.ReactNativeWebView.postMessage(JSON.stringify({type:'call-answered'})); }catch(e){}
   clearTimeout(callRingTO);stopCallInvite();
   callAnswered=true;
   callIncoming=false;$('#callAvatar').classList.remove('incoming-ring');$('#callSpamBadge').style.display='none';
@@ -6029,6 +6033,8 @@ window.olesyaCallAction=function(action,from,kind,name){
 };
 function endCall(remote){
   _ringStop();
+  try{ if(window.__OLESYA_NATIVE__&&window.ReactNativeWebView)
+        window.ReactNativeWebView.postMessage(JSON.stringify({type:'call-ended'})); }catch(e){}
   stopCallInvite();
   clearTimeout(_connectTO); _connectTO=null;
   try{clearInterval(_inviteWatch);}catch(e){} _inviteWatch=null;
@@ -6102,8 +6108,15 @@ function renderCallActions(incoming,active,opt){
     const mb=btn('',ICON.mic,()=>{muted=!muted;mb.classList.toggle('active',muted);if(localStream)localStream.getAudioTracks().forEach(t=>t.enabled=!muted);toast(muted?'Микрофон выключен':'Микрофон включён');});
     a.appendChild(mb);
     // Громкая связь: на мобильных медиа-звук идёт в динамик; кнопка управляет громкостью/выводом
-    const applySpk=()=>{const ra=$('#remoteAudio');if(ra){ra.muted=false;ra.volume=_spkOn?1:0.4;if(_spkOn&&ra.setSinkId){try{ra.setSinkId('');}catch(e){}}}};
-    const sb=btn('',_spkOn?ICON.spk:ICON.spkoff,()=>{_spkOn=!_spkOn;sb.innerHTML=_spkOn?ICON.spk:ICON.spkoff;sb.classList.toggle('active',!_spkOn);applySpk();toast(_spkOn?'🔊 Громкая связь включена':'🔉 Тихий режим');});
+    /* Слушается ли движок, когда громкость меняют из кода. На iOS — нет. */
+    const _volWorks=(()=>{ const ra=$('#remoteAudio'); if(!ra)return false;
+      try{ const was=ra.volume; ra.volume=0.5; const ok=Math.abs(ra.volume-0.5)<0.01; ra.volume=was; return ok; }catch(e){ return false; } })();
+    const applySpk=()=>{const ra=$('#remoteAudio');if(!ra)return;
+      if(_volWorks){ ra.muted=false; ra.volume=_spkOn?1:0.35; }
+      else { ra.muted=!_spkOn; ra.volume=1; }
+      if(_spkOn&&ra.setSinkId){try{ra.setSinkId('');}catch(e){}}};
+    const sb=btn('',_spkOn?ICON.spk:ICON.spkoff,()=>{_spkOn=!_spkOn;sb.innerHTML=_spkOn?ICON.spk:ICON.spkoff;sb.classList.toggle('active',!_spkOn);applySpk();
+      toast(_volWorks?(_spkOn?'🔊 Громко':'🔉 Тише'):(_spkOn?'🔊 Звук включён':'🔇 Звук выключен'));});
     a.appendChild(sb);applySpk();
     a.appendChild(btn('end',ICON.end,()=>endCall(false)));
     if(callKind==='video'){
@@ -7912,7 +7925,7 @@ let _tapDn=null;
 document.addEventListener('pointerdown',function(e){
   const snd=tapSoundOn(), vib=tapVibeOn();
   if(!snd&&!vib){_tapDn=null;return;}
-  if(snd)_tapUnlock();   // разморозка+прогрев на ЛЮБОМ касании — к первому клику по кнопке звук уже готов
+  _tapUnlock();   // разморозка на ЛЮБОМ касании и независимо от настроек: без неё звонок молчит
   const el=_tapTarget(e.target);
   if(!el){_tapDn=null;return;}
   if(vib)doVibe(95);   // сильнее: 95мс → нативка Heavy-импакт + длинный вибро-пульс (масштаб по ms в текущем APK)
@@ -7928,7 +7941,7 @@ document.addEventListener('pointerup',function(e){
   tapClick();
 },{passive:true});
 document.addEventListener('pointercancel',function(){_tapDn=null;},{passive:true});
-document.addEventListener('touchend',function(){ if(tapSoundOn())_tapUnlock(); },{passive:true});  // фолбэк: часть WebView засчитывает «жест» только на touchend
+document.addEventListener('touchend',function(){ _tapUnlock(); },{passive:true});  // фолбэк: часть WebView засчитывает «жест» только на touchend
 /* Своя модалка подтверждения (в стиле приложения) вместо браузерного confirm(). Возвращает Promise<bool>. */
 function appConfirm(message,opts){
   opts=opts||{};
