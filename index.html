@@ -1913,7 +1913,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.15', BUILD_ID='2026-08-28-biz1-1';
+const APP_VERSION='5.0.16', BUILD_ID='2026-08-28-texts-1';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 try{const _vl=document.getElementById('appVerLine'); if(_vl)_vl.textContent='ZORVELD v'+APP_VERSION;}catch(e){}
@@ -1960,13 +1960,13 @@ function isNetErr(e){
   const n=(e&&e.name)||'', m=String((e&&e.message)||e||'').toLowerCase();
   return n==='AbortError'||n==='TimeoutError'||/network|failed to fetch|load failed|timeout|aborted|fetch/.test(m);
 }
-function netHelpText(){return 'Сервер авторизации недоступен из текущей сети. Основной API должен работать через api.zorveld.pro; если он недоступен, приложение автоматически попробует backup-api.zorveld.pro и резерв workers.dev. Проверьте раздел Настройки → Диагностика сети.';}
+function netHelpText(){return 'Сервер авторизации недоступен из текущей сети. Основной адрес — шлюз Yandex Cloud; если он не отвечает, приложение само пробует api.zorveld.pro, затем запасной адрес на workers.dev. Проверьте раздел Настройки → Диагностика сети.';}
 function showNetAuthHelp(shortText){
   const msg=shortText||netHelpText();
   try{localStorage.setItem('om_last_net_error',JSON.stringify({ts:Date.now(),api:getApiUrl(),ua:navigator.userAgent,msg}));}catch(_){ }
   toast(msg);
   const oh=$('#otpHint'); if(oh) oh.textContent=msg;
-  const ph=$('#phoneHelper'); if(ph){ph.style.display='block'; ph.textContent='Диагностика: откройте /network-diagnostic.html или Настройки → Диагностика сети. Основной API: api.zorveld.pro, резерв: backup-api.zorveld.pro.';}
+  const ph=$('#phoneHelper'); if(ph){ph.style.display='block'; ph.textContent='Диагностика: Настройки → Диагностика сети. Основной адрес — шлюз Yandex Cloud, запасные — api.zorveld.pro и workers.dev.';}
 }
 /* Ограничитель времени для запросов, которые идут мимо apiFetch (там таймаут уже есть).
    Без него зависшая сеть = вечное ожидание без единой подсказки на экране. */
@@ -7090,7 +7090,7 @@ function forceLogout(msg){try{dropSession();}catch(e){}try{setOnline(false);}cat
   try{_ccUserSet=false;autodetectCC();}catch(e){}}
 
 function buildServer(body){const cfg=cloudCfg();
-  body.appendChild(el('<div class="note">Основной адрес API для продукта: <b>https://api.zorveld.pro</b>. Резерв: <b>https://backup-api.zorveld.pro</b>. Старый workers.dev оставлен только как аварийный fallback, чтобы вход не ломался у пользователей при проблемах DNS/оператора.</div>'));
+  body.appendChild(el('<div class="note">Основной адрес — шлюз Yandex Cloud: российские операторы часто режут Cloudflare, и прямой заход туда срывает вход. Запасные, по порядку: <b>api.zorveld.pro</b>, затем <b>olesya-api.vs2145061.workers.dev</b>.</div>'));
   const wrap=el('<div></div>');
   function render(){wrap.innerHTML='';
     wrap.appendChild(optRow('📴 Локальный режим (только это устройство)',cfg.provider!=='worker'&&cfg.provider!=='supabase',()=>{cfg.provider='';render();}));
