@@ -1913,7 +1913,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.12', BUILD_ID='2026-08-28-lockcall-1';
+const APP_VERSION='5.0.13', BUILD_ID='2026-08-28-backlock-1';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 try{const _vl=document.getElementById('appVerLine'); if(_vl)_vl.textContent='ZORVELD v'+APP_VERSION;}catch(e){}
@@ -7798,6 +7798,8 @@ window.addEventListener('popstate',()=>{
     }finally{ _omMicro(function(){ _omPopping=false; }); }   // сброс ПОСЛЕ реакции наблюдателя
     return;
   }
+  /* Звонок лежит поверх замка — «назад» не уводит в приложение, как и с самого замка. */
+  if(_callOverLock)return;
   // 2) подэкран (не корневой)
   const scr=[...document.querySelectorAll('.screen')].find(s=>!s.classList.contains('hidden'));
   if(!scr||OM_ROOT_SCREENS.includes(scr.id))return; // корень — пусть система выходит из приложения
