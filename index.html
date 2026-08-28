@@ -1905,7 +1905,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.9', BUILD_ID='2026-08-27-ring-1';
+const APP_VERSION='5.0.10', BUILD_ID='2026-08-28-ice-1';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 try{const _vl=document.getElementById('appVerLine'); if(_vl)_vl.textContent='ZORVELD v'+APP_VERSION;}catch(e){}
@@ -5719,8 +5719,14 @@ function _onCallOffer(p){
   }
   if(pc&&pc.signalingState!=='closed'){ applyOfferAndAnswer(p.sdp); } else { pendingOffer=p.sdp; }
 }
-function _addRemoteIce(c){ if(!c)return; if(pc&&_callHasRemote){ try{pc.addIceCandidate(c);}catch(e){} } else { _callIceBuf.push(c); } }
-function _drainRemoteIce(){ _callHasRemote=true; if(!pc)return; const buf=_callIceBuf; _callIceBuf=[]; for(const c of buf){ try{pc.addIceCandidate(c);}catch(e){} } }
+let _iceAdded=0, _iceRejected=0;
+function _iceAdd(c){
+  if(!pc||!c)return;
+  try{ const r=pc.addIceCandidate(c); if(r&&r.then)r.then(()=>{_iceAdded++;},()=>{_iceRejected++;}); else _iceAdded++; }
+  catch(e){ _iceRejected++; }
+}
+function _addRemoteIce(c){ if(!c)return; if(pc&&_callHasRemote){ _iceAdd(c); } else { _callIceBuf.push(c); } }
+function _drainRemoteIce(){ _callHasRemote=true; if(!pc)return; const buf=_callIceBuf; _callIceBuf=[]; for(const c of buf){ _iceAdd(c); } }
 function stopCallInvite(){ if(callInviteTimer){clearInterval(callInviteTimer);callInviteTimer=null;} }
 // RTCIceCandidate нельзя структурно клонировать (BroadcastChannel/localStorage) → шлём простой объект
 function _iceToPlain(c){ if(!c)return c; try{ if(typeof c.toJSON==='function')return c.toJSON(); }catch(e){} return {candidate:c.candidate,sdpMid:c.sdpMid,sdpMLineIndex:c.sdpMLineIndex,usernameFragment:c.usernameFragment}; }
@@ -5753,18 +5759,23 @@ const RTC_CFG={iceServers:[
 ],iceCandidatePoolSize:6};
 let _iceServers=RTC_CFG.iceServers.slice();   // текущий набор (STUN + подтянутый TURN)
 let _iceAt=0;
+let _turnOk=false;
 async function ensureTurn(force){
-  try{
-    if(!force && _iceServers.length>RTC_CFG.iceServers.length && (Date.now()-_iceAt)<3000000) return; // кэш свеж (<50 мин)
-    const url=(typeof getApiUrl==='function')&&getApiUrl();
-    if(!url)return;
-    const r=await apiFetch(url+'/turn',{timeout:6000});
-    const d=await r.json();
-    let extra=[];
-    if(d&&d.iceServers) extra=Array.isArray(d.iceServers)?d.iceServers:[d.iceServers];
-    extra=extra.filter(s=>s&&s.urls);
-    if(extra.length){ _iceServers=RTC_CFG.iceServers.concat(extra); _iceAt=Date.now(); }
-  }catch(e){}
+  if(!force && _iceServers.length>RTC_CFG.iceServers.length && (Date.now()-_iceAt)<3000000){ _turnOk=true; return; }   // кэш свеж (<50 мин)
+  const url=(typeof getApiUrl==='function')&&getApiUrl();
+  if(!url)return;
+  /* Две попытки: одна неудачная сетевая попытка не должна стоить всего звонка. */
+  for(let i=0;i<2;i++){
+    try{
+      const r=await apiFetch(url+'/turn',{timeout:10000});
+      const d=await r.json();
+      let extra=[];
+      if(d&&d.iceServers) extra=Array.isArray(d.iceServers)?d.iceServers:[d.iceServers];
+      extra=extra.filter(s=>s&&s.urls);
+      if(extra.length){ _iceServers=RTC_CFG.iceServers.concat(extra); _iceAt=Date.now(); _turnOk=true; return; }
+    }catch(e){}
+  }
+  _turnOk=false;
 }
 function rtcConfig(){ return {iceServers:_iceServers, iceCandidatePoolSize:6}; }
 try{ ensureTurn(); }catch(e){}   // прогрев на старте
@@ -5796,8 +5807,12 @@ async function setupPeer(isCaller,kind){
   }catch(e){ toast(kind==='video'?'Камера/микрофон недоступны':'Микрофон недоступен'); }
   if(!hasRTC())return; // нет WebRTC (например, jsdom) — выходим, локальное превью уже показано
   try{
-    await ensureTurn();                       // подтягиваем TURN-креды (Cloudflare) перед соединением
-    _callIceBuf=[]; _callHasRemote=false;     // сброс trickle-состояния под новый звонок
+    await ensureTurn();                       // подтягиваем креды ретранслятора перед соединением
+    if(!_turnOk){ const cs=$('#callStatus'); if(cs&&!callStart)cs.textContent='Нет доступа к серверу связи…'; }
+    /* Буфер здесь НЕ трогаем: пока мы ждали микрофон и ретранслятор, в него уже
+       легли адреса собеседника. Сброс делается в начале звонка — см. startCall()
+       и showIncomingCall(). */
+    _callHasRemote=false;                     // сброс только признака «удалённое описание применено»
     if(callPeerId)_preCallTake(callPeerId);   // и только теперь — offer/ICE, пришедшие раньше времени
     pc=new RTCPeerConnection(rtcConfig());
     pc.onicecandidate=e=>{ if(e.candidate&&callPeerId)emit('call:ice',{to:callPeerId,from:me.id,candidate:_iceToPlain(e.candidate)}); };   // trickle ICE — кандидаты по мере сбора (в т.ч. TURN relay)
@@ -5911,6 +5926,7 @@ function startCall(kind){
   if(kind==='video'&&!camAllowed()){kind='audio';toast('📷 Камера выключена — звоню только со звуком');}
   if(recState==='recording')pauseRecForCall();
   if(!current)return;callKind=kind;callPeerId=current.id;callIncoming=false;callStart=0;callAnswered=false;
+  _callIceBuf=[];_callHasRemote=false;   // чистое состояние обмена адресами — В НАЧАЛЕ звонка
   av($('#callAvatar'),current);$('#callName').textContent=current.name;$('#callStatus').textContent='Вызов…';
   go('callScreen');try{window.__omResetLocalVid&&window.__omResetLocalVid();}catch(e){}renderCallActions(false);
   closePeer();pendingOffer=null;
@@ -5945,6 +5961,7 @@ function showIncomingCall(p){
   saveSec(sec);
   if(sec.callsFrom==='contacts'&&!known){emit('call:reject',{to:from,from:me.id,reason:'screen'});logSec('📵 Отклонён звонок (только контакты): '+(p.name||from));toast('📵 Звонок не из контактов отклонён');return;}
   callPeerId=from;callKind=p.kind;callIncoming=true;callStart=0;callAnswered=false;
+  _callIceBuf=[];_callHasRemote=false;   // чистое состояние обмена адресами — В НАЧАЛЕ звонка
   _lastInviteAt=Date.now();
   try{clearInterval(_inviteWatch);}catch(e){}
   /* Сторож: звонящий повторяет приглашение каждые 2 секунды. Замолчал дольше 8 —
