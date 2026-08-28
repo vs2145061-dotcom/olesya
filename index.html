@@ -645,6 +645,12 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 .call-info{text-align:center;z-index:3;display:flex;flex-direction:column;align-items:center;gap:14px}
 .call-info .nm{font-family:var(--disp);font-size:27px;font-weight:600}
 .call-info .stat{color:var(--muted);font-size:15px;font-family:var(--mono);display:flex;align-items:center;gap:7px}
+/* Экран звонка тёмный при любой теме — цвет задаём явно, иначе в светлой теме
+   имя и таймер наследуют тёмный цвет и сливаются с фоном. */
+#callScreen .call-info .nm{color:#FFFFFF;font-size:29px;letter-spacing:.2px;text-shadow:0 1px 14px rgba(0,0,0,.55)}
+#callScreen .call-info .stat{color:rgba(255,255,255,.88);text-shadow:0 1px 10px rgba(0,0,0,.5)}
+/* Экран звонка ложится ПОВЕРХ замка: у замка z-index 80. */
+#callScreen.over-lock{z-index:90}
 .call-secure{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--amber);background:rgba(0,0,0,.3);padding:5px 12px;border-radius:20px;z-index:3}
 .call-actions{display:flex;gap:18px;z-index:3}
 /* Видеозвонок: аватар прячем совсем (видно собеседника), имя+время — в левый верхний угол */
@@ -1907,7 +1913,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.11', BUILD_ID='2026-08-28-callui-1';
+const APP_VERSION='5.0.12', BUILD_ID='2026-08-28-lockcall-1';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 try{const _vl=document.getElementById('appVerLine'); if(_vl)_vl.textContent='ZORVELD v'+APP_VERSION;}catch(e){}
@@ -5949,6 +5955,26 @@ $('#btnAudioCall').onclick=()=>startCall('audio');
 $('#btnVideoCall').onclick=()=>startCall('video');
 $('#favEntry').onclick=()=>{if(me)openConv(me.id);};
 
+/* ЗВОНОК ПОВЕРХ ЗАМКА.
+   Раньше при включённом PIN входящий выглядел так: уведомление → приложение →
+   экран ввода PIN → код → и только потом звонок. Пока человек вводил код,
+   звонящий слушал тишину, а половина вызовов успевала оборваться.
+   Обычный телефон так себя не ведёт: ответить можно, не разблокировав аппарат,
+   а всё остальное остаётся закрытым. Делаем так же — экран звонка ложится
+   ПОВЕРХ замка, сам замок под ним никуда не девается. Кончился разговор —
+   человек снова упирается в ввод PIN, ничего не открыв по дороге. */
+let _callOverLock=false;
+function _callShowOverLock(){
+  const cs=document.getElementById('callScreen'); if(!cs)return false;
+  _callOverLock=true;
+  cs.classList.remove('hidden'); cs.classList.add('over-lock');
+  return true;
+}
+function _callHideOverLock(){
+  const cs=document.getElementById('callScreen');
+  if(cs){ cs.classList.remove('over-lock'); cs.classList.add('hidden'); }
+  _callOverLock=false;
+}
 function showIncomingCall(p){
   const sec=getSec();const from=p.from;const known=isContact(from);const now=Date.now();
   // Повтор приглашения — это ПУЛЬС: пока он идёт, звонящий на линии (см. сторож ниже).
@@ -5980,7 +6006,9 @@ function showIncomingCall(p){
   av($('#callAvatar'),u);$('#callName').textContent=u.name;$('#callStatus').textContent=(p.kind==='video'?'Входящий видеозвонок':'Входящий звонок');
   $('#callSpamBadge').style.display=known?'none':'flex';
   if(recState==='recording'){const _k=recKind;pauseRecForCall();toast(_k==='video'?'🎥 Видео-кружок на паузе — продолжите после звонка':'🎙️ Запись голосового на паузе — продолжите после звонка');}
-  go('callScreen');try{window.__omResetLocalVid&&window.__omResetLocalVid();}catch(e){}renderCallActions(true,false,{unknown:!known,from:from});
+  /* Заперто на PIN — не прячем звонок за вводом кода, кладём поверх. */
+  if(currentScreenId()==='lockScreen'&&_callShowOverLock()){} else go('callScreen');
+  try{window.__omResetLocalVid&&window.__omResetLocalVid();}catch(e){}renderCallActions(true,false,{unknown:!known,from:from});
   $('#callAvatar').classList.add('incoming-ring');
   _ringStart('in');
   if(appHidden())showNotif('📞 Входящий '+(p.kind==='video'?'видеозвонок':'звонок'),(u.name||p.name||'Неизвестный номер'),from);
@@ -6053,6 +6081,8 @@ function endCall(remote){
   const fromHub=!!_callOrigin; const dest=_callOrigin||(current?'scrConv':'scrChats'); _callOrigin=null;
   if(fromHub)current=null;
   callPeerId=null;callStart=0;callAnswered=false;clearTimeout(callRingTO);$('#callSpamBadge').style.display='none';
+  /* Разговор шёл поверх замка — возвращаем замок, а не пускаем в переписку. */
+  if(_callOverLock){ _callHideOverLock(); if(remote)toast('Звонок завершён'); try{maybeLock();}catch(e){} return; }
   go(dest);
   if(dest==='scrChats')renderChats();
   else if(dest==='scrContacts')renderContacts();
