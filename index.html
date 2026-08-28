@@ -1913,7 +1913,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.14', BUILD_ID='2026-08-28-biolock-1';
+const APP_VERSION='5.0.15', BUILD_ID='2026-08-28-biz1-1';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 try{const _vl=document.getElementById('appVerLine'); if(_vl)_vl.textContent='ZORVELD v'+APP_VERSION;}catch(e){}
@@ -7235,8 +7235,25 @@ async function buildBusiness(body){
     card.innerHTML='<div class="sec-head">Карточка бизнеса</div><input class="input sub-input" id="bcCompany" placeholder="Компания / проект"/><input class="input sub-input" id="bcRole" placeholder="Роль / услуга"/><input class="input sub-input" id="bcPhone" placeholder="Рабочий телефон"/><input class="input sub-input" id="bcSite" placeholder="Сайт"/><textarea class="input sub-input" id="bcDesc" placeholder="Описание услуг" style="height:90px"></textarea><button class="btn sub-btn" id="bcSave">Сохранить карточку</button>';
     wrap.appendChild(card);
 
+    /* КНИГА КЛИЕНТОВ. Раньше имя и телефон вбивались руками в каждую заявку,
+       и связать её с человеком было нечем: у одного клиента набиралось три
+       написания имени, а найти все его заявки — никак.
+       Теперь клиент заводится один раз и выбирается из списка. */
+    const clients=el('<div></div>');
+    clients.innerHTML='<div class="sec-head">Клиенты</div>'
+      +'<input class="input sub-input" id="bcName" placeholder="Имя клиента"/>'
+      +'<input class="input sub-input" id="bcCliPhone" placeholder="Телефон (по нему найдём его в мессенджере)"/>'
+      +'<button class="btn sub-btn" id="bcAdd">Добавить клиента</button>'
+      +'<div id="bcList" class="note">Загружаю…</div>';
+    wrap.appendChild(clients);
+
     const tk=el('<div></div>');
-    tk.innerHTML='<div class="sec-head">Новая заявка</div><input class="input sub-input" id="btClient" placeholder="Клиент"/><input class="input sub-input" id="btPhone" placeholder="Телефон клиента"/><input class="input sub-input" id="btTitle" placeholder="Что нужно сделать"/><textarea class="input sub-input" id="btNote" placeholder="Заметка, чек-лист, фото до/после текстом" style="height:100px"></textarea><button class="btn sub-btn" id="btAdd">Создать заявку</button>';
+    tk.innerHTML='<div class="sec-head">Новая заявка</div>'
+      +'<select class="input sub-input" id="btClientSel"><option value="">— клиент не выбран —</option></select>'
+      +'<input class="input sub-input" id="btTitle" placeholder="Что нужно сделать"/>'
+      +'<input class="input sub-input" id="btPrice" inputmode="decimal" placeholder="Сумма, ₽ (необязательно)"/>'
+      +'<textarea class="input sub-input" id="btNote" placeholder="Заметка для себя — клиенту она не видна" style="height:100px"></textarea>'
+      +'<button class="btn sub-btn" id="btAdd">Создать заявку</button>';
     wrap.appendChild(tk);
 
     const list=el('<div class="note">Загружаю заявки…</div>');
@@ -7245,7 +7262,69 @@ async function buildBusiness(body){
     const STAGES=[['new','🆕 Новая'],['work','🔧 В работе'],['done','✅ Готово'],['paid','💰 Оплачено']];
     const stageName=(v)=>{const f=STAGES.find(x=>x[0]===v);return f?f[1]:('🆕 Новая');};
 
+    /* Связываем клиента с аккаунтом СО СТОРОНЫ КЛИЕНТА, через уже существующий
+       поиск по телефону: там свои правила приватности, включая «скрыть мой номер».
+       Заводить второй путь поиска на сервере нельзя — у него оказались бы другие
+       правила, и настройка приватности перестала бы работать. */
+    async function findUidByPhone(phone){
+      const p=String(phone||'').trim(); if(!p)return null;
+      try{ const u=await cloudLookup(p); return (u&&u.id)||null; }catch(e){ return null; }
+    }
+
+    let _clients=[];
+    function fillClientSelect(){
+      const sel=tk.querySelector('#btClientSel'); if(!sel)return;
+      const was=sel.value;
+      sel.innerHTML='<option value="">— клиент не выбран —</option>';
+      _clients.forEach(c=>{
+        const o=document.createElement('option');
+        o.value=c.id;
+        o.textContent=c.name+(c.uid?' · в мессенджере':'')+(c.phone?(' · '+c.phone):'');
+        sel.appendChild(o);
+      });
+      if(was)sel.value=was;
+    }
+    async function loadClients(){
+      const box=clients.querySelector('#bcList');
+      try{
+        const r=await jget(wapi('/business/clients'));
+        _clients=(r&&r.clients)||[];
+      }catch(e){ box.textContent='Не удалось загрузить клиентов.'; return; }
+      fillClientSelect();
+      box.innerHTML='';
+      if(!_clients.length){ box.textContent='Пока никого. Добавьте первого клиента выше.'; return; }
+      _clients.forEach(c=>{
+        const row=el('<div class="log-row"><div><b>'+esc(c.name)+'</b></div><div>'
+          +esc(c.phone||'без телефона')+(c.uid?' · есть в мессенджере':' · не найден в мессенджере')+'</div></div>');
+        const del=el('<button class="btn sub-btn" style="margin-top:8px">Убрать из книги</button>');
+        del.onclick=async()=>{
+          const okk=await appConfirm('Убрать «'+c.name+'» из книги клиентов? Заявки останутся.',{okText:'Убрать',danger:true});
+          if(!okk)return;
+          try{ await jpost(wapi('/business/clients/delete'),{id:c.id}); toast('Клиент убран'); loadClients(); }
+          catch(e){ toast('Не удалось убрать'); }
+        };
+        row.appendChild(del);
+        box.appendChild(row);
+      });
+    }
+    clients.querySelector('#bcAdd').onclick=async()=>{
+      const b=clients.querySelector('#bcAdd');
+      const name=clients.querySelector('#bcName').value.trim();
+      const phone=clients.querySelector('#bcCliPhone').value.trim();
+      if(!name){ toast('Напишите имя клиента'); return; }
+      b.disabled=true;
+      try{
+        const uid=phone?await findUidByPhone(phone):null;
+        await jpost(wapi('/business/clients'),{name,phone,uid});
+        toast(uid?('Клиент добавлен · найден в мессенджере'):'Клиент добавлен');
+        clients.querySelector('#bcName').value=''; clients.querySelector('#bcCliPhone').value='';
+        loadClients();
+      }catch(e){ toast(String(e&&e.message)==='biz_required'?'Подписка закончилась':'Не удалось добавить'); }
+      b.disabled=false;
+    };
+
     async function load(){
+      loadClients();
       try{
         const c=await jget(wapi('/business/card'));
         if(c.card){ card.querySelector('#bcCompany').value=c.card.company||''; card.querySelector('#bcRole').value=c.card.role||''; card.querySelector('#bcPhone').value=c.card.phone||''; card.querySelector('#bcSite').value=c.card.website||''; card.querySelector('#bcDesc').value=c.card.description||''; }
@@ -7254,7 +7333,8 @@ async function buildBusiness(body){
         const rows=(r&&r.tickets)||[];
         if(!rows.length){ list.appendChild(el('<div class="note">Пока нет заявок. Создайте первую выше.</div>')); return; }
         rows.forEach(x=>{
-          const row=el('<div class="log-row"><div><b>'+esc(x.title||'Заявка')+'</b></div><div>'+esc(x.client_name||'')+' '+esc(x.client_phone||'')+'</div><div class="lt">'+new Date(x.updated_at||Date.now()).toLocaleString('ru-RU')+'</div>'+(x.note?('<div style="margin-top:6px">'+esc(x.note)+'</div>'):'')+'</div>');
+          const _pr=(x.price!=null&&x.price!=='')?(' · '+(Number(x.price)/100).toLocaleString('ru-RU')+' ₽'):'';
+          const row=el('<div class="log-row"><div><b>'+esc(x.title||'Заявка')+'</b>'+esc(_pr)+'</div><div>'+esc(x.client_name||'')+' '+esc(x.client_phone||'')+'</div><div class="lt">'+new Date(x.updated_at||Date.now()).toLocaleString('ru-RU')+'</div>'+(x.note?('<div style="margin-top:6px">'+esc(x.note)+'</div>'):'')+'</div>');
           const b=el('<button class="btn sub-btn" style="margin-top:8px">'+stageName(x.status)+' · нажмите, чтобы сменить</button>');
           b.onclick=async()=>{
             const i=STAGES.findIndex(z=>z[0]===(x.status||'new'));
@@ -7275,9 +7355,25 @@ async function buildBusiness(body){
     }
 
     card.querySelector('#bcSave').onclick=async()=>{ try{ await jpost(wapi('/business/card'),{company:card.querySelector('#bcCompany').value,role:card.querySelector('#bcRole').value,phone:card.querySelector('#bcPhone').value,website:card.querySelector('#bcSite').value,description:card.querySelector('#bcDesc').value}); toast('Карточка сохранена'); }catch(e){ toast(String(e&&e.message)==='biz_required'?'Подписка закончилась':'Ошибка сохранения'); } };
-    tk.querySelector('#btAdd').onclick=async()=>{ const t=tk.querySelector('#btTitle').value.trim(); if(!t){toast('Напишите, что нужно сделать');return;}
-      try{ await jpost(wapi('/business/tickets'),{client_name:tk.querySelector('#btClient').value,client_phone:tk.querySelector('#btPhone').value,title:t,note:tk.querySelector('#btNote').value,status:'new'});
-           toast('Заявка создана'); tk.querySelector('#btClient').value=''; tk.querySelector('#btPhone').value=''; tk.querySelector('#btTitle').value=''; tk.querySelector('#btNote').value=''; load(); }
+    tk.querySelector('#btAdd').onclick=async()=>{
+      const t=tk.querySelector('#btTitle').value.trim();
+      if(!t){toast('Напишите, что нужно сделать');return;}
+      const cid=tk.querySelector('#btClientSel').value;
+      const c=_clients.find(x=>x.id===cid)||null;
+      try{
+        await jpost(wapi('/business/tickets'),{
+          client_id: c?c.id:null,
+          client_uid: c?(c.uid||null):null,
+          client_name: c?c.name:'',
+          client_phone: c?(c.phone||''):'',
+          title:t,
+          price: tk.querySelector('#btPrice').value,
+          note: tk.querySelector('#btNote').value,
+          status:'new'});
+        toast('Заявка создана');
+        tk.querySelector('#btTitle').value=''; tk.querySelector('#btPrice').value=''; tk.querySelector('#btNote').value='';
+        load();
+      }
       catch(e){ toast(String(e&&e.message)==='biz_required'?'Подписка закончилась':'Не удалось создать заявку'); } };
 
     load();
