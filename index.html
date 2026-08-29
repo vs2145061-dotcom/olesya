@@ -290,6 +290,15 @@ h1.brandname{font-family:var(--brand);font-weight:400;font-size:52px;line-height
 
 /* ===== Conversation ===== */
 .conv-head{display:flex;align-items:center;gap:11px;padding:11px 12px;border-bottom:1px solid var(--line-soft);background:var(--surface)}
+.biz-badge{margin-left:6px;font-size:13px;vertical-align:baseline}
+.biz-card{margin:0;padding:10px 12px;background:var(--surface);border-bottom:1px solid var(--line-soft);font-size:13px}
+.biz-card .bc-head{display:flex;align-items:center;gap:8px}
+.biz-card .bc-co{flex:1;min-width:0;font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.biz-card .bc-x{background:none;border:0;color:var(--muted);font-size:15px;line-height:1;padding:4px 6px;cursor:pointer}
+.biz-card .bc-role{color:var(--muted);margin-top:2px}
+.biz-card .bc-desc{margin-top:6px;white-space:pre-wrap;word-break:break-word}
+.biz-card .bc-line{margin-top:4px;color:var(--muted);word-break:break-word}
+.biz-card .bc-order{margin-top:9px;padding:7px 14px;border:0;border-radius:12px;background:var(--primary);color:#fff;font-size:13px;font-weight:600;cursor:pointer}
 .conv-head .who{flex:1;min-width:0;cursor:pointer}
 .conv-head .nm{font-weight:600;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .conv-head .st{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px;width:auto;height:auto;border-radius:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:default;box-shadow:none;border:none;background:none;transform:none;padding:0}
@@ -1913,7 +1922,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.16', BUILD_ID='2026-08-28-texts-1';
+const APP_VERSION='5.0.17', BUILD_ID='2026-08-29-biz3-1';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 try{const _vl=document.getElementById('appVerLine'); if(_vl)_vl.textContent='ZORVELD v'+APP_VERSION;}catch(e){}
@@ -3620,6 +3629,84 @@ function addTrBlock(b,m){
     translate(m.text,target).then(r=>{trDone[m.id]=r?{text:r.text,engine:r.engine,lang:target}:{text:'(не удалось перевести — проверьте интернет)',engine:'—',lang:target};if(current)renderMessages();});}
   b.appendChild(blk);}
 let _convOrigin='scrChats';   // с какого экрана открыли переписку — туда и «назад»
+/* ===== БИЗНЕС-ВИЗИТКА СОБЕСЕДНИКА (этап 3) =====
+   Показываем в переписке с человеком, у которого заполнена визитка: кто он,
+   чем занимается, как связаться помимо мессенджера.
+
+   Ответ кладём в кэш на сутки. Без кэша каждое открытие переписки — лишний
+   запрос к серверу на экране, который открывают чаще всех остальных, а визитка
+   меняется раз в месяцы. Отсутствие визитки кэшируем тоже: у большинства
+   собеседников её нет никогда, и спрашивать про них каждый раз бессмысленно.
+   А вот ошибку сети и отказ сервера НЕ кэшируем — иначе один разрыв связи
+   спрятал бы визитку на сутки. */
+const BIZCARD_TTL=24*3600*1000, BIZCARD_MAX=60;
+function bizCardCache(){ try{ return JSON.parse(localStorage.getItem('om_bizcards')||'{}')||{}; }catch(e){ return {}; } }
+function bizCardCacheSet(uid,card){
+  try{
+    const c=bizCardCache(); c[uid]={card:card||null,t:Date.now()};
+    const ks=Object.keys(c);
+    if(ks.length>BIZCARD_MAX){ ks.sort((a,b)=>(c[a].t||0)-(c[b].t||0)).slice(0,ks.length-BIZCARD_MAX).forEach(k=>{delete c[k];}); }
+    localStorage.setItem('om_bizcards',JSON.stringify(c));
+  }catch(e){}   /* переполнение хранилища не должно ронять открытие переписки */
+}
+/* undefined = не знаем, null = визитки нет. Разница существенная: на undefined идём спрашивать. */
+function bizCardCached(uid){
+  const e=bizCardCache()[uid];
+  if(!e)return undefined;
+  if(Date.now()-(e.t||0)>BIZCARD_TTL)return undefined;
+  return e.card;
+}
+async function bizCardFetch(uid){
+  let card=null;
+  try{ const r=await jget(wapi('/business/card?uid='+encodeURIComponent(uid))); card=(r&&r.card)||null; }
+  catch(e){ return undefined; }        /* старый сервер, нет сети, нет сессии — молча без визитки */
+  bizCardCacheSet(uid,card);
+  return card;
+}
+function bizCardHide(){
+  const n=document.getElementById('convBizCard'); if(n)n.remove();
+  const b=document.getElementById('convBizBadge'); if(b)b.remove();
+}
+function bizCardRender(uid,card){
+  bizCardHide();
+  if(!card||!card.company)return;
+  if(!current||current.id!==uid)return;   /* переписку успели переключить, пока шёл запрос */
+  const head=document.querySelector('#scrConv .conv-head'); if(!head)return;
+  const nm=document.getElementById('convName');
+  if(nm){ const b=document.createElement('span'); b.id='convBizBadge'; b.className='biz-badge'; b.textContent='💼'; b.title='Бизнес-аккаунт'; nm.appendChild(b); }
+  const box=document.createElement('div'); box.id='convBizCard'; box.className='biz-card';
+  const rows=[];
+  if(card.role)rows.push('<div class="bc-role">'+esc(card.role)+'</div>');
+  if(card.description)rows.push('<div class="bc-desc">'+esc(card.description)+'</div>');
+  if(card.phone)rows.push('<div class="bc-line">📞 '+esc(card.phone)+'</div>');
+  if(card.address)rows.push('<div class="bc-line">📍 '+esc(card.address)+'</div>');
+  if(card.website)rows.push('<div class="bc-line">🌐 '+esc(card.website)+'</div>');
+  /* Только esc(): визитку заполняет чужой человек, и это ровно тот случай,
+     когда разметка из поля «описание» стала бы чужим кодом на нашей странице. */
+  box.innerHTML='<div class="bc-head"><span class="bc-co">💼 '+esc(card.company)+'</span>'
+    +'<button class="bc-x" type="button" aria-label="Свернуть">✕</button></div>'
+    +'<div class="bc-body">'+rows.join('')+'<button class="bc-order" type="button">Оставить заявку</button></div>';
+  box.querySelector('.bc-x').onclick=()=>{ box.remove(); };
+  /* Заявку заводит мастер у себя — у клиента такого пути на сервере нет и не должно быть.
+     Кнопка честно делает то, что человек сделал бы руками: открывает начало сообщения. */
+  box.querySelector('.bc-order').onclick=()=>{
+    const inp=document.getElementById('msgInput'); if(!inp)return;
+    if(!inp.value.trim())inp.value='Здравствуйте! Хочу оставить заявку: ';
+    box.remove();
+    try{ inp.focus(); inp.setSelectionRange(inp.value.length,inp.value.length); }catch(e){}
+    try{ toggleSendBtn(); }catch(e){}
+  };
+  head.insertAdjacentElement('afterend',box);
+}
+async function bizCardShow(uid){
+  bizCardHide();
+  if(!uid||!me||uid===me.id)return;
+  const u0=userById(uid); if(u0&&(u0.group||u0.channel||u0.bot))return;
+  const c=bizCardCached(uid);
+  if(c!==undefined){ bizCardRender(uid,c); return; }   /* из кэша — сразу, без мигания */
+  const fresh=await bizCardFetch(uid);
+  if(fresh!==undefined)bizCardRender(uid,fresh);
+}
 function openConv(peerId){
   // «Назад» из переписки должно вести туда, откуда её открыли: Избранное с Главной → назад на Главную,
   // чат из списка → назад в список. Запоминаем источник и проставляем его кнопке «назад» переписки.
@@ -3642,6 +3729,9 @@ function openConv(peerId){
   applyChatBg();
   cloudLoadHistory(peerId);
   cloudRefreshUser(peerId); // подтянуть свежий аватар/имя собеседника
+  bizCardShow(peerId).catch(()=>{});   // визитка мастера, если она у него есть (этап 3).
+  /* .catch() обязателен: без него любой сбой внутри висел бы красной ошибкой
+     в консоли и сбивал того, кто будет разбирать здесь совсем другое. */
   go('scrConv');
   markRead(peerId);
   if(current&&current.bot)botWelcomeIfEmpty();
@@ -7163,12 +7253,49 @@ async function buildBusiness(body){
   const left=(ms)=>Math.max(0,Math.ceil((ms-Date.now())/86400000));
   const openUrl=(url,title)=>{try{ if(window.__OLESYA_NATIVE__&&window.ReactNativeWebView){window.ReactNativeWebView.postMessage(JSON.stringify({type:'open-browser',url:url,title:title||''}));} else window.open(url,'_blank','noopener'); }catch(e){location.href=url;}};
 
+  /* МОИ ЗАКАЗЫ — то, что человек заказал у КОГО-ТО, а не свой бизнес.
+     Показываем всем и без подписки: за бизнес-режим платит мастер, а не клиент.
+     Раздел появляется, только если заказы есть, — иначе он был бы пустой строкой
+     в настройках у всех подряд.
+     Это справочник. Узнаёт о смене стадии человек не здесь, а в переписке:
+     сервер кладёт туда обычное сообщение. Раздел нужен, чтобы посмотреть
+     «а что там вообще», а не чтобы не пропустить новость. */
+  const ORDER_STAGE={new:'🆕 Принята',work:'🔧 В работе',done:'✅ Готово',paid:'💰 Оплачено'};
+  function orderPrice(p){
+    if(p===null||p===undefined||p==='')return '';
+    const r=Number(p)/100; if(!isFinite(r)||r<=0)return '';
+    return ' · '+r.toLocaleString('ru-RU',{minimumFractionDigits:(Math.round(r*100)%100?2:0),maximumFractionDigits:2})+' ₽';
+  }
+  async function renderMyOrders(){
+    let orders=[];
+    try{ const r=await jget(wapi('/business/orders/mine')); orders=(r&&r.orders)||[]; }
+    catch(e){ return; }                       // нет заказов или старый сервер — молча пропускаем
+    if(!orders.length)return;
+    const box=el('<div></div>');
+    box.appendChild(el('<div class="sec-head">Мои заказы</div>'));
+    box.appendChild(el('<div class="note">Заявки, которые вы оставили. О смене стадии придёт сообщение в переписке.</div>'));
+    orders.forEach(o=>{
+      const кто=o.biz&&o.biz.company?esc(o.biz.company):'Исполнитель';
+      const row=el('<div class="log-row"><div><b>'+esc(o.title||'Заявка')+'</b>'+esc(orderPrice(o.price))+'</div>'
+        +'<div>'+esc(ORDER_STAGE[o.status]||ORDER_STAGE.new)+' · '+кто+'</div>'
+        +'<div class="lt">'+new Date(o.updated_at||Date.now()).toLocaleString('ru-RU')+'</div></div>');
+      if(o.biz&&o.biz.uid){
+        const b=el('<button class="btn sub-btn" style="margin-top:8px">Написать исполнителю</button>');
+        b.onclick=()=>{ try{ closeModal(); }catch(e){} try{ openConv(o.biz.uid); }catch(e){ toast('Не удалось открыть переписку'); } };
+        row.appendChild(b);
+      }
+      box.appendChild(row);
+    });
+    wrap.appendChild(box);
+  }
+
   async function render(){
     wrap.innerHTML='<div class="note">Загружаю…</div>';
     let s=null;
     try{ s=await jget(wapi('/biz/status')); }
     catch(e){ wrap.innerHTML='<div class="note">Нет связи с сервером — откройте позже.</div>'; return; }
     wrap.innerHTML='';
+    await renderMyOrders();                   // сначала свои заказы, потом свой бизнес
     if(s&&s.active) renderActive(s); else renderPaywall(s||{});
   }
 
