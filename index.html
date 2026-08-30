@@ -1922,10 +1922,18 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.17', BUILD_ID='2026-08-29-biz3-1';
+const APP_VERSION='5.0.18', BUILD_ID='2026-08-30-shellver-1';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
-try{const _vl=document.getElementById('appVerLine'); if(_vl)_vl.textContent='ZORVELD v'+APP_VERSION;}catch(e){}
+/* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
+   а номер сборки Android в настройках не показывает — понять, что реально
+   установлено, было нельзя ничем. Оболочка кладёт __OLESYA_SHELL__ ДО запуска
+   этого кода, поэтому гонки нет. В браузере её просто не будет. */
+try{const _vl=document.getElementById('appVerLine');
+  if(_vl){ let _s='ZORVELD v'+APP_VERSION;
+    try{ const _sh=window.__OLESYA_SHELL__; if(_sh&&_sh.b)_s+=' · оболочка '+_sh.v+' ('+_sh.b+')'; }catch(e){}
+    _vl.textContent=_s; }
+}catch(e){}
 (function(){try{
   const prev=localStorage.getItem('om_app_version');
   if(prev&&prev!==APP_VERSION){
