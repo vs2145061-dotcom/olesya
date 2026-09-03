@@ -1922,7 +1922,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.19', BUILD_ID='2026-09-03-crumbs-1';
+const APP_VERSION='5.0.20', BUILD_ID='2026-09-03-speaker-1';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6243,8 +6243,15 @@ function renderCallActions(incoming,active,opt){
       if(_volWorks){ ra.muted=false; ra.volume=_spkOn?1:0.35; }
       else { ra.muted=!_spkOn; ra.volume=1; }
       if(_spkOn&&ra.setSinkId){try{ra.setSinkId('');}catch(e){}}};
+    /* На нативной оболочке настоящее переключение динамик/громкая связь делает
+       InCallManager на стороне Android (route не подчиняется .volume у <audio>).
+       Кнопка шлёт туда команду мостом; .volume остаётся как запасной путь для
+       браузера/PWA, где никакого моста нет. */
+    const isNative=!!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView);
     const sb=btn('',_spkOn?ICON.spk:ICON.spkoff,()=>{_spkOn=!_spkOn;sb.innerHTML=_spkOn?ICON.spk:ICON.spkoff;sb.classList.toggle('active',!_spkOn);applySpk();
-      toast(_volWorks?(_spkOn?'🔊 Громко':'🔉 Тише'):(_spkOn?'🔊 Звук включён':'🔇 Звук выключен'));});
+      if(isNative){ try{window.ReactNativeWebView.postMessage(JSON.stringify({type:'speaker',on:_spkOn}));}catch(e){}
+        toast(_spkOn?'🔊 Громкая связь':'📱 Разговорный динамик'); }
+      else toast(_volWorks?(_spkOn?'🔊 Громко':'🔉 Тише'):(_spkOn?'🔊 Звук включён':'🔇 Звук выключен'));});
     a.appendChild(sb);applySpk();
     a.appendChild(btn('end',ICON.end,()=>endCall(false)));
     if(callKind==='video'){
