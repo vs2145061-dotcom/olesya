@@ -1922,7 +1922,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.18', BUILD_ID='2026-08-30-shellver-1';
+const APP_VERSION='5.0.19', BUILD_ID='2026-09-03-crumbs-1';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -8326,6 +8326,17 @@ function registerExpoPush(token){
 }
 window.olesyaNativePush=registerExpoPush;
 window.olesyaOpenChat=function(peer){ try{window.focus();}catch(e){} if(peer&&me){try{openConv(peer);}catch(e){}} };
+/* Оболочка не знает адреса сервера — его знает страница. Поэтому крошки пути
+   звонка, накопленные оболочкой, она отдаёт сюда, а мы пересылаем на сервер
+   уже с сессией. Нужно затем, что нативное падение не оставляет следа в JS:
+   приложение просто исчезает, и последняя записанная строка — место обрыва. */
+window.olesyaCrumbs=function(list){ try{
+  if(!Array.isArray(list)||!list.length)return;
+  if(!sessionToken)return;                      // до входа отправлять некому
+  jpost(wapi('/diag/native'),{crumbs:list.slice(-60)})
+    .then(()=>{ try{ window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({type:'crumbs-sent'})); }catch(e){} })
+    .catch(()=>{});                             // не доехало — оболочка сохранит до следующего раза
+}catch(e){} };
 /* OTP-код из push-уведомления (нативка зовёт это при получении push с data.type==='otp') — авто-подставляем на экране кода. */
 /* Код из уведомления. Экран ввода мог ещё не открыться в момент прихода — тогда ждём его
    (до 15 с) и подставляем, как только он появится. Раньше такой код просто терялся. */
