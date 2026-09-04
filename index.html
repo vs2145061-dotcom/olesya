@@ -1521,18 +1521,18 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
       <div class="setting pro-row" id="rowPro" style="cursor:pointer"><div class="ic">✨</div><div class="lbl"><div class="t">ZORVELD Pro</div><div class="d" id="stPro">оформить подписку</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowTheme" style="cursor:pointer"><div class="ic">🎨</div><div class="lbl"><div class="t">Тема оформления</div><div class="d" id="stTheme">Авто</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowChatBg" style="cursor:pointer"><div class="ic">🖼️</div><div class="lbl"><div class="t">Фон чатов</div><div class="d" id="stChatBg">Стандартный</div></div><div style="color:var(--faint)">›</div></div>
-      <div class="sec-head">🔥 Firebase (бесплатные SMS)</div>
-      <div id="firebaseStatusBadge" style="padding:8px 20px;font-size:12.5px;color:var(--faint)">⚠️ FIREBASE_CONFIG не заполнен — вставьте данные из Firebase Console в index.html</div>
+      <div class="sec-head owner-only" id="secFirebase">🔥 Firebase (бесплатные SMS)</div>
+      <div class="owner-only" id="firebaseStatusBadge" style="padding:8px 20px;font-size:12.5px;color:var(--faint)">⚠️ FIREBASE_CONFIG не заполнен — вставьте данные из Firebase Console в index.html</div>
       <div class="sec-head">Помощник и ИИ</div>
       <div class="setting" id="rowAi" style="cursor:pointer"><div class="ic">🤖</div><div class="lbl"><div class="t">Олеся ИИ</div><div class="d" id="stAi">Умный ассистент включён</div></div><div style="color:var(--faint)">›</div></div>
       <div class="sec-head">Сервер и синхронизация</div>
-      <div class="setting" id="rowServer" style="cursor:pointer"><div class="ic">☁️</div><div class="lbl"><div class="t">Облачный сервер</div><div class="d" id="stServer">Локальный режим</div></div><div style="color:var(--faint)">›</div></div>
+      <div class="setting owner-only" id="rowServer" style="cursor:pointer"><div class="ic">☁️</div><div class="lbl"><div class="t">Облачный сервер</div><div class="d" id="stServer">Локальный режим</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowNetDiag" style="cursor:pointer"><div class="ic">🩺</div><div class="lbl"><div class="t">Диагностика сети</div><div class="d" id="stNetDiag">API zorveld.pro и резервные адреса</div></div><div style="color:var(--faint)">›</div></div>
       <div class="sec-head">Безопасность аккаунта</div>
       <div class="setting" id="rowTwoFA" style="cursor:pointer"><div class="ic">🔑</div><div class="lbl"><div class="t">Облачный пароль</div><div class="d">Второй фактор · <span id="st2fa">Отключён</span></div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowSessions" style="cursor:pointer"><div class="ic">📱</div><div class="lbl"><div class="t">Активные сеансы</div><div class="d" id="stSess">—</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowIdentity" style="cursor:pointer"><div class="ic">🪪</div><div class="lbl"><div class="t">Никнейм, QR и приглашения</div><div class="d" id="stIdentity">@username · ссылка для приглашения</div></div><div style="color:var(--faint)">›</div></div>
-      <div class="setting" id="rowServerContacts" style="cursor:pointer"><div class="ic">📇</div><div class="lbl"><div class="t">Серверные контакты</div><div class="d">синхронизация контактов между устройствами</div></div><div style="color:var(--faint)">›</div></div>
+      <div class="setting owner-only" id="rowServerContacts" style="cursor:pointer"><div class="ic">📇</div><div class="lbl"><div class="t">Серверные контакты</div><div class="d">синхронизация контактов между устройствами</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowBusiness" style="cursor:pointer"><div class="ic">💼</div><div class="lbl"><div class="t">Бизнес-режим</div><div class="d">заявки, карточка клиента, статусы, чек-листы</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowLog" style="cursor:pointer"><div class="ic">📜</div><div class="lbl"><div class="t">Журнал безопасности</div><div class="d">Входы, блокировки, анти-спам</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowLegal" style="cursor:pointer"><div class="ic">📄</div><div class="lbl"><div class="t">Документы и приватность</div><div class="d">Политика, соглашение, удаление аккаунта</div></div><div style="color:var(--faint)">›</div></div>
@@ -1929,7 +1929,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.22', BUILD_ID='2026-09-04-spkfix-1';
+const APP_VERSION='5.0.23', BUILD_ID='2026-09-04-ownergate-1';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -4903,9 +4903,24 @@ function proUntil(){return (me&&me.proUntil)||0;}
 function isPro(){return proUntil()>Date.now();}
 function maxFileMB(){return isPro()?100:12;}
 function setProUntil(until){const d=db();if(d.users[me.id]){d.users[me.id].proUntil=until||0;me=d.users[me.id];save(d);}}
+/* Технические настройки — только владельцам сервиса.
+   Обычному человеку они не нужны, а «Облачный сервер» ещё и опасен: там можно
+   вписать ЛЮБОЙ адрес сервера, и вход с перепиской поедут куда угодно. Признак
+   владельца сервер уже присылал в статусе подписки, мы его просто выбрасывали.
+   Помним ответ между запусками, иначе у владельца пункты мигали бы при каждом
+   открытии настроек. По умолчанию скрыто: ошибиться безопаснее в эту сторону. */
+let _isOwner=(localStorage.getItem('om_is_owner')==='1');
+function applyOwnerUI(){
+  try{ document.querySelectorAll('.owner-only').forEach(e=>{ e.style.display=_isOwner?'':'none'; }); }catch(e){}
+}
+function setOwner(v){
+  const n=!!v; if(n===_isOwner){applyOwnerUI();return;}
+  _isOwner=n; try{localStorage.setItem('om_is_owner',n?'1':'0');}catch(e){}
+  applyOwnerUI();
+}
 async function cloudProStatus(){
   if(!me||!cloudOn||!isCloudReady()||CFG.provider!=='worker')return;
-  try{const r=await jget(wapi('/pro/status'));if(r&&typeof r.until!=='undefined'){setProUntil(r.until||0);refreshProUI();}}catch(e){}
+  try{const r=await jget(wapi('/pro/status'));if(r&&typeof r.until!=='undefined'){setProUntil(r.until||0);setOwner(r.owner);refreshProUI();}}catch(e){}
 }
 async function redeemProCode(code){
   code=String(code||'').trim();if(!code){toast('Введите промокод');return;}
@@ -7179,6 +7194,7 @@ $('#subBack').onclick=()=>$('#subSheet').classList.remove('show');
 function el(html){const t=document.createElement('div');t.innerHTML=String(html).trim();return t.firstChild;}
 function optRow(label,sel,onclick){const r=el('<div class="opt'+(sel?' sel':'')+'"><div class="rb"></div><div>'+label+'</div></div>');r.onclick=onclick;return r;}
 function refreshSettings(){if(!me)return;
+  applyOwnerUI();
   const cfg=cloudCfg();const se=$('#stServer');if(se)se.textContent=cfg.provider==='worker'?'Cloudflare Worker':(cfg.provider==='supabase'?'Supabase':'Локальный режим');
   const t2=$('#st2fa');if(t2)t2.textContent=me.cloud?'Облачный пароль':((me.twoFA&&me.twoFA.hash)?'Включён':'Отключён');
   const ss=$('#stSess');if(ss)ss.textContent=Object.keys(sessionsMap()).length+' активн.';
