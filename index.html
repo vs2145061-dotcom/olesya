@@ -909,6 +909,14 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 .hc-calls{background:linear-gradient(150deg,#2bb377,#3FCF8E)}
 .hc-book{background:linear-gradient(150deg,#6C7BFF,#C56CFF)}
 .hc-fav{background:linear-gradient(150deg,#e0734a,#F5B544)}
+/* Новости, Соцсети и Каналы раньше были белыми карточками: на светлой теме они
+   выпадали из общего вида. Даём им заливку в цвет их же кружков, чтобы главный
+   экран читался как одно целое. Бизнес и Pro — в цветах значка подписки. */
+.hc-news{background:linear-gradient(150deg,#2F6BFF,#5AD1FF)}
+.hc-social{background:linear-gradient(150deg,#C56CFF,#FF9DBE)}
+.hc-channels{background:linear-gradient(150deg,#0E7BD6,#36D1FF)}
+.hc-biz{background:linear-gradient(150deg,#F59E0B,#A855F7)}
+.o-biz{background:radial-gradient(120% 120% at 32% 24%, #FFD066, #A855F7 72%)}
 .home-foot{text-align:center;color:var(--faint);font-size:12px;padding:22px 10px 4px;line-height:1.5}
 /* фон лицевой страницы (своё фото) — плитки ПОВЕРХ фона, с прозрачностью/размытием */
 #scrHome.homebg{background-size:cover;background-position:center;background-repeat:no-repeat}
@@ -936,24 +944,11 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 #scrHome.homebg .hc-book{background:linear-gradient(150deg, rgba(108,123,255,.52), rgba(197,108,255,.5))}
 #scrHome.homebg .hc-fav{background:linear-gradient(150deg, rgba(224,115,74,.52), rgba(245,181,68,.5))}
 
-/* Второстепенные карточки (Новости, Соцсети, Каналы) собственной заливки НЕ имели —
-   сквозь них просвечивал фон страницы, а текст у всех карточек жёстко белый.
-   В тёмной теме белое на тёмном читалось, в светлой пропадало полностью (контраст 1.0).
-   Даём им поверхность и цвет текста из темы: вид «спокойных» карточек сохраняется,
-   а читаемость появляется в обеих темах. */
-.hc-news,.hc-social,.hc-channels{background:var(--surface);color:var(--text)}
-.hc-news .hc-d,.hc-social .hc-d,.hc-channels .hc-d{color:var(--muted);opacity:1}
-:root[data-theme="light"] .hc-news,
-:root[data-theme="light"] .hc-social,
-:root[data-theme="light"] .hc-channels{border-color:var(--line);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 12px 26px -18px rgba(50,45,110,.45)}
-/* Верхний глянцевый блик на светлой поверхности делаем мягче, иначе карточка выцветает */
-:root[data-theme="light"] .hc-news::before,
-:root[data-theme="light"] .hc-social::before,
-:root[data-theme="light"] .hc-channels::before{background:linear-gradient(rgba(255,255,255,.5),rgba(255,255,255,0))}
-/* С обоями на лицевой все плитки полупрозрачные поверх затемнения — текст снова светлый */
-#scrHome.homebg .hc-news,#scrHome.homebg .hc-social,#scrHome.homebg .hc-channels{background:rgba(18,14,32,.42);color:#fff}
-#scrHome.homebg .hc-news .hc-d,#scrHome.homebg .hc-social .hc-d,#scrHome.homebg .hc-channels .hc-d{color:rgba(255,255,255,.85)}
+/* С обоями на лицевой все плитки полупрозрачные поверх затемнения — теперь и эти. */
+#scrHome.homebg .hc-news{background:linear-gradient(150deg, rgba(47,107,255,.52), rgba(90,209,255,.5))}
+#scrHome.homebg .hc-social{background:linear-gradient(150deg, rgba(197,108,255,.52), rgba(255,157,190,.5))}
+#scrHome.homebg .hc-channels{background:linear-gradient(150deg, rgba(14,123,214,.52), rgba(54,209,255,.5))}
+#scrHome.homebg .hc-biz{background:linear-gradient(150deg, rgba(245,158,11,.52), rgba(168,85,247,.5))}
 
 /* ===================== КОНТАКТЫ / ЗВОНКИ ===================== */
 .cn-hint{padding:8px 18px 2px;color:var(--faint);font-size:12.5px;line-height:1.4}
@@ -1182,6 +1177,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
         <div class="home-card hc-news" id="cardNews"><div class="orb o-news hc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"><path d="M4 5h13v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M17 8h3v11a2 2 0 0 1-3 1.7"/><path d="M7 9h7M7 13h7M7 17h4" stroke-linecap="round"/></svg></div><div><div class="hc-t">Новости</div><div class="hc-d">мир · финансы · рассказы</div></div></div>
         <div class="home-card hc-social" id="cardSocial"><div class="orb o-social hc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="6" cy="12" r="2.4"/><circle cx="17" cy="6" r="2.4"/><circle cx="17" cy="18" r="2.4"/><path d="M8.2 11l6.6-3.6M8.2 13l6.6 3.6" stroke-linecap="round"/></svg></div><div><div class="hc-t">Социальные сети</div><div class="hc-d">ваши страницы внутри</div></div></div>
         <div class="home-card hc-channels" id="cardChannels"><div class="orb o-channels hc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"><path d="M4 9v6h3l6 4V5L7 9z" fill="#fff" stroke="none"/><path d="M16.5 8.5a4 4 0 0 1 0 7M19 6a7 7 0 0 1 0 12" stroke-linecap="round"/></svg></div><div><div class="hc-t">Каналы</div><div class="hc-d">публичные ленты · подписки</div></div></div>
+        <div class="home-card hc-biz" id="cardBiz"><div class="orb o-biz hc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"><rect x="3" y="7.5" width="18" height="12.5" rx="2.5"/><path d="M9 7.5V5.5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 12.5h18" stroke-linecap="round"/></svg></div><div><div class="hc-t">Бизнес и Pro</div><div class="hc-d">заявки · подписка</div></div></div>
       </div>
       <div class="home-foot">ZORVELD · защищённый чат<br>сквозное шифрование · ИИ-перевод · анти-спам · 2FA</div>
     </div>
@@ -1929,7 +1925,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.23', BUILD_ID='2026-09-04-ownergate-1';
+const APP_VERSION='5.0.24', BUILD_ID='2026-09-04-hometiles-1';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6582,6 +6578,14 @@ $('#pasteSheet').addEventListener('click',e=>{if(e.target.id==='pasteSheet')clos
 $('#langSheet').addEventListener('click',e=>{if(e.target.id==='langSheet')$('#langSheet').classList.remove('show');});
 /* каналы */
 $('#cardChannels').onclick=openChannelsScreen;
+/* Плитка ведёт в развилку, а не дублирует экраны: бизнес-режим и подписка живут
+   в настройках, и здесь мы просто открываем те же самые. */
+function buildBizHub(body){
+  const row=(icon,title,desc,fn)=>{const r=el('<div class="setting" style="cursor:pointer"><div class="ic">'+icon+'</div><div class="lbl"><div class="t">'+title+'</div><div class="d">'+desc+'</div></div><div style="color:var(--faint)">›</div></div>');r.onclick=fn;return r;};
+  body.appendChild(row('💼','Бизнес-режим','заявки, клиенты, карточка компании',()=>openSub('Бизнес-режим',buildBusiness)));
+  body.appendChild(row('✨','ZORVELD Pro','подписка: файлы до 100 МБ, оформление',()=>{$('#subSheet').classList.remove('show');openPro();}));
+}
+$('#cardBiz').onclick=()=>openSub('Бизнес и подписка',buildBizHub);
 $('#channelsSearch').addEventListener('input',()=>renderChannelsScreen());
 $('#btnNewChannel').onclick=openNewChannel;
 $('#btnCreateChannel').onclick=()=>{createChannel($('#chHandle').value,$('#chName').value,$('#chDescr').value);};
