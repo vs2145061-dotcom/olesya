@@ -1929,7 +1929,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.21', BUILD_ID='2026-09-04-calltheme-1';
+const APP_VERSION='5.0.22', BUILD_ID='2026-09-04-spkfix-1';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6244,22 +6244,28 @@ function renderCallActions(incoming,active,opt){
     a.appendChild(mb);
     // Громкая связь: на мобильных медиа-звук идёт в динамик; кнопка управляет громкостью/выводом
     /* Слушается ли движок, когда громкость меняют из кода. На iOS — нет. */
+    /* Кнопка посередине — это ВЫХОД звука, а не громкость.
+       В оболочке маршрут (наушник или громкая связь) переключает Android через
+       InCallManager; страница им управлять не может, а трогать .volume/.muted
+       там прямо опасно — так можно заглушить разговор.
+       В браузере и PWA маршрута нет: кнопка работает громкостью, а где движок
+       громкость игнорирует (iPhone) — выключает и включает звук. Подписи ниже
+       называют то, что происходит на самом деле, в каждом из трёх случаев. */
     const _volWorks=(()=>{ const ra=$('#remoteAudio'); if(!ra)return false;
       try{ const was=ra.volume; ra.volume=0.5; const ok=Math.abs(ra.volume-0.5)<0.01; ra.volume=was; return ok; }catch(e){ return false; } })();
+    const isNative=!!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView);
+    if(isNative)_spkOn=false;   // оболочка стартует с наушника — значок не должен врать
     const applySpk=()=>{const ra=$('#remoteAudio');if(!ra)return;
+      if(isNative){ ra.muted=false; ra.volume=1; return; }
       if(_volWorks){ ra.muted=false; ra.volume=_spkOn?1:0.35; }
       else { ra.muted=!_spkOn; ra.volume=1; }
       if(_spkOn&&ra.setSinkId){try{ra.setSinkId('');}catch(e){}}};
-    /* На нативной оболочке настоящее переключение динамик/громкая связь делает
-       InCallManager на стороне Android (route не подчиняется .volume у <audio>).
-       Кнопка шлёт туда команду мостом; .volume остаётся как запасной путь для
-       браузера/PWA, где никакого моста нет. */
-    const isNative=!!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView);
-    const sb=btn('',_spkOn?ICON.spk:ICON.spkoff,()=>{_spkOn=!_spkOn;sb.innerHTML=_spkOn?ICON.spk:ICON.spkoff;sb.classList.toggle('active',!_spkOn);applySpk();
-      if(isNative){ try{window.ReactNativeWebView.postMessage(JSON.stringify({type:'speaker',on:_spkOn}));}catch(e){}
-        toast(_spkOn?'🔊 Громкая связь':'📱 Разговорный динамик'); }
+    const sendSpk=()=>{ if(!isNative)return; try{window.ReactNativeWebView.postMessage(JSON.stringify({type:'speaker',on:_spkOn}));}catch(e){} };
+    const sb=btn('',ICON.spk,()=>{_spkOn=!_spkOn;sb.classList.toggle('active',_spkOn);applySpk();sendSpk();
+      if(isNative)toast(_spkOn?'🔊 Громкая связь':'📱 Разговорный динамик');
       else toast(_volWorks?(_spkOn?'🔊 Громко':'🔉 Тише'):(_spkOn?'🔊 Звук включён':'🔇 Звук выключен'));});
-    a.appendChild(sb);applySpk();
+    sb.classList.toggle('active',_spkOn);
+    a.appendChild(sb);applySpk();sendSpk();
     a.appendChild(btn('end',ICON.end,()=>endCall(false)));
     if(callKind==='video'){
       const cb=btn('',ICON.cam,()=>{camOff=!camOff;cb.classList.toggle('active',camOff);if(localStream)localStream.getVideoTracks().forEach(t=>t.enabled=!camOff);});a.appendChild(cb);
