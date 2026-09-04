@@ -1695,7 +1695,14 @@ window.olesyaSystemTheme=function(scheme){ try{ window.__OM_SYS_DARK__=(scheme==
 function resolveTheme(pref){pref=pref||getThemePref();return pref==='dark'?'dark':pref==='light'?'light':(systemPrefersDark()?'dark':'light');}
 // Синхронизирует нативный статус-бар/фон APK с темой. Экран блокировки ВСЕГДА тёмный,
 // поэтому на нём принудительно шлём dark:true (иначе тёмный замок под белым статус-баром).
-function omSyncNativeTheme(){ try{ if(!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView))return; var dark=(document.documentElement.getAttribute('data-theme')!=='light'); window.ReactNativeWebView.postMessage(JSON.stringify({type:'theme',dark:dark})); }catch(e){} }
+function omSyncNativeTheme(){ try{ if(!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView))return;
+  var dark=(document.documentElement.getAttribute('data-theme')!=='light');
+  /* Экран звонка тёмный ВСЕГДА, независимо от темы приложения (см. #callScreen
+     в стилях). Раньше оболочке уходила тема приложения, и при светлой теме
+     сверху и снизу от тёмного звонка оставались белые полосы. */
+  try{ var cs=document.getElementById('callScreen'), gs=document.getElementById('gcallScreen');
+    if((cs&&!cs.classList.contains('hidden'))||(gs&&!gs.classList.contains('hidden'))) dark=true; }catch(e){}
+  window.ReactNativeWebView.postMessage(JSON.stringify({type:'theme',dark:dark})); }catch(e){} }
 function applyTheme(pref,_skipNative){
   const t=resolveTheme(pref);
   document.documentElement.setAttribute('data-theme',t);
@@ -1922,7 +1929,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.20', BUILD_ID='2026-09-03-speaker-1';
+const APP_VERSION='5.0.21', BUILD_ID='2026-09-04-calltheme-1';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
