@@ -1944,7 +1944,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.25', BUILD_ID='2026-09-04-biztile-1';
+const APP_VERSION='5.0.26', BUILD_ID='2026-09-04-funnel-1';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -2134,6 +2134,37 @@ function loadSupabaseSDK(){
 }
 function sbClient(){if(CFG.provider==='supabase'&&window.supabase&&CFG.supabaseUrl&&CFG.supabaseKey){if(!sb)sb=window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseKey);return sb;}return null;}
 function wapi(path){return getApiUrl()+path;}
+/* ── ВОРОНКА: шесть чисел, без которых решения о продукте — угадывание ──
+   install → register → first_msg → first_reply → d7_return → pay.
+   Сервер пишет каждое событие ОДИН раз на устройство, поэтому повтор безвреден:
+   отметку «отправлено» ставим только после успеха, а при неудаче просто
+   попробуем на следующем запуске. Оплату отмечает сервер сам — ей верить
+   с клиента нельзя. Ничего личного не отправляем: только случайный
+   идентификатор устройства и название события. */
+function evDev(){
+  try{ let d=localStorage.getItem('om_dev_id');
+    if(!d){ d='d'+Math.random().toString(36).slice(2,10)+Date.now().toString(36); localStorage.setItem('om_dev_id',d); }
+    return d; }catch(e){ return ''; }
+}
+function evSend(ev){
+  try{
+    if(localStorage.getItem('om_ev_'+ev)==='1')return;
+    if(!cloudOn||!isCloudReady()||CFG.provider!=='worker')return;
+    const dev=evDev(); if(!dev)return;
+    fetch(wapi('/ev'),{method:'POST',headers:{'Content-Type':'application/json','x-session-token':sessionToken||''},
+      body:JSON.stringify({dev:dev,ev:ev})})
+      .then(r=>{ if(r&&r.ok)localStorage.setItem('om_ev_'+ev,'1'); }).catch(()=>{});
+  }catch(e){}
+}
+/* Запуск: установка и возврат на седьмой день. Обе отметки считаются от
+   момента, когда на устройстве впервые появился аккаунт. */
+function evStartup(){
+  try{
+    evSend('install');
+    const reg=parseInt(localStorage.getItem('om_reg_at')||'0',10);
+    if(reg && Date.now()-reg >= 7*86400000) evSend('d7_return');
+  }catch(e){}
+}
 let sessionToken=localStorage.getItem('om_session_token')||'';
 function saveSessionToken(t){sessionToken=t||'';if(t)localStorage.setItem('om_session_token',t);else localStorage.removeItem('om_session_token');}
 function apiHeaders(){return{'content-type':'application/json','x-session-token':sessionToken};}
@@ -3306,6 +3337,7 @@ $('#btnFinish').onclick=async()=>{
 /* ================== APP ENTRY ================== */
 function enterApp(){
   if(!me)me=loadMe(); if(!me){go('scrPhone');return;}
+  try{ if(!localStorage.getItem('om_reg_at')){ localStorage.setItem('om_reg_at',String(Date.now())); } evSend('register'); }catch(e){}
   try{sessionStorage.setItem(SS,me.id);}catch(e){}
   {const d=db();if(!d.users[me.id]){d.users[me.id]=me;save(d);}}
   loadBusSeq();
@@ -4252,6 +4284,7 @@ async function transmitMessage(m,peerId,isBot){
   }
 }
 function pushMessage(obj){
+  try{ evSend('first_msg'); }catch(e){}
   if(current&&current.channel)return postChannelMessage(obj);
   if(current&&current.group)return pushGroupMessage(obj);
   const d=db();const k=chatKey(me.id,current.id);if(!d.chats[k])d.chats[k]={id:k,members:[me.id,current.id],messages:[]};
@@ -4304,6 +4337,7 @@ function showTyping(on){
 
 /* incoming */
 async function onIncomingMessage(p){
+  try{ evSend('first_reply'); }catch(e){}
   if(p&&p.gid)return onIncomingGroupMessage(p);
   if(p&&p.from&&isBlocked(p.from))return;   // сообщения от заблокированных не показываем
   if(p&&p.e2e&&p.enc){
@@ -6608,6 +6642,7 @@ function buildBizHub(body){
   body.appendChild(row('✨','ZORVELD Pro','подписка: файлы до 100 МБ, оформление',()=>{$('#subSheet').classList.remove('show');openPro();}));
 }
 $('#cardBiz').onclick=()=>openSub('Бизнес и подписка',buildBizHub);
+try{ evStartup(); }catch(e){}   // воронка: установка и возврат на седьмой день
 try{ applyOwnerUI(); }catch(e){}   // приманка на главном экране — сразу, не дожидаясь настроек
 $('#channelsSearch').addEventListener('input',()=>renderChannelsScreen());
 $('#btnNewChannel').onclick=openNewChannel;
