@@ -1944,7 +1944,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.26', BUILD_ID='2026-09-04-funnel-1';
+const APP_VERSION='5.0.27', BUILD_ID='2026-09-06-lockcall';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -8008,7 +8008,21 @@ document.addEventListener('visibilitychange',()=>{
   }
   // в пределах порога / без PIN — ничего не делаем: экран под шторкой тот же, что был.
 });
-function maybeLock(){const c=lockCfg();if(c.pin){const cur=currentScreenId();if(cur!=='lockScreen')_preLockScreen=cur;pinMode='check';pinBuffer='';$('#lockTitle').textContent='Введите PIN-код';renderPinDots();go('lockScreen');tryBiometricUnlock();}}
+/* Замок никогда не встаёт ПОВЕРХ идущего звонка. Порядок событий при ответе
+   с заблокированного телефона такой: оболочка показала вызов, а страница
+   догрузилась и позвала замок уже ПОСЛЕ — старый код закрывал им звонок и
+   вдобавок поднимал системное окно отпечатка. Именно это владелец видел как
+   «отпечаток поверх звонка» (06.09.2026). Теперь замок ставится ПОД вызов
+   тем же приёмом, что и при звонке на уже запертом экране, а отпечаток не
+   запрашивается: под звонком он не нужен, а окно системное и легло бы сверху.
+   Разговор кончился — endCall сам зовёт замок заново, уже с отпечатком. */
+function maybeLock(){const c=lockCfg();if(!c.pin)return;
+  const inCall=(typeof callPeerId!=='undefined'&&!!callPeerId);
+  const cur=currentScreenId();
+  if(cur!=='lockScreen'&&cur!=='callScreen')_preLockScreen=cur;
+  pinMode='check';pinBuffer='';$('#lockTitle').textContent='Введите PIN-код';renderPinDots();go('lockScreen');
+  if(inCall){_callShowOverLock();return;}
+  tryBiometricUnlock();}
 /* Биометрия (Face ID/отпечаток) — только в нативной обёртке, как быстрая замена PIN. */
 function bioAvailable(){try{const c=lockCfg();return !!(c&&c.pin&&c.bio!==false&&window.__OLESYA_NATIVE__&&window.ReactNativeWebView);}catch(e){return false;}}   // биометрия ВКЛЮЧЕНА по умолчанию (пока явно не выключили)
 function tryBiometricUnlock(){
