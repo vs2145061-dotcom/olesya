@@ -1974,7 +1974,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.29', BUILD_ID='2026-09-07-work';
+const APP_VERSION='5.0.30', BUILD_ID='2026-09-07-work';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -3376,6 +3376,11 @@ $('#btnFinish').onclick=async()=>{
 /* ================== APP ENTRY ================== */
 function enterApp(){
   if(!me)me=loadMe(); if(!me){go('scrPhone');return;}
+  /* Вход состоялся — только теперь известно, ЧЕЙ признак владельца брать из кэша.
+     На старте страницы me ещё нет, там ownerRestore() честно даёт «скрыто»; без
+     этого вызова владелец до открытия настроек видел бы у себя приманку
+     «7 дней бесплатно», а технические пункты оставались бы спрятанными. */
+  try{ ownerRestore(); }catch(e){}
   try{ if(!localStorage.getItem('om_reg_at')){ localStorage.setItem('om_reg_at',String(Date.now())); } evSend('register'); }catch(e){}
   try{sessionStorage.setItem(SS,me.id);}catch(e){}
   {const d=db();if(!d.users[me.id]){d.users[me.id]=me;save(d);}}
@@ -4997,7 +5002,12 @@ function setProUntil(until){const d=db();if(d.users[me.id]){d.users[me.id].proUn
    владельца сервер уже присылал в статусе подписки, мы его просто выбрасывали.
    Помним ответ между запусками, иначе у владельца пункты мигали бы при каждом
    открытии настроек. По умолчанию скрыто: ошибиться безопаснее в эту сторону. */
-let _isOwner=(localStorage.getItem('om_is_owner')==='1');
+/* Ключ привязан к uid. Раньше был общий на устройство — и после смены
+   аккаунта новый человек наследовал технические настройки прежнего.
+   Нет аккаунта или чужой аккаунт → признака нет → скрыто. */
+function ownerKey(){ try{ return 'om_is_owner_'+((me&&me.id)||''); }catch(e){ return 'om_is_owner_'; } }
+function ownerCached(){ try{ return !!(me&&me.id)&&localStorage.getItem(ownerKey())==='1'; }catch(e){ return false; } }
+let _isOwner=false;
 function applyOwnerUI(){
   try{ document.querySelectorAll('.owner-only').forEach(e=>{ e.style.display=_isOwner?'':'none'; }); }catch(e){}
   /* Обратное: приманка про пробный период владельцу бессмысленна — у него всё
@@ -5006,9 +5016,13 @@ function applyOwnerUI(){
 }
 function setOwner(v){
   const n=!!v; if(n===_isOwner){applyOwnerUI();return;}
-  _isOwner=n; try{localStorage.setItem('om_is_owner',n?'1':'0');}catch(e){}
+  _isOwner=n;
+  try{ if(me&&me.id)localStorage.setItem(ownerKey(),n?'1':'0'); }catch(e){}
   applyOwnerUI();
 }
+/* Признак берётся из кэша ТОЛЬКО когда известно, чей он. Зовётся при старте
+   и после входа: до этого _isOwner=false, то есть скрыто. */
+function ownerRestore(){ _isOwner=ownerCached(); applyOwnerUI(); }
 async function cloudProStatus(){
   if(!me||!cloudOn||!isCloudReady()||CFG.provider!=='worker')return;
   try{const r=await jget(wapi('/pro/status'));if(r&&typeof r.until!=='undefined'){setProUntil(r.until||0);setOwner(r.owner);refreshProUI();}}catch(e){}
@@ -6910,7 +6924,7 @@ try{
    у остальных — в раздел подписки. Проверку делает openWork(). */
 $('#cardBiz').onclick=()=>openWork();
 try{ evStartup(); }catch(e){}   // воронка: установка и возврат на седьмой день
-try{ applyOwnerUI(); }catch(e){}   // приманка на главном экране — сразу, не дожидаясь настроек
+try{ ownerRestore(); }catch(e){}   // приманка на главном экране — сразу, но ТОЛЬКО по своему аккаунту
 $('#channelsSearch').addEventListener('input',()=>renderChannelsScreen());
 $('#btnNewChannel').onclick=openNewChannel;
 $('#btnCreateChannel').onclick=()=>{createChannel($('#chHandle').value,$('#chName').value,$('#chDescr').value);};
@@ -7496,7 +7510,11 @@ function setRemember(on){try{localStorage.setItem('om_remember',on?'1':'0');}cat
 $('#btnSettings').onclick=()=>{paintMe();refreshSettings();$('#settingsSheet').classList.add('show');};
 $('#myAvatarTop').onclick=()=>{paintMe();refreshSettings();$('#settingsSheet').classList.add('show');};
 $('#btnCloseSettings').onclick=()=>$('#settingsSheet').classList.remove('show');
-$('#btnLogout').onclick=()=>{setOnline(false);sessionStorage.removeItem(SS);localStorage.removeItem('om_me');saveSessionToken('');me=null;$('#settingsSheet').classList.remove('show');location.reload();};
+$('#btnLogout').onclick=()=>{setOnline(false);sessionStorage.removeItem(SS);localStorage.removeItem('om_me');
+  /* Кэш визиток — это список компаний, с которыми человек переписывался.
+     Он переживал выход с релиза 17. Моя недоделка, чиню здесь. */
+  try{localStorage.removeItem('om_bizcards');}catch(e){}
+  saveSessionToken('');me=null;$('#settingsSheet').classList.remove('show');location.reload();};
 /* btnClearAll назначается ниже (полная очистка всех om-ключей) — здесь дубль удалён */
 $('#screenToggle').onclick=function(){this.classList.toggle('on');toast(this.classList.contains('on')?'Защита от скриншотов включена':'Защита выключена');};
 $('#rememberToggle').onclick=function(){const on=!this.classList.contains('on');this.classList.toggle('on',on);setRemember(on);
@@ -7523,7 +7541,11 @@ $('#subBack').onclick=()=>$('#subSheet').classList.remove('show');
 function el(html){const t=document.createElement('div');t.innerHTML=String(html).trim();return t.firstChild;}
 function optRow(label,sel,onclick){const r=el('<div class="opt'+(sel?' sel':'')+'"><div class="rb"></div><div>'+label+'</div></div>');r.onclick=onclick;return r;}
 function refreshSettings(){if(!me)return;
-  applyOwnerUI();
+  ownerRestore();
+  /* Раньше признак исправлялся только из openPro(). Человек, не открывавший
+     экран Pro, мог не увидеть исправления НИКОГДА. Спрашиваем здесь: технические
+     пункты живут именно в настройках, и один запрос на их открытие незаметен. */
+  try{ cloudProStatus(); }catch(e){}
   const cfg=cloudCfg();const se=$('#stServer');if(se)se.textContent=cfg.provider==='worker'?'Cloudflare Worker':(cfg.provider==='supabase'?'Supabase':'Локальный режим');
   const t2=$('#st2fa');if(t2)t2.textContent=me.cloud?'Облачный пароль':((me.twoFA&&me.twoFA.hash)?'Включён':'Отключён');
   const ss=$('#stSess');if(ss)ss.textContent=Object.keys(sessionsMap()).length+' активн.';
@@ -7545,7 +7567,13 @@ function refreshSettings(){if(!me)return;
   const fb=$('#firebaseStatusBadge');if(fb){fb.textContent=isFirebaseReady()?'✅ Firebase подключён; для +7 используется Worker/SMSC, для остальных номеров — Firebase':'ℹ️ Firebase не используется для +7: вход идёт через Worker/SMSC';}
 }
 function forceLogout(msg){try{dropSession();}catch(e){}try{setOnline(false);}catch(e){}
-  sessionStorage.removeItem(SS);localStorage.removeItem('om_me');saveSessionToken('');me=null;current=null;
+  sessionStorage.removeItem(SS);localStorage.removeItem('om_me');
+  try{localStorage.removeItem('om_bizcards');}catch(e){}
+  /* Принудительный выход НЕ перезагружает страницу, в отличие от кнопки «Выйти».
+     Значит списки рабочего стола остались бы в памяти под следующим аккаунтом. */
+  try{ _workTickets=[]; _workClients=[]; _workFilter=''; _workTab='tickets'; }catch(e){}
+  _isOwner=false; try{applyOwnerUI();}catch(e){}
+  saveSessionToken('');me=null;current=null;
   $('#settingsSheet').classList.remove('show');$('#subSheet').classList.remove('show');
   otpFails=0;otpLocked=false;pendingUser=null;
   if($('#cc'))$('#cc').value='+7';if($('#phoneNum'))$('#phoneNum').value='';
