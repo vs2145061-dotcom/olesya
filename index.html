@@ -1944,7 +1944,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.27', BUILD_ID='2026-09-06-lockcall';
+const APP_VERSION='5.0.28', BUILD_ID='2026-09-07-funnelfix';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -2149,7 +2149,16 @@ function evDev(){
 function evSend(ev){
   try{
     if(localStorage.getItem('om_ev_'+ev)==='1')return;
-    if(!cloudOn||!isCloudReady()||CFG.provider!=='worker')return;
+    /* Раньше здесь стояло ещё и cloudOn — и воронка молчала двое суток.
+       cloudOn поднимается только ПОСЛЕ ответа /health, а install и d7_return
+       отправляются при разборе страницы, register — из enterApp(), который для
+       вернувшегося человека зовётся намеренно до сети (чтобы не мелькал экран
+       ввода номера). Оба события гарантированно попадали в момент cloudOn=false
+       и молча пропадали. Проверено 07.09.2026: сервер писал и читал верно,
+       не слал клиент. isCloudReady() смотрит настройку адреса, а не сеть, и верна
+       сразу; сессия для /ev не нужна; отметка «отправлено» ставится только после
+       успеха — значит при обрыве связи событие уйдёт на следующем запуске. */
+    if(!isCloudReady()||CFG.provider!=='worker')return;
     const dev=evDev(); if(!dev)return;
     fetch(wapi('/ev'),{method:'POST',headers:{'Content-Type':'application/json','x-session-token':sessionToken||''},
       body:JSON.stringify({dev:dev,ev:ev})})
