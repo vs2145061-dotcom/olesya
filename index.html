@@ -1204,7 +1204,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
         <div class="home-card hc-news" id="cardNews"><div class="orb o-news hc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"><path d="M4 5h13v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M17 8h3v11a2 2 0 0 1-3 1.7"/><path d="M7 9h7M7 13h7M7 17h4" stroke-linecap="round"/></svg></div><div><div class="hc-t">Новости</div><div class="hc-d">мир · финансы · рассказы</div></div></div>
         <div class="home-card hc-social" id="cardSocial"><div class="orb o-social hc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="6" cy="12" r="2.4"/><circle cx="17" cy="6" r="2.4"/><circle cx="17" cy="18" r="2.4"/><path d="M8.2 11l6.6-3.6M8.2 13l6.6 3.6" stroke-linecap="round"/></svg></div><div><div class="hc-t">Социальные сети</div><div class="hc-d">ваши страницы внутри</div></div></div>
         <div class="home-card hc-channels" id="cardChannels"><div class="orb o-channels hc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"><path d="M4 9v6h3l6 4V5L7 9z" fill="#fff" stroke="none"/><path d="M16.5 8.5a4 4 0 0 1 0 7M19 6a7 7 0 0 1 0 12" stroke-linecap="round"/></svg></div><div><div class="hc-t">Каналы</div><div class="hc-d">публичные ленты · подписки</div></div></div>
-        <div class="home-card hc-biz" id="cardBiz"><div class="hc-lure guest-only">7 дней бесплатно</div><div class="orb o-biz hc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"><rect x="3" y="7.5" width="18" height="12.5" rx="2.5"/><path d="M9 7.5V5.5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 12.5h18" stroke-linecap="round"/></svg></div><div><div class="hc-t">Бизнес и Pro</div><div class="hc-d">заявки · подписка</div></div></div>
+        <div class="home-card hc-biz" id="cardBiz"><div class="hc-lure guest-only">7 дней бесплатно</div><div class="orb o-biz hc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"><rect x="3" y="7.5" width="18" height="12.5" rx="2.5"/><path d="M9 7.5V5.5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 12.5h18" stroke-linecap="round"/></svg></div><div><div class="hc-t">Бизнес-режим</div><div class="hc-d">заявки · клиенты</div></div></div>
       </div>
       <div class="home-foot">ZORVELD · защищённый чат<br>сквозное шифрование · ИИ-перевод · анти-спам · 2FA</div>
     </div>
@@ -1974,7 +1974,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.30', BUILD_ID='2026-09-07-work';
+const APP_VERSION='5.0.31', BUILD_ID='2026-09-07-pro';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -5042,7 +5042,16 @@ async function proCheckout(plan){
 function proAccentVal(){try{return localStorage.getItem('om_proaccent')||'';}catch(e){return '';}}
 function applyProAccent(){const a=isPro()?proAccentVal():'';if(a){document.documentElement.style.setProperty('--primary',a);}else{document.documentElement.style.removeProperty('--primary');}}
 function setProAccent(color){if(!isPro()){openPro();toast('Цвета акцента — в ZORVELD Pro ✨');return;}try{localStorage.setItem('om_proaccent',color);}catch(e){}applyProAccent();renderPro();toast('Цвет акцента обновлён ✨');}
-function openPro(){go('scrPro');renderPro();cloudProStatus();}
+/* Pro — это отдельный ЭКРАН, а не подраздел настроек. Пока лист настроек
+   открыт, он лежит поверх любого экрана, и переход выглядел как «ничего не
+   произошло»: экран Pro честно открывался ПОД листом, и его было видно только
+   после системной кнопки «назад», которая лист закрывала. Гасим листы здесь, в
+   одном месте: в Pro ведут ещё цвета акцента и голосовое управление. */
+function openPro(){
+  try{ $('#subSheet').classList.remove('show'); }catch(e){}
+  try{ $('#settingsSheet').classList.remove('show'); }catch(e){}
+  go('scrPro');renderPro();cloudProStatus();
+}
 function renderPro(){
   const active=isPro();
   const st=$('#proStatus');if(st){if(active){st.textContent='✨ Подписка активна до '+new Date(proUntil()).toLocaleDateString('ru-RU');st.className='pro-status on';}else{st.textContent='Подписка не активна';st.className='pro-status';}}
@@ -6689,11 +6698,10 @@ $('#langSheet').addEventListener('click',e=>{if(e.target.id==='langSheet')$('#la
 $('#cardChannels').onclick=openChannelsScreen;
 /* Плитка ведёт в развилку, а не дублирует экраны: бизнес-режим и подписка живут
    в настройках, и здесь мы просто открываем те же самые. */
-function buildBizHub(body){
-  const row=(icon,title,desc,fn)=>{const r=el('<div class="setting" style="cursor:pointer"><div class="ic">'+icon+'</div><div class="lbl"><div class="t">'+title+'</div><div class="d">'+desc+'</div></div><div style="color:var(--faint)">›</div></div>');r.onclick=fn;return r;};
-  body.appendChild(row('💼','Бизнес-режим','заявки, клиенты, карточка компании',()=>openSub('Бизнес-режим',buildBusiness)));
-  body.appendChild(row('✨','ZORVELD Pro','подписка: файлы до 100 МБ, оформление',()=>{$('#subSheet').classList.remove('show');openPro();}));
-}
+/* Раздел «Бизнес и Pro» убран (07.09.2026, решение владельца): плитка на
+   главной ведёт прямо в бизнес-режим, а ZORVELD Pro остаётся пунктом настроек.
+   Как показывать Pro шире — решим отдельно. Функция buildBizHub удалена, а не
+   оставлена без вызовов: мёртвый код потом читают как живой. */
 /* ── РАБОЧИЙ СТОЛ бизнес-режима (этап 4) ───────────────────────────────────
    Заявки и клиенты — инструмент, которым пользуются десятки раз за день,
    поэтому у них свой экран, а не строка в настройках. Данные и эндпоинты те
@@ -6713,7 +6721,7 @@ let _workTab='tickets', _workTickets=[], _workClients=[], _workFilter='';
 async function openWork(){
   let s=null;
   try{ s=await jget(wapi('/biz/status')); }catch(e){}
-  if(!(s&&s.active)){ openSub('Бизнес и подписка',buildBizHub); return; }
+  if(!(s&&s.active)){ openSub('Бизнес-режим',buildBusiness); return; }
   go('scrWork'); renderWork();
 }
 function workSetTab(t){
@@ -6734,7 +6742,7 @@ async function renderWork(){
     if(String(e&&e.message)==='http_402'||String(e&&e.message)==='biz_required'){
       box.innerHTML='<div class="note">Бизнес-режим не подключён или закончился.</div>';
       const b=el('<button class="btn sub-btn">Открыть подписку</button>');
-      b.onclick=()=>openSub('Бизнес и подписка',buildBizHub); box.appendChild(b); return;
+      b.onclick=()=>openSub('Бизнес-режим',buildBusiness); box.appendChild(b); return;
     }
     box.innerHTML='<div class="note">Нет связи с сервером — откройте позже.</div>';
   }
