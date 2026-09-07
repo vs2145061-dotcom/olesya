@@ -1063,6 +1063,14 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 .o-news{background:radial-gradient(120% 120% at 32% 24%, #5AD1FF, #2F6BFF 72%)}
 .o-social{background:radial-gradient(120% 120% at 32% 24%, #FF9DBE, #C56CFF 72%)}
 .tabbar{display:flex;gap:6px;padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--line-soft)}
+/* Рабочий стол: фильтр стадий листается вбок, а не переносится по слогам
+   (при переносе «В работе 1» разваливалось на три строки). Кнопки в строке
+   заявки — компактные: их видно в списке десятками, крупные съедали экран. */
+.work-chips{flex-wrap:nowrap;overflow-x:auto;border-bottom:none;-webkit-overflow-scrolling:touch}
+.work-chips::-webkit-scrollbar{display:none}
+.work-chips .tabbtn{flex:0 0 auto;white-space:nowrap}
+.work-act{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.work-act .btn{flex:1 1 0;width:auto;margin:0;min-width:130px;padding:9px 12px;font-size:13px;white-space:nowrap}
 .tabbtn{flex:1;padding:9px 6px;border-radius:12px;font-family:var(--disp);font-weight:600;font-size:13.5px;color:var(--muted);background:var(--raised);border:1px solid transparent;transition:.15s}
 .tabbtn.sel{color:#fff;background:linear-gradient(135deg,var(--primary),#8a7bff);box-shadow:0 6px 14px -6px rgba(90,65,255,.6)}
 .news-list{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:11px}
@@ -1351,6 +1359,28 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
       <button class="iconbtn fx-call" id="btnCallPick" title="Позвонить контакту"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></button>
     </div>
     <div class="list" id="callsList"></div>
+  </section>
+
+  <!-- ============ РАБОЧИЙ СТОЛ (бизнес-режим) ============
+       Отдельный экран, а не раздел настроек. Раньше заявки, клиенты и карточка
+       жили в одном свитке внутри настроек: чтобы сменить стадию заявки, мастер
+       открывал настройки, листал мимо подписки и промокода. Рабочий инструмент
+       так не открывают по двадцать раз в день.
+       Экран виден ТОЛЬКО при действующем бизнес-режиме: у остальных плитка на
+       главной по-прежнему ведёт в раздел подписки. Общую навигацию не трогаем —
+       у экрана свои вкладки, как у «Новостей». -->
+  <section class="screen hidden" id="scrWork">
+    <div class="topbar">
+      <button class="iconbtn" data-back="scrHome" title="Главная">←</button>
+      <div class="grow"><div class="title">Работа</div><div class="sub" id="workSub">заявки и клиенты</div></div>
+      <button class="iconbtn" id="btnWorkReload" title="Обновить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v6h-6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
+    <div class="tabbar" id="workTabs">
+      <button class="tabbtn sel" data-wt="tickets">Заявки</button>
+      <button class="tabbtn" data-wt="clients">Клиенты</button>
+      <button class="tabbtn" data-wt="card">Карточка</button>
+    </div>
+    <div class="list" id="workBody"></div>
   </section>
 
   <!-- ============ CONVERSATION ============ -->
@@ -1944,7 +1974,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.28', BUILD_ID='2026-09-07-funnelfix';
+const APP_VERSION='5.0.29', BUILD_ID='2026-09-07-work';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6650,7 +6680,235 @@ function buildBizHub(body){
   body.appendChild(row('💼','Бизнес-режим','заявки, клиенты, карточка компании',()=>openSub('Бизнес-режим',buildBusiness)));
   body.appendChild(row('✨','ZORVELD Pro','подписка: файлы до 100 МБ, оформление',()=>{$('#subSheet').classList.remove('show');openPro();}));
 }
-$('#cardBiz').onclick=()=>openSub('Бизнес и подписка',buildBizHub);
+/* ── РАБОЧИЙ СТОЛ бизнес-режима (этап 4) ───────────────────────────────────
+   Заявки и клиенты — инструмент, которым пользуются десятки раз за день,
+   поэтому у них свой экран, а не строка в настройках. Данные и эндпоинты те
+   же, что в разделе «Бизнес-режим»; здесь другой способ ими пользоваться:
+   стадии видно сразу, смена — в один тап, клиент из заявки открывается в
+   переписке. Раздел настроек остаётся: там подписка, промокод и оплата. */
+const WORK_STAGES=[['new','🆕 Принята'],['work','🔧 В работе'],['done','✅ Готово'],['paid','💰 Оплачено']];
+function workStageName(s){const f=WORK_STAGES.find(x=>x[0]===(s||'new'));return f?f[1]:WORK_STAGES[0][1];}
+function workPrice(p){
+  if(p===null||p===undefined||p==='')return '';
+  const r=Number(p)/100; if(!isFinite(r)||r<=0)return '';
+  return ' · '+r.toLocaleString('ru-RU',{minimumFractionDigits:(Math.round(r*100)%100?2:0),maximumFractionDigits:2})+' ₽';
+}
+let _workTab='tickets', _workTickets=[], _workClients=[], _workFilter='';
+/* Открыть рабочий стол. Если подписки нет — ведём в раздел подписки, а не
+   показываем пустой инструмент: человеку нужен ответ «почему не работает». */
+async function openWork(){
+  let s=null;
+  try{ s=await jget(wapi('/biz/status')); }catch(e){}
+  if(!(s&&s.active)){ openSub('Бизнес и подписка',buildBizHub); return; }
+  go('scrWork'); renderWork();
+}
+function workSetTab(t){
+  _workTab=t; _workFilter='';
+  try{ $('#workTabs .tabbtn').forEach(b=>b.classList.toggle('sel',b.dataset.wt===t)); }catch(e){}
+  renderWork();
+}
+async function renderWork(){
+  const box=$('#workBody'); if(!box)return;
+  box.innerHTML='<div class="note">Загружаю…</div>';
+  try{
+    if(_workTab==='tickets')return await workTickets(box);
+    if(_workTab==='clients')return await workClients(box);
+    return await workCard(box);
+  }catch(e){
+    /* 402 — подписка кончилась прямо во время работы. Не оставляем человека
+       перед пустым экраном: объясняем и даём кнопку. */
+    if(String(e&&e.message)==='http_402'||String(e&&e.message)==='biz_required'){
+      box.innerHTML='<div class="note">Бизнес-режим не подключён или закончился.</div>';
+      const b=el('<button class="btn sub-btn">Открыть подписку</button>');
+      b.onclick=()=>openSub('Бизнес и подписка',buildBizHub); box.appendChild(b); return;
+    }
+    box.innerHTML='<div class="note">Нет связи с сервером — откройте позже.</div>';
+  }
+}
+/* ── Заявки ── */
+async function workTickets(box){
+  const r=await jget(wapi('/business/tickets'));
+  _workTickets=(r&&r.tickets)||[];
+  box.innerHTML='';
+  const sub=$('#workSub'); if(sub)sub.textContent=_workTickets.length?('заявок: '+_workTickets.length):'заявок пока нет';
+
+  const add=el('<div class="cn-add"><div class="ad-ic">＋</div><div><div class="ad-t">Новая заявка</div><div class="ad-d">что нужно сделать и для кого</div></div></div>');
+  add.onclick=()=>workNewTicket();
+  box.appendChild(add);
+
+  if(!_workTickets.length){
+    box.appendChild(el('<div class="empty" style="padding:36px 26px">Пока нет заявок.<br>Создайте первую — она появится здесь и у клиента в разделе «Мои заказы».</div>'));
+    return;
+  }
+  /* Фильтр по стадии со счётчиками: главный вопрос мастера утром — «что в
+     работе» и «что не оплачено», а не весь список подряд. */
+  const chips=el('<div class="tabbar work-chips"></div>');
+  const mk=(key,name)=>{
+    const n=key?_workTickets.filter(t=>(t.status||'new')===key).length:_workTickets.length;
+    const b=el('<button class="tabbtn'+(_workFilter===key?' sel':'')+'">'+esc(name)+' '+n+'</button>');
+    b.onclick=()=>{_workFilter=key;renderWork();};
+    chips.appendChild(b);
+  };
+  mk('','Все'); WORK_STAGES.forEach(s=>mk(s[0],s[1]));
+  box.appendChild(chips);
+
+  const rows=_workFilter?_workTickets.filter(t=>(t.status||'new')===_workFilter):_workTickets;
+  if(!rows.length){ box.appendChild(el('<div class="note">В этой стадии сейчас пусто.</div>')); return; }
+  rows.forEach(x=>{
+    const row=el('<div class="log-row"></div>');
+    row.appendChild(el('<div><b>'+esc(x.title||'Заявка')+'</b>'+esc(workPrice(x.price))+'</div>'));
+    const кто=(x.client_name||'')+(x.client_phone?(' · '+x.client_phone):'');
+    if(кто.trim())row.appendChild(el('<div>'+esc(кто)+'</div>'));
+    row.appendChild(el('<div class="lt">'+esc(new Date(x.updated_at||Date.now()).toLocaleString('ru-RU'))+'</div>'));
+
+    const acts=el('<div class="work-act"></div>'); row.appendChild(acts);
+    const st=el('<button class="btn sub-btn">'+esc(workStageName(x.status))+' · сменить</button>');
+    st.onclick=async()=>{
+      const i=WORK_STAGES.findIndex(z=>z[0]===(x.status||'new'));
+      const next=WORK_STAGES[(i<0?0:(i+1))%WORK_STAGES.length][0];
+      st.disabled=true;
+      try{
+        await jpost(wapi('/business/tickets/update'),{id:x.id,client_name:x.client_name,client_phone:x.client_phone,
+          title:x.title,status:next,note:x.note,photos:[],checklist:[],client_id:x.client_id||null,client_uid:x.client_uid||null,price:x.price});
+        x.status=next; st.textContent=workStageName(next)+' · сменить';
+        toast('Стадия: '+workStageName(next).replace(/^\S+\s/,''));
+        /* Счётчики в фильтре обязаны сойтись с новым состоянием, иначе мастер
+           увидит «В работе 3», а внутри две заявки. */
+        if(_workFilter)renderWork();
+      }catch(e){ toast('Не удалось изменить стадию'); }
+      st.disabled=false;
+    };
+    acts.appendChild(st);
+
+    if(x.client_uid){
+      const w=el('<button class="btn sub-btn">Написать клиенту</button>');
+      w.onclick=()=>{ try{ openConv(x.client_uid); }catch(e){ toast('Переписка недоступна'); } };
+      acts.appendChild(w);
+    }
+    box.appendChild(row);
+  });
+}
+/* Новая заявка. Клиента выбираем из книги: без этого заявка не связана с
+   человеком, и сервер не сможет прислать ему сообщение о смене стадии. */
+async function workNewTicket(){
+  try{ const r=await jget(wapi('/business/clients')); _workClients=(r&&r.clients)||[]; }catch(e){ _workClients=[]; }
+  const box=$('#workBody'); if(!box)return;
+  box.innerHTML='';
+  const f=el('<div class="log-row"></div>');
+  f.innerHTML='<div class="sec-head">Новая заявка</div>'
+    +'<input class="input sub-input" id="wtTitle" placeholder="Что нужно сделать" />'
+    +'<select class="input sub-input" id="wtClient"></select>'
+    +'<input class="input sub-input" id="wtPrice" placeholder="Сумма, ₽ (необязательно)" inputmode="decimal" />'
+    +'<textarea class="input sub-input" id="wtNote" placeholder="Заметка" style="height:80px"></textarea>';
+  box.appendChild(f);
+  const sel=f.querySelector('#wtClient');
+  sel.appendChild(el('<option value="">— без клиента из книги —</option>'));
+  _workClients.forEach(c=>{ const o=el('<option></option>'); o.value=c.id; o.textContent=c.name+(c.phone?(' · '+c.phone):''); sel.appendChild(o); });
+
+  const save=el('<button class="btn sub-btn" style="margin-top:10px">Создать заявку</button>');
+  save.onclick=async()=>{
+    const t=f.querySelector('#wtTitle').value.trim();
+    if(!t){ toast('Напишите, что нужно сделать'); return; }
+    const c=_workClients.find(x=>x.id===sel.value)||null;
+    save.disabled=true;
+    try{
+      await jpost(wapi('/business/tickets'),{client_id:c?c.id:null,client_uid:c?(c.uid||null):null,
+        client_name:c?c.name:'',client_phone:c?(c.phone||''):'',title:t,
+        price:f.querySelector('#wtPrice').value,note:f.querySelector('#wtNote').value,status:'new'});
+      toast('Заявка создана'); _workTab='tickets'; renderWork();
+    }catch(e){ toast(String(e&&e.message)==='biz_required'?'Подписка закончилась':'Не удалось создать заявку'); save.disabled=false; }
+  };
+  box.appendChild(save);
+  const back=el('<button class="btn sub-btn" style="margin-top:6px">Отмена</button>');
+  back.onclick=()=>renderWork(); box.appendChild(back);
+}
+/* ── Клиенты ── */
+async function workClients(box){
+  const r=await jget(wapi('/business/clients'));
+  _workClients=(r&&r.clients)||[];
+  box.innerHTML='';
+  const sub=$('#workSub'); if(sub)sub.textContent=_workClients.length?('клиентов: '+_workClients.length):'клиентов пока нет';
+
+  const f=el('<div class="log-row"></div>');
+  f.innerHTML='<div class="sec-head">Добавить клиента</div>'
+    +'<input class="input sub-input" id="wcName" placeholder="Имя" />'
+    +'<input class="input sub-input" id="wcPhone" placeholder="Телефон" inputmode="tel" />';
+  const addb=el('<button class="btn sub-btn" style="margin-top:8px">Добавить</button>');
+  addb.onclick=async()=>{
+    const name=f.querySelector('#wcName').value.trim(), phone=f.querySelector('#wcPhone').value.trim();
+    if(!name){ toast('Впишите имя'); return; }
+    addb.disabled=true;
+    let uid=null;
+    /* Ищем человека по телефону: если он есть в ZORVELD, заявки будут
+       связаны с его аккаунтом и он увидит их у себя в «Моих заказах». */
+    try{ if(phone){ const u=await cloudLookup(phone); uid=(u&&u.id)||null; } }catch(e){}
+    try{ await jpost(wapi('/business/clients'),{name,phone,uid}); toast(uid?'Клиент добавлен и связан с аккаунтом':'Клиент добавлен');
+         f.querySelector('#wcName').value=''; f.querySelector('#wcPhone').value=''; renderWork(); }
+    catch(e){ toast('Не удалось добавить'); addb.disabled=false; }
+  };
+  f.appendChild(addb);
+  box.appendChild(f);
+
+  if(!_workClients.length){ box.appendChild(el('<div class="empty" style="padding:30px 26px">Книга клиентов пуста.</div>')); return; }
+  _workClients.forEach(c=>{
+    const row=el('<div class="log-row"></div>');
+    row.appendChild(el('<div><b>'+esc(c.name||'Клиент')+'</b></div>'));
+    if(c.phone)row.appendChild(el('<div>'+esc(c.phone)+'</div>'));
+    const n=_workTickets.filter(t=>t.client_id===c.id).length;
+    if(n)row.appendChild(el('<div class="lt">заявок: '+n+'</div>'));
+    if(c.uid){
+      const w=el('<button class="btn sub-btn" style="margin-top:8px">Написать</button>');
+      w.onclick=()=>{ try{ openConv(c.uid); }catch(e){ toast('Переписка недоступна'); } };
+      row.appendChild(w);
+    }
+    const del=el('<button class="btn sub-btn" style="margin-top:6px">Убрать из книги</button>');
+    del.onclick=async()=>{
+      const okk=await appConfirm('Убрать «'+(c.name||'клиента')+'» из книги? Заявки останутся.',{okText:'Убрать',danger:true});
+      if(!okk)return;
+      try{ await jpost(wapi('/business/clients/delete'),{id:c.id}); toast('Клиент убран'); renderWork(); }
+      catch(e){ toast('Не удалось убрать'); }
+    };
+    row.appendChild(del);
+    box.appendChild(row);
+  });
+}
+/* ── Карточка компании ── */
+async function workCard(box){
+  const c=await jget(wapi('/business/card'));
+  const d=(c&&c.card)||{};
+  box.innerHTML='';
+  const sub=$('#workSub'); if(sub)sub.textContent=d.company?d.company:'карточка компании';
+  const f=el('<div class="log-row"></div>');
+  f.innerHTML='<div class="sec-head">Как вас видит собеседник</div>'
+    +'<input class="input sub-input" id="wkCompany" placeholder="Компания / проект" />'
+    +'<input class="input sub-input" id="wkRole" placeholder="Роль / услуга" />'
+    +'<input class="input sub-input" id="wkPhone" placeholder="Рабочий телефон" inputmode="tel" />'
+    +'<input class="input sub-input" id="wkSite" placeholder="Сайт" />'
+    +'<textarea class="input sub-input" id="wkDesc" placeholder="Описание услуг" style="height:90px"></textarea>';
+  box.appendChild(f);
+  f.querySelector('#wkCompany').value=d.company||''; f.querySelector('#wkRole').value=d.role||'';
+  f.querySelector('#wkPhone').value=d.phone||''; f.querySelector('#wkSite').value=d.website||'';
+  f.querySelector('#wkDesc').value=d.description||'';
+  const save=el('<button class="btn sub-btn" style="margin-top:10px">Сохранить карточку</button>');
+  save.onclick=async()=>{
+    save.disabled=true;
+    try{ await jpost(wapi('/business/card'),{company:f.querySelector('#wkCompany').value,role:f.querySelector('#wkRole').value,
+           phone:f.querySelector('#wkPhone').value,website:f.querySelector('#wkSite').value,description:f.querySelector('#wkDesc').value});
+         toast('Карточка сохранена'); }
+    catch(e){ toast('Не удалось сохранить'); }
+    save.disabled=false;
+  };
+  box.appendChild(save);
+  box.appendChild(el('<div class="note" style="margin-top:8px">Карточку видит собеседник в переписке с вами. Подписка, оплата и промокод — в разделе «Бизнес и Pro» на главной.</div>'));
+}
+try{
+  $('#workTabs .tabbtn').forEach(b=>{ b.onclick=()=>workSetTab(b.dataset.wt); });
+  const wr=$('#btnWorkReload'); if(wr)wr.onclick=()=>renderWork();
+}catch(e){}
+
+/* Плитка на главной: у мастера с действующим режимом она ведёт прямо в работу,
+   у остальных — в раздел подписки. Проверку делает openWork(). */
+$('#cardBiz').onclick=()=>openWork();
 try{ evStartup(); }catch(e){}   // воронка: установка и возврат на седьмой день
 try{ applyOwnerUI(); }catch(e){}   // приманка на главном экране — сразу, не дожидаясь настроек
 $('#channelsSearch').addEventListener('input',()=>renderChannelsScreen());
