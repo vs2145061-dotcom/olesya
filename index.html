@@ -1974,7 +1974,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.37', BUILD_ID='2026-09-09-tokenreport';
+const APP_VERSION='5.0.38', BUILD_ID='2026-09-09-tokenretry';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -8774,12 +8774,25 @@ window.olesyaNativePush=registerExpoPush;
    службу Expo из сборки убрали, наш приёмник молчал, а карточка всё равно
    появлялась и звенела — рисовать её было больше некому. Прямая отправка в
    Google даёт чистые данные, и приёмник наконец получает управление. */
-let _devicePushToken=null;
+let _devicePushToken=null, _devicePushDone=false, _devicePushTries=0;
 function registerDevicePush(token){
   if(token)_devicePushToken=token;
-  const t=_devicePushToken; if(!t)return;
-  if(!(me&&cloudOn&&CFG.provider==='worker'&&isCloudReady()))return;
-  try{ jpost(wapi('/push/native'),{token:t}); }catch(e){}
+  if(_devicePushDone)return;
+  const t=_devicePushToken;
+  /* Не готовы — не сдаёмся, а пробуем снова. Адрес приходит от оболочки сразу
+     после загрузки, а соединение с облаком поднимается позже; одна попытка в
+     этот момент всегда уходит впустую. Пробуем полторы минуты, этого хватает
+     с запасом даже на медленной сети. */
+  const рано = !t || !(me&&cloudOn&&CFG.provider==='worker'&&isCloudReady());
+  if(рано){
+    if(_devicePushTries++<30) setTimeout(registerDevicePush,3000);
+    return;
+  }
+  try{
+    jpost(wapi('/push/native'),{token:t})
+      .then(function(){ _devicePushDone=true; })
+      .catch(function(){ if(_devicePushTries++<30) setTimeout(registerDevicePush,3000); });
+  }catch(e){ if(_devicePushTries++<30) setTimeout(registerDevicePush,3000); }
 }
 window.olesyaDevicePush=registerDevicePush;
 /* Доклад о состоянии родного адреса — через тот же путь, что и крошки оболочки.
