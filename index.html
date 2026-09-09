@@ -1974,7 +1974,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.33', BUILD_ID='2026-09-08-nobiodelay';
+const APP_VERSION='5.0.34', BUILD_ID='2026-09-09-spk';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6389,10 +6389,22 @@ function renderCallActions(incoming,active,opt){
       if(_volWorks){ ra.muted=false; ra.volume=_spkOn?1:0.35; }
       else { ra.muted=!_spkOn; ra.volume=1; }
       if(_spkOn&&ra.setSinkId){try{ra.setSinkId('');}catch(e){}}};
-    const sendSpk=()=>{ if(!isNative)return; try{window.ReactNativeWebView.postMessage(JSON.stringify({type:'speaker',on:_spkOn}));}catch(e){} };
-    const sb=btn('',ICON.spk,()=>{_spkOn=!_spkOn;sb.classList.toggle('active',_spkOn);applySpk();sendSpk();
-      if(isNative)toast(_spkOn?'🔊 Громкая связь':'📱 Разговорный динамик');
-      else toast(_volWorks?(_spkOn?'🔊 Громко':'🔉 Тише'):(_spkOn?'🔊 Звук включён':'🔇 Звук выключен'));});
+    /* На устройстве маршрутом звука владеет оболочка, а не страница: настоящий
+       переключатель — системный, и последнее слово всегда за ним. Раньше страница
+       присылала АБСОЛЮТНОЕ значение из своей переменной, и если оно расходилось
+       с настоящим маршрутом, первое нажатие уходило впустую — отсюда жалоба
+       «кнопка срабатывает со второго раза». Теперь страница просит ПЕРЕКЛЮЧИТЬ
+       и рисует то, что оболочка ответила. В браузере всё как было. */
+    const sendSpk=()=>{ if(!isNative)return; try{window.ReactNativeWebView.postMessage(JSON.stringify({type:'speaker',toggle:true}));}catch(e){} };
+    const sb=btn('',ICON.spk,()=>{
+      if(isNative){ sendSpk(); return; }        // значок обновит ответ оболочки
+      _spkOn=!_spkOn;sb.classList.toggle('active',_spkOn);applySpk();
+      toast(_volWorks?(_spkOn?'🔊 Громко':'🔉 Тише'):(_spkOn?'🔊 Звук включён':'🔇 Звук выключен'));});
+    /* Ответ оболочки: только он и меняет значок на устройстве. */
+    window.olesyaSpeakerState=function(on){
+      try{ _spkOn=!!on; sb.classList.toggle('active',_spkOn); applySpk();
+           toast(_spkOn?'🔊 Громкая связь':'📱 Разговорный динамик'); }catch(e){}
+    };
     sb.classList.toggle('active',_spkOn);
     a.appendChild(sb);applySpk();sendSpk();
     a.appendChild(btn('end',ICON.end,()=>endCall(false)));
