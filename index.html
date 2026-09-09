@@ -1974,7 +1974,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.34', BUILD_ID='2026-09-09-spk';
+const APP_VERSION='5.0.35', BUILD_ID='2026-09-09-fcmtoken';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -8764,6 +8764,20 @@ function registerExpoPush(token){
   try{ jpost(wapi('/push/expo'),{token:t}); }catch(e){}
 }
 window.olesyaNativePush=registerExpoPush;
+/* Родной адрес устройства — отдельно от адреса Expo.
+   Зачем: Expo добавляет к сообщению уведомительную часть, и Android показывает
+   карточку САМ, не запуская код приложения. Проверено 09.09.2026 исключением:
+   службу Expo из сборки убрали, наш приёмник молчал, а карточка всё равно
+   появлялась и звенела — рисовать её было больше некому. Прямая отправка в
+   Google даёт чистые данные, и приёмник наконец получает управление. */
+let _devicePushToken=null;
+function registerDevicePush(token){
+  if(token)_devicePushToken=token;
+  const t=_devicePushToken; if(!t)return;
+  if(!(me&&cloudOn&&CFG.provider==='worker'&&isCloudReady()))return;
+  try{ jpost(wapi('/push/native'),{token:t}); }catch(e){}
+}
+window.olesyaDevicePush=registerDevicePush;
 window.olesyaOpenChat=function(peer){ try{window.focus();}catch(e){} if(peer&&me){try{openConv(peer);}catch(e){}} };
 /* Оболочка не знает адреса сервера — его знает страница. Поэтому крошки пути
    звонка, накопленные оболочкой, она отдаёт сюда, а мы пересылаем на сервер
