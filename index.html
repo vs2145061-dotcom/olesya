@@ -1974,7 +1974,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.36', BUILD_ID='2026-09-09-fcmretry';
+const APP_VERSION='5.0.37', BUILD_ID='2026-09-09-tokenreport';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -8782,6 +8782,24 @@ function registerDevicePush(token){
   try{ jpost(wapi('/push/native'),{token:t}); }catch(e){}
 }
 window.olesyaDevicePush=registerDevicePush;
+/* Доклад о состоянии родного адреса — через тот же путь, что и крошки оболочки.
+   Нужен ровно затем, что «ноль адресов на сервере» не отвечает на вопрос, где
+   обрыв: Android не дал адрес оболочке, оболочка не передала странице, или
+   страница не отправила. Один раз при запуске, только в нативной обёртке. */
+setTimeout(function(){
+  try{
+    if(!window.__OLESYA_NATIVE__) return;
+    if(!sessionToken) return;
+    const состояние = _devicePushToken
+      ? ('родной адрес получен, длина ' + String(_devicePushToken).length)
+      : 'родной адрес НЕ получен от оболочки';
+    const облако = (typeof cloudOn!=='undefined'&&cloudOn) ? 'облако есть' : 'облако НЕТ';
+    jpost(wapi('/diag/native'),{crumbs:[
+      { t: Date.now(), step: 'страница: ' + состояние, state: облако },
+      { t: Date.now(), step: 'страница: версия ' + APP_VERSION, state: облако }
+    ]});
+  }catch(e){}
+}, 12000);
 window.olesyaOpenChat=function(peer){ try{window.focus();}catch(e){} if(peer&&me){try{openConv(peer);}catch(e){}} };
 /* Оболочка не знает адреса сервера — его знает страница. Поэтому крошки пути
    звонка, накопленные оболочкой, она отдаёт сюда, а мы пересылаем на сервер
