@@ -1974,7 +1974,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.40', BUILD_ID='2026-09-10-invitecheck';
+const APP_VERSION='5.0.41', BUILD_ID='2026-09-10-earpiece';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6023,6 +6023,13 @@ function _preferVp8(sdp){
   }catch(e){ return sdp; }
 }
 let _pendingRemoteAudio=false, _spkOn=true;
+/* Куда идёт звук в начале разговора. В оболочке — разговорный динамик: так
+   устроен любой телефон, и оболочка тоже начинает каждый звонок с наушника
+   (stopCallService сбрасывает свой признак). В браузере маршрута нет, там
+   «громко» — это просто полная громкость, как было. */
+function сбросВыводЗвука(){
+  try{ _spkOn = !(window.__OLESYA_NATIVE__&&window.ReactNativeWebView); }catch(e){ _spkOn=true; }
+}
 // Если автоплей звука собеседника заблокирован — включаем по первому касанию экрана звонка
 document.addEventListener('pointerdown',()=>{ if(_pendingRemoteAudio){ const ra=document.getElementById('remoteAudio'); if(ra){ ra.muted=false; const pr=ra.play(); if(pr&&pr.then)pr.then(()=>{_pendingRemoteAudio=false;}).catch(()=>{}); } } const rvp=document.getElementById('remoteVideo'); if(rvp&&rvp.srcObject){ try{rvp.muted=true;rvp.play&&rvp.play().catch(()=>{});}catch(_){} } },{passive:true});
 /* ICE-серверы. STUN — обнаружение публичного адреса; TURN — РЕЛЕ для звонков между
@@ -6198,6 +6205,7 @@ function _ringStop(){
   if(_ringTO){ clearTimeout(_ringTO); _ringTO=null; }
 }
 function startCall(kind){
+  сбросВыводЗвука();
   if(current&&current.group)return startGroupCall(kind);
   if(!micAllowed()){toast('🎤 Включите доступ к микрофону в Настройках, чтобы звонить');return;}
   if(kind==='video'&&!camAllowed()){kind='audio';toast('📷 Камера выключена — звоню только со звуком');}
@@ -6258,6 +6266,7 @@ function showIncomingCall(p){
   if(h.length>4&&!known){sec.tmp[from]=now+600000;saveSec(sec);emit('call:reject',{to:from,from:me.id,reason:'blocked'});logSec('⛔ Анти-спам: авто-блокировка на 10 мин — частые звонки ('+(p.name||from)+')');toast('⛔ Анти-спам: спам-номер заблокирован');return;}   // контакты НЕ блокируем — только чужие номера (иначе при частых звонках блокируется свой же собеседник)
   saveSec(sec);
   if(sec.callsFrom==='contacts'&&!known){emit('call:reject',{to:from,from:me.id,reason:'screen'});logSec('📵 Отклонён звонок (только контакты): '+(p.name||from));toast('📵 Звонок не из контактов отклонён');return;}
+  сбросВыводЗвука();
   callPeerId=from;callKind=p.kind;callIncoming=true;callStart=0;callAnswered=false;
   _callIceBuf=[];_callHasRemote=false;   // чистое состояние обмена адресами — В НАЧАЛЕ звонка
   _lastInviteAt=Date.now();
@@ -6419,7 +6428,6 @@ function renderCallActions(incoming,active,opt){
     const _volWorks=(()=>{ const ra=$('#remoteAudio'); if(!ra)return false;
       try{ const was=ra.volume; ra.volume=0.5; const ok=Math.abs(ra.volume-0.5)<0.01; ra.volume=was; return ok; }catch(e){ return false; } })();
     const isNative=!!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView);
-    if(isNative)_spkOn=false;   // оболочка стартует с наушника — значок не должен врать
     const applySpk=()=>{const ra=$('#remoteAudio');if(!ra)return;
       if(isNative){ ra.muted=false; ra.volume=1; return; }
       if(_volWorks){ ra.muted=false; ra.volume=_spkOn?1:0.35; }
@@ -6442,7 +6450,7 @@ function renderCallActions(incoming,active,opt){
            toast(_spkOn?'🔊 Громкая связь':'📱 Разговорный динамик'); }catch(e){}
     };
     sb.classList.toggle('active',_spkOn);
-    a.appendChild(sb);applySpk();sendSpk();
+    a.appendChild(sb);applySpk();
     a.appendChild(btn('end',ICON.end,()=>endCall(false)));
     if(callKind==='video'){
       const cb=btn('',ICON.cam,()=>{camOff=!camOff;cb.classList.toggle('active',camOff);if(localStream)localStream.getVideoTracks().forEach(t=>t.enabled=!camOff);});a.appendChild(cb);
