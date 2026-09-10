@@ -1974,7 +1974,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.39', BUILD_ID='2026-09-09-tokenwhy';
+const APP_VERSION='5.0.40', BUILD_ID='2026-09-10-invitecheck';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -2281,12 +2281,43 @@ let busSeq=0;
 function busSeqKey(){return 'om_busseq_'+(me?me.id:'x');}
 function loadBusSeq(){try{busSeq=parseInt(localStorage.getItem(busSeqKey())||'0',10)||0;}catch(e){busSeq=0;}}
 function saveBusSeq(){try{localStorage.setItem(busSeqKey(),String(busSeq));}catch(e){}}
+let _busОшибка='', _busУспех=0;
 async function cloudBusSend(msg){
-  if(!cloudOn||!me)return;
+  /* Шина запоминает, чем кончилась отправка. Раньше ошибка глоталась молча — и
+     звонок с iPhone на Android 10.09.2026 не дошёл никак: у звонящего «Вызов…»,
+     у получателя тишина, на сервере ни следа. Молчание — худший из ответов. */
+  if(!cloudOn||!me){ _busОшибка='нет связи с облаком'; return false; }
   try{
-    if(CFG.provider==='worker'){await jpost(wapi('/bus'),{to:msg.payload&&msg.payload.to||'*',from:me.id,payload:msg});return;}
+    if(CFG.provider==='worker'){
+      await jpost(wapi('/bus'),{to:msg.payload&&msg.payload.to||'*',from:me.id,payload:msg});
+      _busУспех=Date.now(); _busОшибка=''; return true;
+    }
     const c=sbClient();if(c)await c.from('om_bus').insert({to_id:(msg.payload&&msg.payload.to)||'*',payload:JSON.stringify(msg),t:Date.now()});
+    _busУспех=Date.now(); _busОшибка=''; return true;
+  }catch(e){ _busОшибка=String((e&&e.message)||e).slice(0,60); return false; }
+}
+/* Крошка с ЛЮБОЙ платформы, не только из нативной оболочки: разбирать звонок
+   между iPhone и Android иначе нечем — на iPhone у нас пока веб-клиент. */
+function крошка(шаг,состояние){
+  try{
+    if(!sessionToken)return;
+    jpost(wapi('/diag/native'),{crumbs:[{t:Date.now(),step:String(шаг).slice(0,120),state:String(состояние||'').slice(0,24)}]}).catch(function(){});
   }catch(e){}
+}
+/* Приглашение звонка — единственное событие, чья молчаливая неудача стоит
+   звонка целиком. Проверяем, дошло ли оно до сервера, и говорим об этом
+   человеку, а не только себе. */
+function проверитьПриглашение(кому){
+  setTimeout(function(){
+    if(!callPeerId||callPeerId!==кому)return;      // звонок уже кончился — молчим
+    if(_busОшибка){
+      крошка('страница: приглашение НЕ ушло — '+_busОшибка,'звоню');
+      try{ $('#callStatus').textContent='Нет связи с сервером'; }catch(e){}
+      toast('Звонок не ушёл: нет связи с сервером');
+    } else {
+      крошка('страница: приглашение звонка отправлено','звоню');
+    }
+  },2500);
 }
 /* ОПРОС ШИНЫ — как приходят чужие сообщения.
    Раньше опрос стоял на setInterval(1200) и не ждал, чем кончился предыдущий
@@ -6177,6 +6208,7 @@ function startCall(kind){
   go('callScreen');try{window.__omResetLocalVid&&window.__omResetLocalVid();}catch(e){}renderCallActions(false);
   closePeer();pendingOffer=null;
   emit('call:invite',{to:current.id,from:me.id,name:me.name,kind});   // сервер /bus сам шлёт пуш получателю (с антиспам-дедупом)
+  проверитьПриглашение(current.id);
   clearTimeout(callRingTO);
   if(current.bot){setTimeout(()=>{onCallAccepted();onCallConnected();},1800);} // бот отвечает (симуляция, без реального WebRTC)
   else{ startCallPoll(); _ringStart('out'); setupPeer(true,kind);
