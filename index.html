@@ -1747,7 +1747,15 @@ function omSyncNativeTheme(){ try{ if(!(window.__OLESYA_NATIVE__&&window.ReactNa
      сверху и снизу от тёмного звонка оставались белые полосы. */
   try{ var cs=document.getElementById('callScreen'), gs=document.getElementById('gcallScreen');
     if((cs&&!cs.classList.contains('hidden'))||(gs&&!gs.classList.contains('hidden'))) dark=true; }catch(e){}
-  window.ReactNativeWebView.postMessage(JSON.stringify({type:'theme',dark:dark})); }catch(e){} }
+  /* Экран звонка не просто тёмный — он тёмно-фиолетовый. Оболочке нужны его
+     крайние цвета, иначе сверху и снизу остаются чёрные полосы, не совпадающие
+     с фоном вызова (владелец увидел это на сборке 32). */
+  var звонокВидно=false;
+  try{ var cs2=document.getElementById('callScreen'), gs2=document.getElementById('gcallScreen');
+    звонокВидно=!!((cs2&&!cs2.classList.contains('hidden'))||(gs2&&!gs2.classList.contains('hidden'))); }catch(e){}
+  var весть={type:'theme',dark:dark};
+  if(звонокВидно){ весть.top='#201843'; весть.bottom='#100B22'; }
+  window.ReactNativeWebView.postMessage(JSON.stringify(весть)); }catch(e){} }
 function applyTheme(pref,_skipNative){
   const t=resolveTheme(pref);
   document.documentElement.setAttribute('data-theme',t);
@@ -1974,7 +1982,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.42', BUILD_ID='2026-09-10-connected';
+const APP_VERSION='5.0.43', BUILD_ID='2026-09-11-nolockflash';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6246,12 +6254,14 @@ function _callShowOverLock(){
   const cs=document.getElementById('callScreen'); if(!cs)return false;
   _callOverLock=true;
   cs.classList.remove('hidden'); cs.classList.add('over-lock');
+  try{omSyncNativeTheme();}catch(e){}
   return true;
 }
 function _callHideOverLock(){
   const cs=document.getElementById('callScreen');
   if(cs){ cs.classList.remove('over-lock'); cs.classList.add('hidden'); }
   _callOverLock=false;
+  try{omSyncNativeTheme();}catch(e){}
 }
 function showIncomingCall(p){
   const sec=getSec();const from=p.from;const known=isContact(from);const now=Date.now();
@@ -8384,8 +8394,15 @@ document.addEventListener('visibilitychange',()=>{
 /* Отметка старта страницы. Нужна ровно для одного случая ниже: понять, что
    приложение только что запустилось, а значит вызов ещё может прийти. */
 const _pageStart=Date.now(); let _bioWait=null;
+/* Оболочка дописывает к адресу ?call=1, когда приложение подняли ВХОДЯЩИМ
+   звонком: она узнаёт об этом из файла, который оставил нативный приёмник,
+   ещё до загрузки страницы. Значит вызов уже в пути, и ставить перед ним
+   замок незачем — именно его владелец видел как «мелькнул PIN». Ждём вызов
+   не дольше четырёх секунд: не пришёл — замок встаёт как обычно. */
+const _звонокВПути = (function(){ try{ return /[?&]call=1/.test(location.search) ? Date.now() : 0; }catch(e){ return 0; } })();
 function maybeLock(){const c=lockCfg();if(!c.pin)return;
   const inCall=(typeof callPeerId!=='undefined'&&!!callPeerId);
+  if(!inCall && _звонокВПути && (Date.now()-_звонокВПути)<4000){ setTimeout(maybeLock,250); return; }
   const cur=currentScreenId();
   if(cur!=='lockScreen'&&cur!=='callScreen')_preLockScreen=cur;
   pinMode='check';pinBuffer='';$('#lockTitle').textContent='Введите PIN-код';renderPinDots();go('lockScreen');
