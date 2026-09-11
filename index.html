@@ -1982,7 +1982,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.43', BUILD_ID='2026-09-11-nolockflash';
+const APP_VERSION='5.0.44', BUILD_ID='2026-09-11-onering';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6031,6 +6031,9 @@ function _preferVp8(sdp){
   }catch(e){ return sdp; }
 }
 let _pendingRemoteAudio=false, _spkOn=true;
+/* Кто звонит, если вызов принесла нативная оболочка. Нужен ровно для одного:
+   не включать второй рингтон поверх того, что уже звенит в уведомлении. */
+let _звонокОтОболочки=null;
 /* Куда идёт звук в начале разговора. В оболочке — разговорный динамик: так
    устроен любой телефон, и оболочка тоже начинает каждый звонок с наушника
    (stopCallService сбрасывает свой признак). В браузере маршрута нет, там
@@ -6294,12 +6297,13 @@ function showIncomingCall(p){
   const u=userById(from)||{name:p.name||'Неизвестный номер',avatar:'🙂',color:'#FF6B6B'};
   av($('#callAvatar'),u);$('#callName').textContent=u.name;$('#callStatus').textContent=(p.kind==='video'?'Входящий видеозвонок':'Входящий звонок');
   $('#callSpamBadge').style.display=known?'none':'flex';
+  const _звенитОболочка=(_звонокОтОболочки===from);
   if(recState==='recording'){const _k=recKind;pauseRecForCall();toast(_k==='video'?'🎥 Видео-кружок на паузе — продолжите после звонка':'🎙️ Запись голосового на паузе — продолжите после звонка');}
   /* Заперто на PIN — не прячем звонок за вводом кода, кладём поверх. */
   if(currentScreenId()==='lockScreen'&&_callShowOverLock()){} else go('callScreen');
   try{window.__omResetLocalVid&&window.__omResetLocalVid();}catch(e){}renderCallActions(true,false,{unknown:!known,from:from});
   $('#callAvatar').classList.add('incoming-ring');
-  _ringStart('in');
+  if(!_звенитОболочка)_ringStart('in');
   if(appHidden())showNotif('📞 Входящий '+(p.kind==='video'?'видеозвонок':'звонок'),(u.name||p.name||'Неизвестный номер'),from);
   if(_autoAcceptFrom&&_autoAcceptFrom===from){ _autoAcceptFrom=null; setTimeout(()=>{try{acceptCall();}catch(e){}},150); }   // нативная оболочка нажала «Ответить» на полноэкранном звонке
 }
@@ -6348,6 +6352,7 @@ function acceptCall(){
 window.olesyaCallAction=function(action,from,kind,name){
   try{
     if(!me||!from)return;
+    _звонокОтОболочки=from;   // этот вызов уже звенит рингтоном уведомления
     if(action==='accept'){ _autoAcceptFrom=from; if(callPeerId===from&&callIncoming){ _autoAcceptFrom=null; acceptCall(); } return; }
     if(action==='decline'){ if(callPeerId===from){ endCall(false); } else { try{emit('call:reject',{to:from,from:me.id,reason:'screen'});}catch(e){} } return; }
     if(callPeerId===from)return;   // show — показать входящий сразу, не дожидаясь опроса
