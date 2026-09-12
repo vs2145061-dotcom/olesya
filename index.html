@@ -1982,7 +1982,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.45', BUILD_ID='2026-09-12-nolockover';
+const APP_VERSION='5.0.46', BUILD_ID='2026-09-12-lockexit';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6382,7 +6382,7 @@ function endCall(remote){
   if(fromHub)current=null;
   callPeerId=null;callStart=0;callAnswered=false;clearTimeout(callRingTO);$('#callSpamBadge').style.display='none';
   /* Разговор шёл поверх замка — возвращаем замок, а не пускаем в переписку. */
-  if(_callOverLock){ _callHideOverLock(); if(remote)toast('Звонок завершён'); try{maybeLock();}catch(e){} return; }
+  if(_callOverLock){ _callHideOverLock(); if(remote)toast('Звонок завершён'); if(уйтиИЗапереть())return; try{maybeLock();}catch(e){} return; }
   go(dest);
   if(dest==='scrChats')renderChats();
   else if(dest==='scrContacts')renderContacts();
@@ -6392,7 +6392,8 @@ function endCall(remote){
   if(remote)toast('Звонок завершён');
   /* Разговор кончился — возвращаем замок, который не стали показывать поверх
      вызова. Отпечаток при этом запрашивается как обычно. */
-  if(_замокПослеЗвонка){ _замокПослеЗвонка=false; try{maybeLock();}catch(e){} }
+  if(_замокПослеЗвонка){ _замокПослеЗвонка=false;
+    if(!уйтиИЗапереть()){ try{maybeLock();}catch(e){} } }
 }
 function initLocalVideo(){
   if(navigator.mediaDevices){getMediaWithTimeout({video:true,audio:true},15000).then(s=>{if(!s)return;localStream=s;$('#localVideo').srcObject=s;}).catch(()=>{toast('Камера недоступна — звук активен');});}
@@ -8341,6 +8342,7 @@ function refreshLockToggle(){const c=lockCfg();$('#lockToggle').classList.toggle
 let pinBuffer='',pinMode='check',pinFirst='',pinFails=0,pinLockUntil=0,pinLockInt=null,hidAt=0,_preLockScreen='';
 // Куда вернуться после разблокировки (экран, на котором были до блокировки). Возврат вместо Главной.
 function _unlockReturn(){
+  _былаРазблокировка=true;
   /* Разблокировались, пока поверх замка шёл звонок — возвращаемся НА ЗВОНОК.
      Человек вошёл по-настоящему, поэтому «поверх замка» снимаем: после
      разговора запирать заново не нужно, замка под звонком больше нет. */
@@ -8404,6 +8406,20 @@ document.addEventListener('visibilitychange',()=>{
 const _pageStart=Date.now(); let _bioWait=null;
 /* Замок отложен до конца разговора — см. maybeLock ниже. */
 let _замокПослеЗвонка=false;
+/* Входили ли по-настоящему (PIN или отпечаток) с момента запуска страницы.
+   Если нет, а приложение подняли звонком с запертого телефона — после разговора
+   уходим с экрана, вместо того чтобы показывать ввод кода. */
+let _былаРазблокировка=false;
+function уйтиИЗапереть(){
+  try{
+    if(!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView))return false;
+    if(!_звонокВПути)return false;              // приложение открыл не звонок
+    if(_былаРазблокировка)return false;         // человек вошёл — он тут хозяин
+    const c=lockCfg(); if(!c||!c.pin)return false;   // замка нет — незачем
+    window.ReactNativeWebView.postMessage(JSON.stringify({type:'lock-and-exit'}));
+    return true;
+  }catch(e){ return false; }
+}
 /* Оболочка дописывает к адресу ?call=1, когда приложение подняли ВХОДЯЩИМ
    звонком: она узнаёт об этом из файла, который оставил нативный приёмник,
    ещё до загрузки страницы. Значит вызов уже в пути, и ставить перед ним
