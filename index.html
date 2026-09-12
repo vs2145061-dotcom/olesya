@@ -1982,7 +1982,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.47', BUILD_ID='2026-09-12-nozoom';
+const APP_VERSION='5.0.48', BUILD_ID='2026-09-12-exitwhy';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -8412,10 +8412,15 @@ let _замокПослеЗвонка=false;
 let _былаРазблокировка=false;
 function уйтиИЗапереть(){
   try{
-    if(!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView))return false;
-    if(!_звонокВПути)return false;              // приложение открыл не звонок
-    if(_былаРазблокировка)return false;         // человек вошёл — он тут хозяин
-    const c=lockCfg(); if(!c||!c.pin)return false;   // замка нет — незачем
+    const вОболочке=!!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView);
+    const сЗамком=(function(){ try{ const c=lockCfg(); return !!(c&&c.pin); }catch(e){ return false; } })();
+    let причина='';
+    if(!вОболочке)причина='не в оболочке';
+    else if(!_звонокВПути)причина='открыл не звонок';
+    else if(_былаРазблокировка)причина='человек уже входил';
+    else if(!сЗамком)причина='замок не настроен';
+    if(причина){ крошка('страница: остаюсь на экране — '+причина,'после звонка'); return false; }
+    крошка('страница: прошу уйти и запереть','после звонка');
     window.ReactNativeWebView.postMessage(JSON.stringify({type:'lock-and-exit'}));
     return true;
   }catch(e){ return false; }
