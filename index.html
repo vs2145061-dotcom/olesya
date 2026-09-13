@@ -1982,7 +1982,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.48', BUILD_ID='2026-09-12-exitwhy';
+const APP_VERSION='5.0.49', BUILD_ID='2026-09-13-callface';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6226,7 +6226,7 @@ function startCall(kind){
   av($('#callAvatar'),current);$('#callName').textContent=current.name;$('#callStatus').textContent='Вызов…';
   go('callScreen');try{window.__omResetLocalVid&&window.__omResetLocalVid();}catch(e){}renderCallActions(false);
   closePeer();pendingOffer=null;
-  emit('call:invite',{to:current.id,from:me.id,name:me.name,kind});   // сервер /bus сам шлёт пуш получателю (с антиспам-дедупом)
+  emit('call:invite',{to:current.id,from:me.id,name:me.name,kind,avatar:me.avatar||'',color:me.color||''});   // сервер /bus сам шлёт пуш получателю (с антиспам-дедупом)
   проверитьПриглашение(current.id);
   clearTimeout(callRingTO);
   if(current.bot){setTimeout(()=>{onCallAccepted();onCallConnected();},1800);} // бот отвечает (симуляция, без реального WebRTC)
@@ -6237,7 +6237,7 @@ function startCall(kind){
     // Надёжная доставка приглашения: облачная шина best-effort, одна отправка может не дойти →
     // повторяем call:invite каждые 2с, пока не ответят (callStart>0) или звонок не завершится.
     stopCallInvite();
-    callInviteTimer=setInterval(()=>{ if(callPeerId&&!callAnswered){ emit('call:invite',{to:callPeerId,from:me.id,name:me.name,kind}); } else { stopCallInvite(); } },2000);
+    callInviteTimer=setInterval(()=>{ if(callPeerId&&!callAnswered){ emit('call:invite',{to:callPeerId,from:me.id,name:me.name,kind,avatar:me.avatar||'',color:me.color||''}); } else { stopCallInvite(); } },2000);
   }
 }
 $('#btnAudioCall').onclick=()=>startCall('audio');
