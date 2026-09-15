@@ -656,7 +656,13 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 .call-info .stat{color:var(--muted);font-size:15px;font-family:var(--mono);display:flex;align-items:center;gap:7px}
 /* Экран звонка тёмный при любой теме — цвет задаём явно, иначе в светлой теме
    имя и таймер наследуют тёмный цвет и сливаются с фоном. */
-#callScreen .call-info .nm{color:#FFFFFF;font-size:29px;letter-spacing:.2px;text-shadow:0 1px 14px rgba(0,0,0,.55)}
+#callScreen .call-info .nm{color:#FFFFFF;font-size:32px;letter-spacing:.2px;text-shadow:0 1px 14px rgba(0,0,0,.55)}
+/* Значок — как в оболочке: 132 точки, крупная буква. */
+#callScreen:not(.video) .call-info .avatar.xl{width:132px;height:132px;font-size:54px}
+/* Группа «значок + имя + состояние» стоит по центру экрана и поднята на 90:
+   строго по центру она проваливается вниз, потому что снизу её подпирают
+   кнопки, а сверху пусто. Те же 90, что в оболочке. */
+#callScreen:not(.video) .call-info{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%) translateY(-90px)}
 #callScreen .call-info .stat{color:rgba(255,255,255,.88);text-shadow:0 1px 10px rgba(0,0,0,.5)}
 /* Экран звонка ложится ПОВЕРХ замка: у замка z-index 80. */
 #callScreen.over-lock{z-index:90}
@@ -683,13 +689,22 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 .callbtn:active{transform:scale(.92)}
 .callbtn svg{width:26px;height:26px;color:#fff}
 .callbtn.active{background:#fff}.callbtn.active svg{color:#10131c}
+/* Выключенный микрофон — красный, громкая связь — янтарная. Цвет виден краем
+   глаза, подпись читать не нужно. Блик и тени те же, что у кнопок ответа и
+   отбоя, чтобы ряд смотрелся одинаково. */
+.callbtn.mic.active{background:var(--red)}
+.callbtn.mic.active svg{color:#fff}
+.callbtn.spk.active{background:var(--amber,#F5B33C)}
+.callbtn.spk.active svg{color:#20160a}
+.callbtn.mic.active,.callbtn.spk.active{box-shadow:inset 0 -4px 8px rgba(0,0,0,.28), inset 0 3px 5px rgba(255,255,255,.35), 0 10px 22px -8px rgba(0,0,0,.5)}
+.callbtn.mic.active::after,.callbtn.spk.active::after{content:"";position:absolute;left:18%;right:18%;top:9%;height:36%;border-radius:50%;background:linear-gradient(rgba(255,255,255,.5),rgba(255,255,255,0));pointer-events:none}
 .callbtn.end{background:var(--red);width:70px;height:70px}
 .callbtn.accept{background:var(--green)}
 /* Входящий звонок: крупные кнопки «Отклонить»/«Ответить» с подписями, как в обычном звонке */
 .call-actions.answer-row{width:100%;justify-content:space-around;align-items:flex-start;gap:0}
 .ca-col{display:flex;flex-direction:column;align-items:center;gap:9px}
 .ca-label{color:#fff;font-size:14px;font-weight:600;letter-spacing:.2px;text-shadow:0 1px 4px rgba(0,0,0,.5)}
-.call-actions.answer-row .callbtn{width:74px;height:74px}
+.call-actions.answer-row .callbtn{width:76px;height:76px}
 .call-actions.answer-row .callbtn svg{width:30px;height:30px}
 .callbtn.ans-pulse{animation:ansPulse 1.4s ease-in-out infinite}
 @keyframes ansPulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(63,207,142,.5)}50%{transform:scale(1.09);box-shadow:0 0 0 14px rgba(63,207,142,0)}}
@@ -1982,7 +1997,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.49', BUILD_ID='2026-09-13-callface';
+const APP_VERSION='5.0.50', BUILD_ID='2026-09-15-callsame';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6439,7 +6454,7 @@ function renderCallActions(incoming,active,opt){
     a.appendChild(col('accept',ICON.accept,'Ответить',acceptCall,'ans-pulse'));
   }else{
     let muted=false,camOff=false;
-    const mb=btn('',ICON.mic,()=>{muted=!muted;mb.classList.toggle('active',muted);if(localStream)localStream.getAudioTracks().forEach(t=>t.enabled=!muted);toast(muted?'Микрофон выключен':'Микрофон включён');});
+    const mb=btn('mic',ICON.mic,()=>{muted=!muted;mb.classList.toggle('active',muted);if(localStream)localStream.getAudioTracks().forEach(t=>t.enabled=!muted);toast(muted?'Микрофон выключен':'Микрофон включён');});
     a.appendChild(mb);
     // Громкая связь: на мобильных медиа-звук идёт в динамик; кнопка управляет громкостью/выводом
     /* Слушается ли движок, когда громкость меняют из кода. На iOS — нет. */
@@ -6465,7 +6480,7 @@ function renderCallActions(incoming,active,opt){
        «кнопка срабатывает со второго раза». Теперь страница просит ПЕРЕКЛЮЧИТЬ
        и рисует то, что оболочка ответила. В браузере всё как было. */
     const sendSpk=()=>{ if(!isNative)return; try{window.ReactNativeWebView.postMessage(JSON.stringify({type:'speaker',toggle:true}));}catch(e){} };
-    const sb=btn('',ICON.spk,()=>{
+    const sb=btn('spk',ICON.spk,()=>{
       if(isNative){ sendSpk(); return; }        // значок обновит ответ оболочки
       _spkOn=!_spkOn;sb.classList.toggle('active',_spkOn);applySpk();
       toast(_volWorks?(_spkOn?'🔊 Громко':'🔉 Тише'):(_spkOn?'🔊 Звук включён':'🔇 Звук выключен'));});
