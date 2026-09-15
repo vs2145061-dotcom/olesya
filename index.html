@@ -685,9 +685,9 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 .call-actions.compact .callbtn.end{width:56px;height:56px}
 .call-actions.compact .callbtn svg{width:22px;height:22px}
 #callScreen.video::after{content:'';position:absolute;left:0;right:0;bottom:0;height:140px;background:linear-gradient(0deg,rgba(0,0,0,.5),transparent);z-index:2;pointer-events:none}
-.callbtn{width:62px;height:62px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.12);backdrop-filter:blur(8px);transition:transform .1s,background .15s}
+.callbtn{width:70px;height:70px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.12);backdrop-filter:blur(8px);transition:transform .1s,background .15s}
 .callbtn:active{transform:scale(.92)}
-.callbtn svg{width:26px;height:26px;color:#fff}
+.callbtn svg{width:29px;height:29px;color:#fff}
 .callbtn.active{background:#fff}.callbtn.active svg{color:#10131c}
 /* Выключенный микрофон — красный, громкая связь — янтарная. Цвет виден краем
    глаза, подпись читать не нужно. Блик и тени те же, что у кнопок ответа и
@@ -698,7 +698,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 .callbtn.spk.active svg{color:#20160a}
 .callbtn.mic.active,.callbtn.spk.active{box-shadow:inset 0 -4px 8px rgba(0,0,0,.28), inset 0 3px 5px rgba(255,255,255,.35), 0 10px 22px -8px rgba(0,0,0,.5)}
 .callbtn.mic.active::after,.callbtn.spk.active::after{content:"";position:absolute;left:18%;right:18%;top:9%;height:36%;border-radius:50%;background:linear-gradient(rgba(255,255,255,.5),rgba(255,255,255,0));pointer-events:none}
-.callbtn.end{background:var(--red);width:70px;height:70px}
+.callbtn.end{background:var(--red);width:76px;height:76px}
 .callbtn.accept{background:var(--green)}
 /* Входящий звонок: крупные кнопки «Отклонить»/«Ответить» с подписями, как в обычном звонке */
 .call-actions.answer-row{width:100%;justify-content:space-around;align-items:flex-start;gap:0}
@@ -763,6 +763,7 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 .chat-row.pinned .cr-time::before{content:'📌 ';font-size:10px}
 
 /* toast */
+body.call-open #toast{bottom:190px}
 #toast{position:absolute;left:50%;bottom:90px;transform:translateX(-50%) translateY(20px);
   background:var(--raised-2);border:1px solid var(--line);color:var(--text);padding:11px 18px;border-radius:14px;
   font-size:14px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:all .25s;z-index:99;white-space:nowrap}
@@ -1997,7 +1998,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.50', BUILD_ID='2026-09-15-callsame';
+const APP_VERSION='5.0.51', BUILD_ID='2026-09-15-lockback';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6232,6 +6233,7 @@ function _ringStop(){
 }
 function startCall(kind){
   сбросВыводЗвука();
+  пометитьЗвонокНаЭкране(true);
   if(current&&current.group)return startGroupCall(kind);
   if(!micAllowed()){toast('🎤 Включите доступ к микрофону в Настройках, чтобы звонить');return;}
   if(kind==='video'&&!camAllowed()){kind='audio';toast('📷 Камера выключена — звоню только со звуком');}
@@ -6268,6 +6270,9 @@ $('#favEntry').onclick=()=>{if(me)openConv(me.id);};
    ПОВЕРХ замка, сам замок под ним никуда не девается. Кончился разговор —
    человек снова упирается в ввод PIN, ничего не открыв по дороге. */
 let _callOverLock=false;
+function пометитьЗвонокНаЭкране(включён){
+  try{ document.body.classList.toggle('call-open', !!включён); }catch(e){}
+}
 function _callShowOverLock(){
   const cs=document.getElementById('callScreen'); if(!cs)return false;
   _callOverLock=true;
@@ -6315,6 +6320,7 @@ function showIncomingCall(p){
   const _звенитОболочка=(_звонокОтОболочки===from);
   if(recState==='recording'){const _k=recKind;pauseRecForCall();toast(_k==='video'?'🎥 Видео-кружок на паузе — продолжите после звонка':'🎙️ Запись голосового на паузе — продолжите после звонка');}
   /* Заперто на PIN — не прячем звонок за вводом кода, кладём поверх. */
+  пометитьЗвонокНаЭкране(true);
   if(currentScreenId()==='lockScreen'&&_callShowOverLock()){} else go('callScreen');
   try{window.__omResetLocalVid&&window.__omResetLocalVid();}catch(e){}renderCallActions(true,false,{unknown:!known,from:from});
   $('#callAvatar').classList.add('incoming-ring');
@@ -6376,6 +6382,7 @@ window.olesyaCallAction=function(action,from,kind,name){
 };
 function endCall(remote){
   _ringStop();
+  пометитьЗвонокНаЭкране(false);
   try{ if(window.__OLESYA_NATIVE__&&window.ReactNativeWebView)
         window.ReactNativeWebView.postMessage(JSON.stringify({type:'call-ended'})); }catch(e){}
   stopCallInvite();
@@ -6444,6 +6451,9 @@ function renderCallActions(incoming,active,opt){
     end:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 15.46l-5.27-.61-2.52 2.52a15.05 15.05 0 0 1-6.59-6.59l2.53-2.53L8.54 3H3.03C2.46 13.18 10.82 21.54 21 20.97v-5.51z" transform="rotate(135 12 12)"/></svg>',
     accept:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24 11.36 11.36 0 0 0 3.57.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1.02l-2.2 2.2z"/></svg>',
     spk:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg>',
+    /* Выключенный микрофон — перечёркнутый: цвет виден краем глаза, но
+       сам значок должен говорить то же самое. Владелец попросил 15.09.2026. */
+    micoff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="m3 3 18 18" stroke-width="2.4"/></svg>',
     spkoff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m23 9-6 6M17 9l6 6"/></svg>',
     flip:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>'};
   if(incoming){
@@ -6454,7 +6464,7 @@ function renderCallActions(incoming,active,opt){
     a.appendChild(col('accept',ICON.accept,'Ответить',acceptCall,'ans-pulse'));
   }else{
     let muted=false,camOff=false;
-    const mb=btn('mic',ICON.mic,()=>{muted=!muted;mb.classList.toggle('active',muted);if(localStream)localStream.getAudioTracks().forEach(t=>t.enabled=!muted);toast(muted?'Микрофон выключен':'Микрофон включён');});
+    const mb=btn('mic',ICON.mic,()=>{muted=!muted;mb.classList.toggle('active',muted);mb.innerHTML=muted?ICON.micoff:ICON.mic;if(localStream)localStream.getAudioTracks().forEach(t=>t.enabled=!muted);toast(muted?'Микрофон выключен':'Микрофон включён');});
     a.appendChild(mb);
     // Громкая связь: на мобильных медиа-звук идёт в динамик; кнопка управляет громкостью/выводом
     /* Слушается ли движок, когда громкость меняют из кода. На iOS — нет. */
@@ -8436,6 +8446,8 @@ function уйтиИЗапереть(){
     else if(!сЗамком)причина='замок не настроен';
     if(причина){ крошка('страница: остаюсь на экране — '+причина,'после звонка'); return false; }
     крошка('страница: прошу уйти и запереть','после звонка');
+    /* Замок ставим ДО ухода: иначе приложение остаётся открытым за спиной. */
+    try{ пометитьЗвонокНаЭкране(false); maybeLock(true); }catch(e){}
     window.ReactNativeWebView.postMessage(JSON.stringify({type:'lock-and-exit'}));
     return true;
   }catch(e){ return false; }
@@ -8446,7 +8458,7 @@ function уйтиИЗапереть(){
    замок незачем — именно его владелец видел как «мелькнул PIN». Ждём вызов
    не дольше четырёх секунд: не пришёл — замок встаёт как обычно. */
 const _звонокВПути = (function(){ try{ return /[?&]call=1/.test(location.search) ? Date.now() : 0; }catch(e){ return 0; } })();
-function maybeLock(){const c=lockCfg();if(!c.pin)return;
+function maybeLock(безОтпечатка){const c=lockCfg();if(!c.pin)return;
   const inCall=(typeof callPeerId!=='undefined'&&!!callPeerId);
   if(!inCall && _звонокВПути && (Date.now()-_звонокВПути)<4000){ setTimeout(maybeLock,250); return; }
   const cur=currentScreenId();
@@ -8469,7 +8481,7 @@ function maybeLock(){const c=lockCfg();if(!c.pin)return;
      Правильное место для этого решения — оболочка: она знает про звонок раньше
      страницы и может просто не запрашивать отпечаток. Делается в следующей
      сборке; здесь возвращаем мгновенный запрос, как было. */
-  tryBiometricUnlock();}
+  if(!безОтпечатка)tryBiometricUnlock();}
 /* Биометрия (Face ID/отпечаток) — только в нативной обёртке, как быстрая замена PIN. */
 function bioAvailable(){try{const c=lockCfg();return !!(c&&c.pin&&c.bio!==false&&window.__OLESYA_NATIVE__&&window.ReactNativeWebView);}catch(e){return false;}}   // биометрия ВКЛЮЧЕНА по умолчанию (пока явно не выключили)
 function tryBiometricUnlock(){
