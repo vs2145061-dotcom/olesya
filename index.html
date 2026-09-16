@@ -1998,7 +1998,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.53', BUILD_ID='2026-09-16-reattach';
+const APP_VERSION='5.0.54', BUILD_ID='2026-09-16-audiodiag';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6241,6 +6241,7 @@ function startCall(kind){
   if(!current)return;callKind=kind;callPeerId=current.id;callIncoming=false;callStart=0;callAnswered=false;
   _callIceBuf=[];_callHasRemote=false;   // чистое состояние обмена адресами — В НАЧАЛЕ звонка
   av($('#callAvatar'),current);$('#callName').textContent=current.name;$('#callStatus').textContent='Вызов…';
+  $('#callAvatar').classList.add('incoming-ring');   // та же анимация, что у входящего
   go('callScreen');try{window.__omResetLocalVid&&window.__omResetLocalVid();}catch(e){}renderCallActions(false);
   closePeer();pendingOffer=null;
   emit('call:invite',{to:current.id,from:me.id,name:me.name,kind,avatar:me.avatar||'',color:me.color||''});   // сервер /bus сам шлёт пуш получателю (с антиспам-дедупом)
@@ -6358,6 +6359,7 @@ function onCallConnected(){
   try{ if(window.__OLESYA_NATIVE__&&window.ReactNativeWebView)
         window.ReactNativeWebView.postMessage(JSON.stringify({type:'call-connected'})); }catch(e){}
   callStart=Date.now();
+  setTimeout(()=>{ доложитьЗвук('соединились'); вылечитьЗвукЕслиМолчит(null); },1500);
   if(callTimer)clearInterval(callTimer);
   callTimer=setInterval(()=>{$('#callStatus').textContent=fmtDur((Date.now()-callStart)/1000,true);},500);
 }
@@ -6508,7 +6510,10 @@ function renderCallActions(incoming,active,opt){
     window.olesyaSpeakerState=function(on){
       try{ _spkOn=!!on; sb.classList.toggle('active',_spkOn); applySpk();
            пересобратьЗвук();
-           toast(_spkOn?'🔊 Громкая связь':'📱 Разговорный динамик'); }catch(e){}
+           toast(_spkOn?'🔊 Громкая связь':'📱 Разговорный динамик');
+           /* Через полторы секунды смотрим, что вышло, и чиним при нужде. */
+           setTimeout(()=>{ доложитьЗвук('после переключения'); вылечитьЗвукЕслиМолчит(пересобратьЗвук); },1500);
+      }catch(e){}
     };
     sb.classList.toggle('active',_spkOn);
     a.appendChild(sb);applySpk();
@@ -8679,6 +8684,42 @@ function fmtDay(t){const d=new Date(t),n=new Date();const days=['Воскрес�
   const y=new Date(n);y.setDate(n.getDate()-1);if(d.toDateString()===y.toDateString())return 'Вчера';
   return d.getDate()+'.'+(d.getMonth()+1).toString().padStart(2,'0')+'.'+d.getFullYear();}
 function fmtDur(s,withH){s=Math.round(s);const m=Math.floor(s/60),sec=s%60;return (withH&&m>=60?Math.floor(m/60)+':'+(m%60).toString().padStart(2,'0'):m)+':'+sec.toString().padStart(2,'0');}
+/* Состояние звука собеседника одной строкой: играет/пауза, громкость,
+   готовность, состояние дорожки. Пишем в журнал не чаще раза в три секунды —
+   он нужен для разбора, а не для потока. */
+let _звукПисал=0;
+function доложитьЗвук(повод){
+  try{
+    if(Date.now()-_звукПисал<3000)return; _звукПисал=Date.now();
+    const ra=$('#remoteAudio');
+    if(!ra){ крошка('звук('+повод+'): элемента нет','разговор'); return; }
+    const п=ra.srcObject, д=(п&&п.getAudioTracks&&п.getAudioTracks()[0])||null;
+    крошка('звук('+повод+'): '+(ra.paused?'ПАУЗА':'играет')
+      +', громкость '+ra.volume+(ra.muted?', заглушен':'')
+      +', готовность '+ra.readyState
+      +', дорожка '+(д?(д.readyState+(д.enabled?'/вкл':'/выкл')+(д.muted?'/тихо':'')):'НЕТ'),'разговор');
+  }catch(e){}
+}
+/* Не играет — чиним сами: пересобираем вывод, а если и это не помогло,
+   уходим на громкую связь. Тишина недопустима ни при каком раскладе. */
+function вылечитьЗвукЕслиМолчит(пересобрать){
+  try{
+    const ra=$('#remoteAudio'); if(!ra||!ra.srcObject)return;
+    const плохо = ra.paused || ra.muted || !ra.volume;
+    if(!плохо)return;
+    крошка('звук: молчал, чиню','разговор');
+    ra.muted=false; ra.volume=1;
+    const p=ra.play&&ra.play(); if(p&&p.catch)p.catch(()=>{});
+    if(пересобрать)пересобрать();
+    setTimeout(()=>{ try{
+      const r2=$('#remoteAudio');
+      if(r2&&(r2.paused||r2.muted)&&!_spkOn&&window.__OLESYA_NATIVE__&&window.ReactNativeWebView){
+        крошка('звук: не ожил — включаю громкую','разговор');
+        window.ReactNativeWebView.postMessage(JSON.stringify({type:'speaker',on:true}));
+      }
+    }catch(e){} },1200);
+  }catch(e){}
+}
 let toastTO=null;function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');clearTimeout(toastTO);toastTO=setTimeout(()=>el.classList.remove('show'),2600);}
 /* ── Отклик при нажатии: звук и вибрация настраиваются РАЗДЕЛЬНО (миграция со старого om_tapfx) ── */
 function tapSoundOn(){try{const v=localStorage.getItem('om_tapsnd');if(v!=null)return v!=='0';return localStorage.getItem('om_tapfx')!=='0';}catch(e){return true;}}   // по умолчанию включено
