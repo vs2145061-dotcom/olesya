@@ -1998,7 +1998,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.52', BUILD_ID='2026-09-15-resumebio';
+const APP_VERSION='5.0.53', BUILD_ID='2026-09-16-reattach';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6495,8 +6495,19 @@ function renderCallActions(incoming,active,opt){
       _spkOn=!_spkOn;sb.classList.toggle('active',_spkOn);applySpk();
       toast(_volWorks?(_spkOn?'🔊 Громко':'🔉 Тише'):(_spkOn?'🔊 Звук включён':'🔇 Звук выключен'));});
     /* Ответ оболочки: только он и меняет значок на устройстве. */
+    /* Заново привязываем звук собеседника: см. разбор Samsung выше. */
+    const пересобратьЗвук=()=>{
+      try{
+        const ra=$('#remoteAudio'); if(!ra)return;
+        const поток=ra.srcObject; if(!поток)return;
+        ra.srcObject=null;
+        setTimeout(()=>{ try{ ra.srcObject=поток; ra.muted=false; ra.volume=1;
+          const p=ra.play&&ra.play(); if(p&&p.catch)p.catch(()=>{}); }catch(e){} },90);
+      }catch(e){}
+    };
     window.olesyaSpeakerState=function(on){
       try{ _spkOn=!!on; sb.classList.toggle('active',_spkOn); applySpk();
+           пересобратьЗвук();
            toast(_spkOn?'🔊 Громкая связь':'📱 Разговорный динамик'); }catch(e){}
     };
     sb.classList.toggle('active',_spkOn);
