@@ -2008,7 +2008,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.55', BUILD_ID='2026-09-17-callwaves';
+const APP_VERSION='5.0.56', BUILD_ID='2026-09-17-noautoanswer';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -5991,6 +5991,14 @@ $('#vdCancel').onclick=()=>{discardDraft();refreshVoiceDraft();toast('Черно
 
 /* ================== CALLS (реальный WebRTC P2P) ================== */
 let callPeerId=null,callKind='audio',callTimer=null,callStart=0,localStream=null,callIncoming=false,callRingTO=null,callInviteTimer=null,_autoAcceptFrom=null,_vidWatch=null,_camFacing='user';
+/* Когда поставлен признак автоприёма. Старше тридцати секунд — не в счёт:
+   это решение человека по ДРУГОМУ звонку, который давно кончился. */
+let _autoAcceptAt=0;
+const АВТОПРИЁМ_ЖИВЁТ=30000;
+function автоприёмДействует(от){
+  return !!(_autoAcceptFrom && _autoAcceptFrom===от && (Date.now()-_autoAcceptAt)<АВТОПРИЁМ_ЖИВЁТ);
+}
+function сбросАвтоприёма(){ _autoAcceptFrom=null; _autoAcceptAt=0; }
 let pc=null, pendingOffer=null, callPollTimer=null;
 let _callIceBuf=[], _callHasRemote=false;   // trickle ICE: буфер удалённых кандидатов до setRemoteDescription
 /* callAnswered — «трубку сняли», callStart — «связь реально установилась». Раньше это была
@@ -6337,7 +6345,8 @@ function showIncomingCall(p){
   волныЗвонка(true,u);
   if(!_звенитОболочка)_ringStart('in');
   if(appHidden())showNotif('📞 Входящий '+(p.kind==='video'?'видеозвонок':'звонок'),(u.name||p.name||'Неизвестный номер'),from);
-  if(_autoAcceptFrom&&_autoAcceptFrom===from){ _autoAcceptFrom=null; setTimeout(()=>{try{acceptCall();}catch(e){}},150); }   // нативная оболочка нажала «Ответить» на полноэкранном звонке
+  if(автоприёмДействует(from)){ сбросАвтоприёма(); setTimeout(()=>{try{acceptCall();}catch(e){}},150); }   // человек нажал «Ответить» на нативном экране только что
+  else сбросАвтоприёма();   // просроченный признак не должен ждать следующего звонка
 }
 /* «Трубку сняли» — это ещё не «соединились». Показываем «Соединение…» и ждём,
    когда WebRTC реально свяжется; секундомер запускает onCallConnected(). */
@@ -6387,7 +6396,7 @@ window.olesyaCallAction=function(action,from,kind,name){
   try{
     if(!me||!from)return;
     _звонокОтОболочки=from;   // этот вызов уже звенит рингтоном уведомления
-    if(action==='accept'){ _autoAcceptFrom=from; if(callPeerId===from&&callIncoming){ _autoAcceptFrom=null; acceptCall(); } return; }
+    if(action==='accept'){ _autoAcceptFrom=from; _autoAcceptAt=Date.now(); if(callPeerId===from&&callIncoming){ сбросАвтоприёма(); acceptCall(); } return; }
     if(action==='decline'){ if(callPeerId===from){ endCall(false); } else { try{emit('call:reject',{to:from,from:me.id,reason:'screen'});}catch(e){} } return; }
     if(callPeerId===from)return;   // show — показать входящий сразу, не дожидаясь опроса
     showIncomingCall({from:from,to:me.id,name:name||'',kind:(kind==='video'?'video':'audio')});
@@ -6395,6 +6404,7 @@ window.olesyaCallAction=function(action,from,kind,name){
 };
 function endCall(remote){
   _ringStop();
+  сбросАвтоприёма();
   волныЗвонка(false);
   пометитьЗвонокНаЭкране(false);
   try{ if(window.__OLESYA_NATIVE__&&window.ReactNativeWebView)
