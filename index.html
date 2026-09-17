@@ -2008,7 +2008,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.61', BUILD_ID='2026-09-17-chatslook';
+const APP_VERSION='5.0.62', BUILD_ID='2026-09-17-noflash';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -2746,14 +2746,24 @@ function handleBus(m){
 }
 
 /* ================== AUTH FLOW ================== */
-/* ================== AUTH FLOW ================== */
+/* Счётчик показов списка: по нему отменяется запоздалое «спрячь». */
+let _меткаСписка=0;
 function showScreen(id){ $$(  '.screen').forEach(s=>{ if(s.id===id){s.classList.remove('hidden','back')} }); }
 function go(id){ try{if(selMode)exitSel();}catch(e){} if(id==='scrPhone'){try{document.documentElement.removeAttribute('data-boot');}catch(e){}} $$('.screen').forEach(s=>s.classList.add('hidden')); const el=$('#'+id); if(el)el.classList.remove('hidden'); else {console.error('go(): экран не найден:',id);return;} if(typeof omPushScreen==='function')omPushScreen(id);
   /* Нативный список чатов показываем ровно тогда, когда открыт экран чатов.
      Данные ему уже отданы; здесь только «покажи/спрячь». */
   try{ if(window.__OLESYA_NATIVE__&&window.ReactNativeWebView&&window.__OLESYA_СПИСОК__){
-    window.ReactNativeWebView.postMessage(JSON.stringify({type:(id==='scrChats')?'chats-show':'chats-hide'}));
-    if(id==='scrChats'&&typeof renderChats==='function')setTimeout(renderChats,0);
+    if(id==='scrChats'){
+      _меткаСписка++;
+      window.ReactNativeWebView.postMessage(JSON.stringify({type:'chats-show'}));
+      if(typeof renderChats==='function')setTimeout(renderChats,0);
+    } else {
+      const метка=++_меткаСписка;
+      setTimeout(function(){
+        if(метка!==_меткаСписка)return;             // успели вернуться на чаты
+        try{ window.ReactNativeWebView.postMessage(JSON.stringify({type:'chats-hide'})); }catch(e){}
+      },320);                                        // переход экрана — 0,28 с
+    }
   } }catch(e){} try{_deskSync(id);}catch(e){} try{omSyncNativeTheme();}catch(e){} }
 /* Двухпанельный десктоп (≥900px): при переписке/списке чатов держим список слева, чат справа. */
 function _isDesk(){ try{return window.matchMedia&&window.matchMedia('(min-width:900px)').matches;}catch(e){return false;} }
@@ -3650,8 +3660,10 @@ function attachChatMenu(row,chat,label){
 function отдатьСписокЧатов(строки){
   try{
     if(!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView&&window.__OLESYA_СПИСОК__))return;
+    let главный='';
+    try{ главный=getComputedStyle(document.documentElement).getPropertyValue('--primary').trim(); }catch(e){}
     window.ReactNativeWebView.postMessage(JSON.stringify({type:'chats',список:строки,
-      я:me?{имя:me.name||'',цвет:me.color||'#6C7BFF'}:null}));
+      я:me?{имя:me.name||'',цвет:me.color||'#6C7BFF',главный:главный||'#6C7BFF'}:null}));
   }catch(e){}
 }
 /* Команды от нативного списка: открыть, закрепить, удалить, пометить прочитанным. */
@@ -3705,7 +3717,8 @@ function renderChats(){
         ищем=c.name||'';
       } else {
         const peerId=(c.members||[]).find(x=>x!==me.id)??me.id; const u=d.users[peerId]; if(!u)return;
-        имя=(peerId===me.id?'🔖 Избранное':(u.name||u.phone||'')); значок=u.avatar||''; цвет=u.color||'';
+        if(peerId===me.id)return;                    // «Избранное» уже есть отдельной строкой
+        имя=u.name||u.phone||''; значок=u.avatar||''; цвет=u.color||'';
         онлайн=u.online?1:0; бот=u.bot?1:0;
         непрочитано=(c.messages||[]).filter(m=>m.from!==me.id&&!(m.readBy||[]).includes(me.id)).length;
         своё=(last&&last.from===me.id)?1:0;
