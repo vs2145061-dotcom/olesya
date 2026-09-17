@@ -2008,7 +2008,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.62', BUILD_ID='2026-09-17-noflash';
+const APP_VERSION='5.0.63', BUILD_ID='2026-09-17-plusfix';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -8801,18 +8801,32 @@ function _omTopOverlay(){
 }
 /* Слежение за открытием/закрытием: держим историю в синхроне. Открылась шторка → запись в
    историю; закрыли сами (тап по крестику/фону) → «съедаем» эту запись через тихий history.back(). */
+/* Нативный список чатов лежит ПОВЕРХ страницы, поэтому любое окно страницы
+   он собой закрывает. Держим его в согласии с тем, что сейчас видно:
+   список нужен только когда открыт экран чатов и поверх ничего нет. */
+function синхроСписка(){
+  try{
+    if(!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView&&window.__OLESYA_СПИСОК__))return;
+    const наЧатах=(typeof currentScreenId==='function')&&currentScreenId()==='scrChats';
+    const надо=наЧатах&&!_omTopOverlay();
+    _меткаСписка++;                                  // отменяем отложенное «спрячь» из go()
+    window.ReactNativeWebView.postMessage(JSON.stringify({type:надо?'chats-show':'chats-hide'}));
+  }catch(e){}
+}
 function _omWatchOverlay(id){
   const e=document.getElementById(id); if(!e)return;
   new MutationObserver(()=>{
     const shown=e.classList.contains('show');
     if(shown&&!_omShown.has(id)){ _omShown.add(id); if(me&&!_omPopping){ try{history.pushState({__omOv:id},'');}catch(_){} } }
     else if(!shown&&_omShown.has(id)){ _omShown.delete(id); if(!_omPopping){ _omSelfBack++; try{history.back();}catch(_){ _omSelfBack--; } } }
+    синхроСписка();
   }).observe(e,{attributes:true,attributeFilter:['class']});
 }
 function _omWatchDialogs(){   // диалоги добавляются/удаляются как узлы, а не классом
   new MutationObserver(muts=>{ muts.forEach(m=>{
     m.addedNodes.forEach(n=>{ if(n.nodeType===1&&n.classList&&n.classList.contains('confirm-back')&&me&&!_omPopping){ try{history.pushState({__omDlg:1},'');}catch(_){} } });
     m.removedNodes.forEach(n=>{ if(n.nodeType===1&&n.classList&&n.classList.contains('confirm-back')&&!_omPopping){ _omSelfBack++; try{history.back();}catch(_){ _omSelfBack--; } } });
+    синхроСписка();
   }); }).observe(document.body,{childList:true});
 }
 try{ OM_OVERLAYS.forEach(_omWatchOverlay); _omWatchDialogs(); }catch(e){}
