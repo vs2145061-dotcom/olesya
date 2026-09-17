@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="256" height="256">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8E7BFF"/><stop offset=".55" stop-color="#A86CF2"/><stop offset="1" stop-color="#F073B8"/></linearGradient>
+<linearGradient id="skin" x1=".2" y1="0" x2=".8" y2="1"><stop offset="0" stop-color="#FFE7D2"/><stop offset="1" stop-color="#F8C8A8"/></linearGradient>
+<linearGradient id="hair" x1=".15" y1="0" x2=".85" y2="1"><stop offset="0" stop-color="#7A4C2C"/><stop offset=".5" stop-color="#4E2B15"/><stop offset="1" stop-color="#2E180C"/></linearGradient>
+<linearGradient id="blouse" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#DBD8F7"/></linearGradient>
+<radialGradient id="glow" cx=".5" cy=".26" r=".78"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".30"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></radialGradient>
+<clipPath id="c"><circle cx="80" cy="80" r="80"/></clipPath>
+</defs>
+<g clip-path="url(#c)">
+  <rect width="160" height="160" fill="url(#bg)"/>
+  <rect width="160" height="160" fill="url(#glow)"/>
+
+  <!-- волосы сзади -->
+  <path d="M80 28C53 28 43 49 45 74c2 21-2 45-6 66l24-6c-5-22-5-40-5-52 0-16 8-24 22-24s22 8 22 24c0 12 0 30-5 52l24 6c-4-21-8-45-6-66 2-25-8-46-35-46z" fill="url(#hair)"/>
+
+  <!-- грудь и плечи -->
+  <path d="M44 160c0-34 16-54 36-54s36 20 36 54z" fill="url(#skin)"/>
+  <path d="M10 160c4-29 22-45 46-50l24 25 24-25c24 5 42 21 46 50z" fill="url(#blouse)"/>
+  <path d="M56 110l24 25 24-25 4 1-28 30-28-30z" fill="#C9C4EE" opacity=".45"/>
+
+  <!-- шея -->
+  <path d="M70 94h20v16c0 6-20 6-20 0z" fill="#EFB896"/>
+  <path d="M70 94h20v7c-6 4-14 4-20 0z" fill="#E0A483"/>
+
+  <!-- уши -->
+  <ellipse cx="53.5" cy="74" rx="5" ry="7" fill="url(#skin)"/><ellipse cx="106.5" cy="74" rx="5" ry="7" fill="url(#skin)"/>
+  <circle cx="53.5" cy="81.5" r="2.2" fill="#FFD36E"/><circle cx="106.5" cy="81.5" r="2.2" fill="#FFD36E"/>
+
+  <!-- лицо -->
+  <path d="M80 37c-17 0-27 12-27 29 0 17 10 33 22 38 3 1.4 7 1.4 10 0 12-5 22-21 22-38 0-17-10-29-27-29z" fill="url(#skin)"/>
+
+  <!-- чёлка: набок, лоб открыт -->
+  <path d="M80 30c-19 0-29 13-28 32 .6-9 3-16 7-20 9 9 25 11 39 4 5 3 8 8 9 16 1-19-8-32-27-32z" fill="url(#hair)"/>
+  <path d="M96 32c8 5 12 15 12 30-2-13-7-23-15-27z" fill="#A9713F" opacity=".4"/>
+  <!-- прядь у лица -->
+  <path d="M55 62c-1 16 1 30 5 44l-9 2c-3-16-4-31-2-46z" fill="url(#hair)"/>
+  <path d="M105 62c1 16-1 30-5 44l9 2c3-16 4-31 2-46z" fill="url(#hair)"/>
+
+  <!-- брови -->
+  <path d="M62.5 60.5c4.5-3.5 11-3.5 14.5-.5" stroke="#3E2315" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+  <path d="M83 60c3.5-3 10-3 14.5.5" stroke="#3E2315" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+
+  <!-- глаза -->
+  <ellipse cx="68.5" cy="72" rx="7.4" ry="5.8" fill="#FFFFFF"/>
+  <circle cx="69" cy="72.4" r="4.5" fill="#6B4224"/><circle cx="69" cy="72.4" r="2.1" fill="#1B0F08"/>
+  <circle cx="67.1" cy="70.2" r="1.7" fill="#FFFFFF"/><circle cx="71" cy="74.4" r=".9" fill="#FFFFFF" opacity=".7"/>
+  <path d="M60.8 69.4c3.5-4.2 11.4-4.4 15.2-.6" stroke="#2A160B" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+  <path d="M60.6 69.2l-3-2.2" stroke="#2A160B" stroke-width="2.1" stroke-linecap="round"/>
+
+  <ellipse cx="91.5" cy="72" rx="7.4" ry="5.8" fill="#FFFFFF"/>
+  <circle cx="91" cy="72.4" r="4.5" fill="#6B4224"/><circle cx="91" cy="72.4" r="2.1" fill="#1B0F08"/>
+  <circle cx="89.1" cy="70.2" r="1.7" fill="#FFFFFF"/><circle cx="93" cy="74.4" r=".9" fill="#FFFFFF" opacity=".7"/>
+  <path d="M84 68.8c3.8-3.8 11.7-3.6 15.2.6" stroke="#2A160B" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+  <path d="M99.4 69.2l3-2.2" stroke="#2A160B" stroke-width="2.1" stroke-linecap="round"/>
+
+  <!-- нос -->
+  <path d="M80 77.5c2.2 4 1.7 6.2-1.2 6.8" stroke="#DBA184" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+
+  <!-- румянец -->
+  <ellipse cx="61.5" cy="82.5" rx="6.6" ry="3.8" fill="#FF8FA6" opacity=".45"/>
+  <ellipse cx="98.5" cy="82.5" rx="6.6" ry="3.8" fill="#FF8FA6" opacity=".45"/>
+
+  <!-- улыбка -->
+  <path d="M70.5 88.5c5-1.4 14-1.4 19 0-1.6 7.6-16.4 7.6-19 0z" fill="#C84A61"/>
+  <path d="M73.2 89.6c4.4-1 9.2-1 13.6 0-1.6 2.6-12 2.6-13.6 0z" fill="#FFFFFF"/>
+  <path d="M70.5 88.5c5-1.4 14-1.4 19 0" stroke="#B03E54" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+
+  <!-- блики на волосах -->
+  <path d="M58 38c-4 8-5 17-4 26" stroke="#B87C46" stroke-width="2.6" fill="none" stroke-linecap="round" opacity=".35"/>
+  <path d="M116 82c2 18 1 34-2 48" stroke="#B87C46" stroke-width="2.8" fill="none" stroke-linecap="round" opacity=".28"/>
+
+  <!-- искорки -->
+  <path d="M132 28l2.4 6.6 6.6 2.4-6.6 2.4-2.4 6.6-2.4-6.6-6.6-2.4 6.6-2.4z" fill="#FFFFFF" opacity=".6"/>
+  <path d="M25 44l1.5 4.2 4.2 1.5-4.2 1.5-1.5 4.2-1.5-4.2-4.2-1.5 4.2-1.5z" fill="#FFFFFF" opacity=".4"/>
+</g>
+</svg>

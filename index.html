@@ -2008,7 +2008,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.60', BUILD_ID='2026-09-17-back';
+const APP_VERSION='5.0.61', BUILD_ID='2026-09-17-chatslook';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -2687,7 +2687,9 @@ function loadMe(){let id=sessionStorage.getItem(SS);
   return null;}
 
 /* ---------- bot (so a single user can chat immediately) ---------- */
-const BOT={id:'bot_olesya',name:'Олеся · помощник',phone:'+7 000 000 00 00',avatar:'🤖',color:'#6C7BFF',bot:true,online:true,lastSeen:Date.now()};
+/* Портрет вместо значка робота: помощнику, с которым разговаривают каждый
+   день, лицо идёт больше, чем пиктограмма. */
+const BOT={id:'bot_olesya',name:'Олеся · помощник',phone:'+7 000 000 00 00',avatar:'img/olesya.svg',color:'#6C7BFF',bot:true,online:true,lastSeen:Date.now()};
 function ensureBot(){const d=db();const ex=d.users[BOT.id];if(!ex){d.users[BOT.id]=BOT;save(d);}else if(ex.name!==BOT.name||ex.avatar!==BOT.avatar){ex.name=BOT.name;ex.avatar=BOT.avatar;ex.bot=true;save(d);}}
 
 /* ---------- realtime bus ---------- */
@@ -3533,7 +3535,7 @@ function av(el,u){if(!el)return;u=u||{};
   el.style.backgroundImage='';
   const a=u.avatar;
   /* фото-аватар (data/http/blob) */
-  if(a&&/^(https?:|data:|blob:)/i.test(a)){el.innerHTML='';el.style.fontFamily='';el.style.background='var(--raised)';el.style.backgroundImage='url("'+a+'")';el.style.backgroundSize='cover';el.style.backgroundPosition='center';return;}
+  if(a&&/^(https?:|data:|blob:|img\/)/i.test(a)){el.innerHTML='';el.style.fontFamily='';el.style.background='var(--raised)';el.style.backgroundImage='url("'+a+'")';el.style.backgroundSize='cover';el.style.backgroundPosition='center';return;}
   el.style.background=gradCss(u.color);el.style.color='#fff';
   /* фирменный 3D-глиф */
   if(a&&GLYPHS[a]){el.style.fontFamily='';el.innerHTML='<svg viewBox="0 0 24 24">'+GLYPHS[a]+'</svg>';return;}
@@ -3648,12 +3650,22 @@ function attachChatMenu(row,chat,label){
 function отдатьСписокЧатов(строки){
   try{
     if(!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView&&window.__OLESYA_СПИСОК__))return;
-    window.ReactNativeWebView.postMessage(JSON.stringify({type:'chats',список:строки}));
+    window.ReactNativeWebView.postMessage(JSON.stringify({type:'chats',список:строки,
+      я:me?{имя:me.name||'',цвет:me.color||'#6C7BFF'}:null}));
   }catch(e){}
 }
 /* Команды от нативного списка: открыть, закрепить, удалить, пометить прочитанным. */
 window.olesyaChat=function(действие,id){
   try{
+    /* Сначала то, что не про конкретный чат. */
+    if(действие==='домой'){ current=null; go('scrHome'); try{renderHome();}catch(e){} return; }
+    if(действие==='настройки'){ const b=$('#btnSettings'); if(b)b.click(); return; }
+    if(действие==='новый'){ try{openNewChat();}catch(e){} return; }
+    if(действие==='избранное'){ if(me)openConv(me.id); return; }
+    if(действие==='искать'){
+      const п=$('#searchInput'); if(п){ п.value=id||''; }
+      renderChats(); return;
+    }
     const d=db(); const c=d.chats[id]; if(!c)return;
     if(действие==='открыть'){
       if(c.channel)return openChannel(c.id);
@@ -3683,23 +3695,29 @@ function renderChats(){
     try{
       if(isChatHidden(c))return;
       const last=(c.messages||[]).at(-1);
-      let имя='', значок='', цвет='', текст='', непрочитано=0;
-      if(c.channel){ имя='📢 '+c.name; значок=c.avatar||'channel'; цвет=c.color||''; текст=last?previewText(last):('@'+c.handle); }
+      let имя='', значок='', цвет='', текст='', непрочитано=0, онлайн=0, своё=0, бот=0, ищем='';
+      if(c.channel){ имя='📢 '+c.name; значок=c.avatar||'channel'; цвет=c.color||''; текст=last?previewText(last):('@'+c.handle); ищем=c.name+' '+(c.handle||''); }
       else if(c.group){
         имя='👥 '+c.name; значок=c.avatar||'group'; цвет=c.color||'';
         непрочитано=(c.messages||[]).filter(m=>m.from!==me.id&&!(m.readBy||[]).includes(me.id)).length;
         const кто=last?(last.from===me.id?'Вы':((d.users[last.from]&&d.users[last.from].name)||'Участник')):'';
         текст=last?(кто+': '+previewText(last)):((c.members||[]).length+' участников');
+        ищем=c.name||'';
       } else {
         const peerId=(c.members||[]).find(x=>x!==me.id)??me.id; const u=d.users[peerId]; if(!u)return;
-        имя=u.name||u.phone||''; значок=u.avatar||''; цвет=u.color||'';
+        имя=(peerId===me.id?'🔖 Избранное':(u.name||u.phone||'')); значок=u.avatar||''; цвет=u.color||'';
+        онлайн=u.online?1:0; бот=u.bot?1:0;
         непрочитано=(c.messages||[]).filter(m=>m.from!==me.id&&!(m.readBy||[]).includes(me.id)).length;
-        текст=last?((last.from===me.id?'Вы: ':'')+previewText(last)):'';
+        своё=(last&&last.from===me.id)?1:0;
+        текст=last?previewText(last):'';
+        ищем=(u.name||'')+' '+(u.phone||'');
       }
+      /* Поиск один на оба списка: что ищет страница, то ищет и оболочка. */
+      if(term&&!((ищем+' '+(last?last.text||'':'')).toLowerCase().includes(term)))return;
       дляОболочки.push({
         id:c.id, имя, значок, цвет, текст,
         время:last?fmtTime(last.t):'', непрочитано,
-        закреплён:isPinned(c.id)?1:0,
+        закреплён:isPinned(c.id)?1:0, онлайн, своё, бот,
       });
     }catch(e){}
   });
