@@ -2008,7 +2008,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.58', BUILD_ID='2026-09-17-afterCall';
+const APP_VERSION='5.0.59', BUILD_ID='2026-09-17-chatsbridge';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -2746,7 +2746,13 @@ function handleBus(m){
 /* ================== AUTH FLOW ================== */
 /* ================== AUTH FLOW ================== */
 function showScreen(id){ $$(  '.screen').forEach(s=>{ if(s.id===id){s.classList.remove('hidden','back')} }); }
-function go(id){ try{if(selMode)exitSel();}catch(e){} if(id==='scrPhone'){try{document.documentElement.removeAttribute('data-boot');}catch(e){}} $$('.screen').forEach(s=>s.classList.add('hidden')); const el=$('#'+id); if(el)el.classList.remove('hidden'); else {console.error('go(): экран не найден:',id);return;} if(typeof omPushScreen==='function')omPushScreen(id); try{_deskSync(id);}catch(e){} try{omSyncNativeTheme();}catch(e){} }
+function go(id){ try{if(selMode)exitSel();}catch(e){} if(id==='scrPhone'){try{document.documentElement.removeAttribute('data-boot');}catch(e){}} $$('.screen').forEach(s=>s.classList.add('hidden')); const el=$('#'+id); if(el)el.classList.remove('hidden'); else {console.error('go(): экран не найден:',id);return;} if(typeof omPushScreen==='function')omPushScreen(id);
+  /* Нативный список чатов показываем ровно тогда, когда открыт экран чатов.
+     Данные ему уже отданы; здесь только «покажи/спрячь». */
+  try{ if(window.__OLESYA_NATIVE__&&window.ReactNativeWebView&&window.__OLESYA_СПИСОК__){
+    window.ReactNativeWebView.postMessage(JSON.stringify({type:(id==='scrChats')?'chats-show':'chats-hide'}));
+    if(id==='scrChats'&&typeof renderChats==='function')setTimeout(renderChats,0);
+  } }catch(e){} try{_deskSync(id);}catch(e){} try{omSyncNativeTheme();}catch(e){} }
 /* Двухпанельный десктоп (≥900px): при переписке/списке чатов держим список слева, чат справа. */
 function _isDesk(){ try{return window.matchMedia&&window.matchMedia('(min-width:900px)').matches;}catch(e){return false;} }
 function _ensureDeskEmpty(){ if(document.getElementById('deskEmpty'))return; const d=document.createElement('div'); d.id='deskEmpty';
@@ -3637,12 +3643,67 @@ function attachChatMenu(row,chat,label){
 // чат, directory) пересобирало весь список (innerHTML='' + все строки заново) → если смотришь на
 // список, он моргал. Теперь строим желаемый список с подписями и трогаем только изменённые строки.
 // Точку «онлайн» в подпись НЕ включаем — ей отдельно занимается refreshPresenceDots (без пересборки).
+/* Отдать список оболочке. Формат простой и плоский: нативной стороне не нужно
+   знать про наши структуры, ей нужно только что рисовать. */
+function отдатьСписокЧатов(строки){
+  try{
+    if(!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView&&window.__OLESYA_СПИСОК__))return;
+    window.ReactNativeWebView.postMessage(JSON.stringify({type:'chats',список:строки}));
+  }catch(e){}
+}
+/* Команды от нативного списка: открыть, закрепить, удалить, пометить прочитанным. */
+window.olesyaChat=function(действие,id){
+  try{
+    const d=db(); const c=d.chats[id]; if(!c)return;
+    if(действие==='открыть'){
+      if(c.channel)return openChannel(c.id);
+      if(c.group)return openGroup(c.id);
+      const peer=(c.members||[]).find(x=>x!==me.id)||me.id;
+      return openConv(peer);
+    }
+    if(действие==='закрепить'){ try{togglePin(c.id);}catch(e){} renderChats(); return; }
+    if(действие==='прочитано'){
+      const peer=(c.members||[]).find(x=>x!==me.id)||me.id;
+      try{ c.group?markReadGroup(c.id):markRead(peer); }catch(e){}
+      renderChats(); return;
+    }
+    if(действие==='удалить'){ try{deleteChatForMe(c,c.name||'');}catch(e){} return; }
+  }catch(e){}
+};
 function renderChats(){
   if(!me)return;const d=db();const wrap=$('#chatList');
   const term=($('#searchInput').value||'').toLowerCase();
   const myChats=Object.values(d.chats).filter(c=>(c.members&&c.members.includes(me.id))||(c.channel&&c.subscribed));
   myChats.sort((a,b)=>{const pa=isPinned(a.id)?1:0,pb=isPinned(b.id)?1:0;if(pa!==pb)return pb-pa;const la=a.messages.at(-1)?.t||0,lb=b.messages.at(-1)?.t||0;return lb-la;});
   const desired=[];
+  const дляОболочки=[];
+  myChats.forEach(c=>{
+    /* Для нативного списка собираем то же самое, но плоско. Пропуски и
+       фильтры ниже работают одинаково для обоих списков. */
+    try{
+      if(isChatHidden(c))return;
+      const last=(c.messages||[]).at(-1);
+      let имя='', значок='', цвет='', текст='', непрочитано=0;
+      if(c.channel){ имя='📢 '+c.name; значок=c.avatar||'channel'; цвет=c.color||''; текст=last?previewText(last):('@'+c.handle); }
+      else if(c.group){
+        имя='👥 '+c.name; значок=c.avatar||'group'; цвет=c.color||'';
+        непрочитано=(c.messages||[]).filter(m=>m.from!==me.id&&!(m.readBy||[]).includes(me.id)).length;
+        const кто=last?(last.from===me.id?'Вы':((d.users[last.from]&&d.users[last.from].name)||'Участник')):'';
+        текст=last?(кто+': '+previewText(last)):((c.members||[]).length+' участников');
+      } else {
+        const peerId=(c.members||[]).find(x=>x!==me.id)??me.id; const u=d.users[peerId]; if(!u)return;
+        имя=u.name||u.phone||''; значок=u.avatar||''; цвет=u.color||'';
+        непрочитано=(c.messages||[]).filter(m=>m.from!==me.id&&!(m.readBy||[]).includes(me.id)).length;
+        текст=last?((last.from===me.id?'Вы: ':'')+previewText(last)):'';
+      }
+      дляОболочки.push({
+        id:c.id, имя, значок, цвет, текст,
+        время:last?fmtTime(last.t):'', непрочитано,
+        закреплён:isPinned(c.id)?1:0,
+      });
+    }catch(e){}
+  });
+  отдатьСписокЧатов(дляОболочки);
   myChats.forEach(c=>{
     if(isChatHidden(c))return;
     const pin=isPinned(c.id)?1:0;
