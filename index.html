@@ -708,8 +708,18 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 .call-actions.answer-row .callbtn svg{width:30px;height:30px}
 .callbtn.ans-pulse{animation:ansPulse 1.4s ease-in-out infinite}
 @keyframes ansPulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(63,207,142,.5)}50%{transform:scale(1.09);box-shadow:0 0 0 14px rgba(63,207,142,0)}}
-.incoming-ring{animation:ring 1.2s infinite}
-@keyframes ring{0%,100%{transform:translateY(0)}25%{transform:translateY(-6px) rotate(-8deg)}75%{transform:translateY(-6px) rotate(8deg)}}
+/* Волны вокруг значка — те же, что рисует оболочка на входящем вызове.
+   Цвет задаётся из кода (--call-ring) и совпадает с цветом собеседника. */
+.call-waves{position:relative;display:grid;place-items:center}
+.call-waves::before,.call-waves::after{content:"";position:absolute;width:132px;height:132px;border-radius:50%;
+  background:var(--call-ring,#8B6CF5);opacity:0;pointer-events:none;z-index:0}
+.call-waves.on::before{animation:callWave 1.9s ease-out infinite}
+.call-waves.on::after{animation:callWave 1.9s ease-out infinite .95s}
+@keyframes callWave{0%{transform:scale(1);opacity:.34}100%{transform:scale(1.85);opacity:0}}
+.call-waves .avatar{position:relative;z-index:1}
+/* Старое покачивание оставлено только как запасное имя класса: им больше
+   ничего не помечается, но чужой код мог на него ссылаться. */
+.incoming-ring{animation:none}
 
 /* ===== Profile / Settings sheet ===== */
 .sheet{position:absolute;inset:0;background:var(--surface);z-index:40;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .26s cubic-bezier(.4,0,.2,1)}
@@ -1532,7 +1542,7 @@ body.call-open #toast{bottom:190px}
     <div class="call-wrap">
       <div class="call-secure">🔒 <span>Сквозное шифрование звонка</span></div>
       <div class="call-info">
-        <div class="avatar xl" id="callAvatar"></div>
+        <div class="call-waves" id="callWaves"><div class="avatar xl" id="callAvatar"></div></div>
         <div class="nm" id="callName"></div>
         <div class="spam-badge" id="callSpamBadge" style="display:none">⚠️ <span>Возможный спам · номер не из ваших контактов</span></div>
         <div class="stat" id="callStatus">Вызов…</div>
@@ -1998,7 +2008,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.54', BUILD_ID='2026-09-16-audiodiag';
+const APP_VERSION='5.0.55', BUILD_ID='2026-09-17-callwaves';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6241,7 +6251,7 @@ function startCall(kind){
   if(!current)return;callKind=kind;callPeerId=current.id;callIncoming=false;callStart=0;callAnswered=false;
   _callIceBuf=[];_callHasRemote=false;   // чистое состояние обмена адресами — В НАЧАЛЕ звонка
   av($('#callAvatar'),current);$('#callName').textContent=current.name;$('#callStatus').textContent='Вызов…';
-  $('#callAvatar').classList.add('incoming-ring');   // та же анимация, что у входящего
+  волныЗвонка(true,current);   // тот же вид, что у входящего в оболочке
   go('callScreen');try{window.__omResetLocalVid&&window.__omResetLocalVid();}catch(e){}renderCallActions(false);
   closePeer();pendingOffer=null;
   emit('call:invite',{to:current.id,from:me.id,name:me.name,kind,avatar:me.avatar||'',color:me.color||''});   // сервер /bus сам шлёт пуш получателю (с антиспам-дедупом)
@@ -6324,7 +6334,7 @@ function showIncomingCall(p){
   пометитьЗвонокНаЭкране(true);
   if(currentScreenId()==='lockScreen'&&_callShowOverLock()){} else go('callScreen');
   try{window.__omResetLocalVid&&window.__omResetLocalVid();}catch(e){}renderCallActions(true,false,{unknown:!known,from:from});
-  $('#callAvatar').classList.add('incoming-ring');
+  волныЗвонка(true,u);
   if(!_звенитОболочка)_ringStart('in');
   if(appHidden())showNotif('📞 Входящий '+(p.kind==='video'?'видеозвонок':'звонок'),(u.name||p.name||'Неизвестный номер'),from);
   if(_autoAcceptFrom&&_autoAcceptFrom===from){ _autoAcceptFrom=null; setTimeout(()=>{try{acceptCall();}catch(e){}},150); }   // нативная оболочка нажала «Ответить» на полноэкранном звонке
@@ -6359,6 +6369,7 @@ function onCallConnected(){
   try{ if(window.__OLESYA_NATIVE__&&window.ReactNativeWebView)
         window.ReactNativeWebView.postMessage(JSON.stringify({type:'call-connected'})); }catch(e){}
   callStart=Date.now();
+  волныЗвонка(false);
   setTimeout(()=>{ доложитьЗвук('соединились'); вылечитьЗвукЕслиМолчит(null); },1500);
   if(callTimer)clearInterval(callTimer);
   callTimer=setInterval(()=>{$('#callStatus').textContent=fmtDur((Date.now()-callStart)/1000,true);},500);
@@ -6384,6 +6395,7 @@ window.olesyaCallAction=function(action,from,kind,name){
 };
 function endCall(remote){
   _ringStop();
+  волныЗвонка(false);
   пометитьЗвонокНаЭкране(false);
   try{ if(window.__OLESYA_NATIVE__&&window.ReactNativeWebView)
         window.ReactNativeWebView.postMessage(JSON.stringify({type:'call-ended'})); }catch(e){}
@@ -8718,6 +8730,20 @@ function вылечитьЗвукЕслиМолчит(пересобрать){
         window.ReactNativeWebView.postMessage(JSON.stringify({type:'speaker',on:true}));
       }
     }catch(e){} },1200);
+  }catch(e){}
+}
+/* Волны вокруг значка на экране звонка: включаем на время дозвона и
+   входящего, гасим при соединении и в конце. Цвет — цвет собеседника. */
+function волныЗвонка(включить,кто){
+  try{
+    const w=document.getElementById('callWaves'); if(!w)return;
+    if(включить){
+      const ц=(кто&&кто.color)||'#8B6CF5';
+      w.style.setProperty('--call-ring',ц);
+      w.classList.add('on');
+    } else {
+      w.classList.remove('on');
+    }
   }catch(e){}
 }
 let toastTO=null;function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');clearTimeout(toastTO);toastTO=setTimeout(()=>el.classList.remove('show'),2600);}
