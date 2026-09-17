@@ -2008,7 +2008,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.59', BUILD_ID='2026-09-17-chatsbridge';
+const APP_VERSION='5.0.60', BUILD_ID='2026-09-17-back';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -4247,8 +4247,20 @@ function _selVibe(ms){ try{ if(typeof doVibe==='function')doVibe(ms||10); else i
 function selBoxFor(mode){ return document.getElementById(mode==='msg'?'msgs':'chatList'); }
 function markSelNode(mode,id,on){ const box=selBoxFor(mode); if(!box)return; const k=(mode==='msg'?'msg:':'chat:')+id;
   Array.prototype.forEach.call(box.children,ch=>{ if(ch.dataset&&ch.dataset.k===k)ch.classList.toggle('selrow',on); }); }
-function enterSel(mode,id){ if(selMode&&selMode!==mode)exitSel(); selMode=mode; selSet=new Set(); const box=selBoxFor(mode); if(box)box.classList.add('selmode');
-  if(id){selSet.add(id);markSelNode(mode,id,true);} _selVibe(14); updateSelBar(); }
+/* Выделение не должно сдвигать переписку. Снизу появляется полоса действий,
+   высота списка меняется, и браузер пересчитывает прокрутку — сообщение уходит
+   из-под пальца (владелец, 17.09.2026). Держим положение ОТ НИЗА: переписка
+   растёт вниз, и на месте должен остаться именно низ. */
+function удержатьПрокрутку(дело){
+  const л=document.getElementById('msgs');
+  if(!л){ дело(); return; }
+  const отНиза=л.scrollHeight-л.scrollTop;
+  дело();
+  requestAnimationFrame(function(){ try{ л.scrollTop=л.scrollHeight-отНиза; }catch(e){} });
+}
+function enterSel(mode,id){ удержатьПрокрутку(function(){
+  if(selMode&&selMode!==mode)exitSel(); selMode=mode; selSet=new Set(); const box=selBoxFor(mode); if(box)box.classList.add('selmode');
+  if(id){selSet.add(id);markSelNode(mode,id,true);} _selVibe(14); updateSelBar(); }); }
 function exitSel(){ if(!selMode)return; const box=selBoxFor(selMode); if(box){box.classList.remove('selmode'); box.querySelectorAll('.selrow').forEach(n=>n.classList.remove('selrow'));} selMode=null; selSet.clear(); hideSelBar(); }
 function toggleSel(mode,id){ if(selMode!==mode){enterSel(mode,id);return;} if(selSet.has(id)){selSet.delete(id);markSelNode(mode,id,false);}else{selSet.add(id);markSelNode(mode,id,true);} _selVibe(8); if(selSet.size===0){exitSel();return;} updateSelBar(); }
 function reapplySel(){ if(!selMode)return; const box=selBoxFor(selMode); if(!box)return; box.classList.add('selmode'); const pref=selMode==='msg'?'msg:':'chat:';
@@ -8773,6 +8785,37 @@ function _omWatchDialogs(){   // диалоги добавляются/удал�
   }); }).observe(document.body,{childList:true});
 }
 try{ OM_OVERLAYS.forEach(_omWatchOverlay); _omWatchDialogs(); }catch(e){}
+/* Оболочка нажала системное «назад». Возвращаем управление тем же путём,
+   что и для истории: слой → экран → рабочий стол. */
+window.olesyaBack=function(){
+  try{
+    if(!me){ уйтиНаРабочийСтол(); return; }
+    /* Идёт выбор сообщений — «назад» снимает выделение, как в любом списке. */
+    try{ if(typeof selMode!=='undefined'&&selMode){ exitSel(); return; } }catch(e){}
+    const top=_omTopOverlay();
+    if(top){
+      _omPopping=true;
+      try{
+        if(top.dlg){ const c=top.dlg.querySelector('.cf-cancel'); if(c)c.click(); else top.dlg.remove(); }
+        else { _omShown.delete(top.id); _omCloseOverlay(top.id); }
+      }finally{ _omMicro(function(){ _omPopping=false; }); }
+      return;
+    }
+    if(_callOverLock)return;                       // поверх замка «назад» не уводит
+    const scr=[...document.querySelectorAll('.screen')].find(s=>!s.classList.contains('hidden'));
+    if(!scr)return;
+    if(scr.id==='lockScreen')return;               // с блокировки выхода нет
+    if(OM_ROOT_SCREENS.includes(scr.id)){ уйтиНаРабочийСтол(); return; }   // с главного — на рабочий стол
+    const bb=scr.querySelector('[data-back]');
+    _omPopping=true;
+    try{ if(bb)bb.click(); else { current=null; go('scrChats'); try{renderChats();}catch(e){} } }
+    finally{ _omPopping=false; }
+  }catch(e){}
+};
+function уйтиНаРабочийСтол(){
+  try{ if(window.__OLESYA_NATIVE__&&window.ReactNativeWebView)
+        window.ReactNativeWebView.postMessage(JSON.stringify({type:'go-home'})); }catch(e){}
+}
 window.addEventListener('popstate',()=>{
   if(_omSelfBack>0){ _omSelfBack--; return; }        // это наш собственный «назад» для уборки записи
   if(!me)return;
