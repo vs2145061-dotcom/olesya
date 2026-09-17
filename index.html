@@ -2008,7 +2008,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.56', BUILD_ID='2026-09-17-noautoanswer';
+const APP_VERSION='5.0.57', BUILD_ID='2026-09-17-nativecall';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6000,6 +6000,33 @@ function автоприёмДействует(от){
 }
 function сбросАвтоприёма(){ _autoAcceptFrom=null; _autoAcceptAt=0; }
 let pc=null, pendingOffer=null, callPollTimer=null;
+/* Разговор держит оболочка? Признак ставит только сборка с нативным движком. */
+function разговорНативный(){
+  try{ return !!(window.__OLESYA_NATIVE__ && window.ReactNativeWebView && window.__OLESYA_RTC__); }
+  catch(e){ return false; }
+}
+function оболочке(о){ try{ window.ReactNativeWebView.postMessage(JSON.stringify(о)); }catch(e){} }
+/* Оболочка отвечает: наше описание, наш адрес, состояние соединения. */
+window.olesyaRtc=function(д){
+  try{
+    if(!д||!callPeerId)return;
+    if(д.что==='sdp'){
+      const тип=(д.роль==='answer')?'call:answer':'call:offer';
+      emit(тип,{to:callPeerId,from:me.id,sdp:{type:(д.роль==='answer')?'answer':'offer',sdp:д.sdp}});
+      return;
+    }
+    if(д.что==='ice'){ emit('call:ice',{to:callPeerId,from:me.id,candidate:д.candidate}); return; }
+    if(д.что==='состояние'){
+      if(д.состояние==='connected'){ try{onCallConnected();}catch(e){} }
+      else if(д.состояние==='failed'||д.состояние==='нет-микрофона'){
+        const cs=$('#callStatus');
+        if(cs)cs.textContent=(д.состояние==='нет-микрофона')?'Нет доступа к микрофону':'Не удалось соединиться';
+        setTimeout(()=>{try{endCall(false);}catch(e){}},1500);
+      }
+      return;
+    }
+  }catch(e){}
+};
 let _callIceBuf=[], _callHasRemote=false;   // trickle ICE: буфер удалённых кандидатов до setRemoteDescription
 /* callAnswered — «трубку сняли», callStart — «связь реально установилась». Раньше это была
    одна переменная, из-за чего секундомер шёл ещё до соединения и человек говорил в пустоту. */
@@ -6036,10 +6063,12 @@ function _onCallOffer(p){
     }
     return;   // иначе ждём, что он ответит на наш offer
   }
+  if(разговорНативный()){ applyOfferAndAnswer(p.sdp); return; }
   if(pc&&pc.signalingState!=='closed'){ applyOfferAndAnswer(p.sdp); } else { pendingOffer=p.sdp; }
 }
 let _iceAdded=0, _iceRejected=0;
 function _iceAdd(c){
+  if(разговорНативный()){ оболочке({type:'rtc-ice',candidate:c}); return; }
   if(!pc||!c)return;
   try{ const r=pc.addIceCandidate(c); if(r&&r.then)r.then(()=>{_iceAdded++;},()=>{_iceRejected++;}); else _iceAdded++; }
   catch(e){ _iceRejected++; }
@@ -6124,6 +6153,15 @@ function iceComplete(p,ms){
   });
 }
 async function setupPeer(isCaller,kind){
+  if(разговорНативный()){
+    /* Адреса ретрансляторов берём те же, что и раньше: они лежат в настройках
+       звонка и нужны, когда собеседники за разными провайдерами. */
+    let ice=[]; try{ await ensureTurn(); const c=rtcConfig(); ice=(c&&c.iceServers)||[]; }catch(e){}
+    _callHasRemote=false;
+    if(callPeerId)_preCallTake(callPeerId);
+    оболочке({type:'rtc-start',caller:!!isCaller,kind:kind,ice:ice});
+    return;
+  }
   // получаем локальные медиа (звук всегда; видео — только для видеозвонка)
   try{
     if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){
@@ -6190,6 +6228,10 @@ async function setupPeer(isCaller,kind){
   }catch(e){console.error('RTC setup error',e);}
 }
 async function applyOfferAndAnswer(sdp){
+  if(разговорНативный()){
+    оболочке({type:'rtc-remote-sdp',sdp:(sdp&&sdp.sdp)||sdp,'роль':((sdp&&sdp.type)==='answer')?'answer':'offer'});
+    return;
+  }
   if(!pc||!sdp)return;
   try{
     await pc.setRemoteDescription(sdp);
@@ -6199,7 +6241,7 @@ async function applyOfferAndAnswer(sdp){
     if(pc&&callPeerId)emit('call:answer',{to:callPeerId,from:me.id,sdp:pc.localDescription});   // trickle: answer сразу
   }catch(e){console.error('RTC answer error',e);}
 }
-function closePeer(){ try{if(pc){pc.ontrack=null;pc.onconnectionstatechange=null;pc.onicecandidate=null;pc.close();}}catch(e){} pc=null; pendingOffer=null; _callIceBuf=[]; _callHasRemote=false; stopCallPoll(); try{clearInterval(_vidWatch);_vidWatch=null;}catch(e){} }
+function closePeer(){ if(разговорНативный())оболочке({type:'rtc-stop'}); try{if(pc){pc.ontrack=null;pc.onconnectionstatechange=null;pc.onicecandidate=null;pc.close();}}catch(e){} pc=null; pendingOffer=null; _callIceBuf=[]; _callHasRemote=false; stopCallPoll(); try{clearInterval(_vidWatch);_vidWatch=null;}catch(e){} }
 /* ЗВУК ЗВОНКА.
    Его не было вовсе. У того, кому звонят, только тряслась аватарка; тот, кто
    звонит, не слышал ничего и не понимал, идёт вызов или уже оборвался.
