@@ -2008,7 +2008,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.57', BUILD_ID='2026-09-17-nativecall';
+const APP_VERSION='5.0.58', BUILD_ID='2026-09-17-afterCall';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -5994,6 +5994,14 @@ let callPeerId=null,callKind='audio',callTimer=null,callStart=0,localStream=null
 /* Когда поставлен признак автоприёма. Старше тридцати секунд — не в счёт:
    это решение человека по ДРУГОМУ звонку, который давно кончился. */
 let _autoAcceptAt=0;
+/* Экран, с которого ушли в звонок. Пусто — значит приложение подняли звонком. */
+let _экранДоЗвонка='';
+function запомнитьЭкранДоЗвонка(){
+  try{
+    const э=currentScreenId();
+    if(э!=='callScreen'&&э!=='gcallScreen'&&э!=='lockScreen')_экранДоЗвонка=э;
+  }catch(e){}
+}
 const АВТОПРИЁМ_ЖИВЁТ=30000;
 function автоприёмДействует(от){
   return !!(_autoAcceptFrom && _autoAcceptFrom===от && (Date.now()-_autoAcceptAt)<АВТОПРИЁМ_ЖИВЁТ);
@@ -6293,6 +6301,7 @@ function _ringStop(){
 }
 function startCall(kind){
   сбросВыводЗвука();
+  запомнитьЭкранДоЗвонка();
   пометитьЗвонокНаЭкране(true);
   if(current&&current.group)return startGroupCall(kind);
   if(!micAllowed()){toast('🎤 Включите доступ к микрофону в Настройках, чтобы звонить');return;}
@@ -6361,6 +6370,7 @@ function showIncomingCall(p){
   saveSec(sec);
   if(sec.callsFrom==='contacts'&&!known){emit('call:reject',{to:from,from:me.id,reason:'screen'});logSec('📵 Отклонён звонок (только контакты): '+(p.name||from));toast('📵 Звонок не из контактов отклонён');return;}
   сбросВыводЗвука();
+  запомнитьЭкранДоЗвонка();
   callPeerId=from;callKind=p.kind;callIncoming=true;callStart=0;callAnswered=false;
   _callIceBuf=[];_callHasRemote=false;   // чистое состояние обмена адресами — В НАЧАЛЕ звонка
   _lastInviteAt=Date.now();
@@ -6466,13 +6476,20 @@ function endCall(remote){
   _pendingRemoteAudio=false;
   if(!remote&&callPeerId)emit('call:end',{to:callPeerId,from:me.id});
   $('#callAvatar').classList.remove('incoming-ring');
-  const fromHub=!!_callOrigin; const dest=_callOrigin||(current?'scrConv':'scrChats'); _callOrigin=null;
+  /* Приложение подняли самим звонком (оболочка пометила адрес) и человек до
+     этого никуда не заходил — значит возвращать некуда, показываем главный. */
+  const подняЛиЗвонком = (typeof _звонокВПути!=='undefined' && !!_звонокВПути && !_экранДоЗвонка);
+  const fromHub=!!_callOrigin;
+  const dest = подняЛиЗвонком ? 'scrHome'
+             : (_callOrigin || _экранДоЗвонка || (current?'scrConv':'scrChats'));
+  _callOrigin=null; _экранДоЗвонка='';
   if(fromHub)current=null;
   callPeerId=null;callStart=0;callAnswered=false;clearTimeout(callRingTO);$('#callSpamBadge').style.display='none';
   /* Разговор шёл поверх замка — возвращаем замок, а не пускаем в переписку. */
   if(_callOverLock){ _callHideOverLock(); if(remote)toast('Звонок завершён'); if(уйтиИЗапереть())return; try{maybeLock();}catch(e){} return; }
   go(dest);
-  if(dest==='scrChats')renderChats();
+  if(dest==='scrHome')renderHome();
+  else if(dest==='scrChats')renderChats();
   else if(dest==='scrContacts')renderContacts();
   else if(dest==='scrCalls')renderCalls();
   else if(dest==='scrHome')renderHome();
