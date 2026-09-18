@@ -2015,7 +2015,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.69', BUILD_ID='2026-09-18-rtcice';
+const APP_VERSION='5.0.71', BUILD_ID='2026-09-18-rtcpending';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -2725,7 +2725,10 @@ function handleBus(m){
     case 'call:invite': if(me&&m.payload.to===me.id)showIncomingCall(m.payload); break;
     case 'call:accept': if(me&&callPeerId===m.payload.from)onCallAccepted(); break;
     case 'call:offer': _onCallOffer(m.payload); break;
-    case 'call:answer': if(me&&callPeerId===m.payload.from&&pc){ Promise.resolve(pc.setRemoteDescription(m.payload.sdp)).then(()=>_drainRemoteIce()).catch(e=>console.error('setRemote',e)); } break;
+    case 'call:answer': if(me&&callPeerId===m.payload.from){
+      if(разговорНативный()){ applyOfferAndAnswer(m.payload.sdp); }
+      else if(pc){ Promise.resolve(pc.setRemoteDescription(m.payload.sdp)).then(()=>_drainRemoteIce()).catch(e=>console.error('setRemote',e)); }
+    } break;
     case 'call:ice': if(me){ if(callPeerId===m.payload.from){ _addRemoteIce(m.payload.candidate); } else { _preCallPut(m.payload.from,'ice',m.payload.candidate); } } break;
     case 'call:end': if(me&&callPeerId===m.payload.from)endCall(true); break;
     case 'call:reject': if(me&&callPeerId===m.payload.from){clearTimeout(callRingTO);stopCallInvite();const rr=m.payload.reason;$('#callStatus').textContent=rr==='busy'?'Занято':(rr==='blocked'?'Абонент недоступен':(rr==='screen'?'Вызов отклонён':'Вызов отклонён'));setTimeout(()=>endCall(true),1300);} break;
@@ -6283,6 +6286,12 @@ async function setupPeer(isCaller,kind){
     _callHasRemote=false;
     if(callPeerId)_preCallTake(callPeerId);
     оболочке({type:'rtc-start',caller:!!isCaller,kind:kind,ice:ice});
+    /* Предложение могло прийти РАНЬШЕ, чем мы узнали, кто звонит: тогда оно
+       лежит в pendingOffer. Обычный путь достаёт его в самом конце, уже после
+       создания pc, а нативная ветка выходит раньше — и предложение терялось.
+       Отдаём его сразу вслед за «начинай»: оболочка придержит, пока поднимется
+       соединение. */
+    if(!isCaller&&pendingOffer){ const off=pendingOffer; pendingOffer=null; await applyOfferAndAnswer(off); }
     return;
   }
   // получаем локальные медиа (звук всегда; видео — только для видеозвонка)
