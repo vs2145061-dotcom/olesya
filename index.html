@@ -2015,7 +2015,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.68', BUILD_ID='2026-09-18-homecolor';
+const APP_VERSION='5.0.69', BUILD_ID='2026-09-18-rtcice';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6196,8 +6196,8 @@ function _iceAdd(c){
   try{ const r=pc.addIceCandidate(c); if(r&&r.then)r.then(()=>{_iceAdded++;},()=>{_iceRejected++;}); else _iceAdded++; }
   catch(e){ _iceRejected++; }
 }
-function _addRemoteIce(c){ if(!c)return; if(pc&&_callHasRemote){ _iceAdd(c); } else { _callIceBuf.push(c); } }
-function _drainRemoteIce(){ _callHasRemote=true; if(!pc)return; const buf=_callIceBuf; _callIceBuf=[]; for(const c of buf){ _iceAdd(c); } }
+function _addRemoteIce(c){ if(!c)return; if((pc||разговорНативный())&&_callHasRemote){ _iceAdd(c); } else { _callIceBuf.push(c); } }
+function _drainRemoteIce(){ _callHasRemote=true; if(!pc&&!разговорНативный())return; const buf=_callIceBuf; _callIceBuf=[]; for(const c of buf){ _iceAdd(c); } }
 function stopCallInvite(){ if(callInviteTimer){clearInterval(callInviteTimer);callInviteTimer=null;} }
 // RTCIceCandidate нельзя структурно клонировать (BroadcastChannel/localStorage) → шлём простой объект
 function _iceToPlain(c){ if(!c)return c; try{ if(typeof c.toJSON==='function')return c.toJSON(); }catch(e){} return {candidate:c.candidate,sdpMid:c.sdpMid,sdpMLineIndex:c.sdpMLineIndex,usernameFragment:c.usernameFragment}; }
@@ -6353,6 +6353,7 @@ async function setupPeer(isCaller,kind){
 async function applyOfferAndAnswer(sdp){
   if(разговорНативный()){
     оболочке({type:'rtc-remote-sdp',sdp:(sdp&&sdp.sdp)||sdp,'роль':((sdp&&sdp.type)==='answer')?'answer':'offer'});
+    _drainRemoteIce();     // адреса, накопленные до описания, теперь можно отдать
     return;
   }
   if(!pc||!sdp)return;
