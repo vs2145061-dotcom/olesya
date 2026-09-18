@@ -2011,7 +2011,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.65', BUILD_ID='2026-09-18-homeicon';
+const APP_VERSION='5.0.66', BUILD_ID='2026-09-18-homekeep';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -8893,8 +8893,13 @@ window.addEventListener('popstate',()=>{
 });
 /* ================== back buttons ================== */
 const BACK_ARROW_SVG='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/></svg>';
-/* Единая стрелка «назад» на ВСЕХ кнопках назад (и data-back, и именованных), КРОМЕ кнопки «Домой» */
-$$('[data-back]:not(#btnHome), #btnCloseSettings, #subBack, #webBack, #readerClose').forEach(b=>{ b.classList.add('fx-back'); b.innerHTML=BACK_ARROW_SVG; });
+/* Единая стрелка «назад» на всех кнопках «на шаг назад».
+   ВАЖНО: кнопки «на главную» сюда не входят. Раньше исключением был только
+   #btnHome, и этот проход стирал домики со всех остальных экранов через миг
+   после отрисовки — правка в разметке выглядела невыполненной, хотя лежала
+   на месте. Исключаем по назначению кнопки, а не по её имени: домик ставится
+   везде, где кнопка ведёт на главный экран. */
+$$('[data-back]:not([data-back="scrHome"]), #btnCloseSettings, #subBack, #webBack, #readerClose').forEach(b=>{ b.classList.add('fx-back'); b.innerHTML=BACK_ARROW_SVG; });
 $$('[data-back]').forEach(b=>{
   b.classList.add('fx-back');   // единый стиль (цвет/размер) — в т.ч. для «Домой» (иконка остаётся домиком)
   b.onclick=()=>{
