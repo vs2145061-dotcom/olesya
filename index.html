@@ -2018,7 +2018,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.72', BUILD_ID='2026-09-18-headers';
+const APP_VERSION='5.0.73', BUILD_ID='2026-09-19-metki';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6181,6 +6181,7 @@ function _preCallTake(from){
    встречный вызов — когда двое позвонили друг другу одновременно (E-5). */
 function _onCallOffer(p){
   if(!me||!p||!p.from)return;
+  try{ крошка('страница: пришло предложение звонка, ждали от '+(callPeerId?'известного':'НИКОГО'),'звонок'); }catch(e){}
   const from=p.from;
   if(callPeerId!==from){ _preCallPut(from,'offer',p.sdp); return; }
   if(!callIncoming && pc && pc.signalingState==='have-local-offer'){
@@ -6283,6 +6284,8 @@ function iceComplete(p,ms){
   });
 }
 async function setupPeer(isCaller,kind){
+  try{ крошка('страница: звонок '+(разговорНативный()?'через оболочку':'по-старому, на странице')
+        +', я '+(isCaller?'звоню':'отвечаю'),'звонок'); }catch(e){}
   if(разговорНативный()){
     /* Адреса ретрансляторов берём те же, что и раньше: они лежат в настройках
        звонка и нужны, когда собеседники за разными провайдерами. */
@@ -6290,6 +6293,7 @@ async function setupPeer(isCaller,kind){
     _callHasRemote=false;
     if(callPeerId)_preCallTake(callPeerId);
     оболочке({type:'rtc-start',caller:!!isCaller,kind:kind,ice:ice});
+    try{ крошка('страница: оболочке сказано начинать, ретрансляторов '+((ice&&ice.length)||0),'звонок'); }catch(e){}
     /* Предложение могло прийти РАНЬШЕ, чем мы узнали, кто звонит: тогда оно
        лежит в pendingOffer. Обычный путь достаёт его в самом конце, уже после
        создания pc, а нативная ветка выходит раньше — и предложение терялось.
@@ -6365,7 +6369,9 @@ async function setupPeer(isCaller,kind){
 }
 async function applyOfferAndAnswer(sdp){
   if(разговорНативный()){
-    оболочке({type:'rtc-remote-sdp',sdp:(sdp&&sdp.sdp)||sdp,'роль':((sdp&&sdp.type)==='answer')?'answer':'offer'});
+    const роль=((sdp&&sdp.type)==='answer')?'answer':'offer';
+    try{ крошка('страница: отдал оболочке '+(роль==='answer'?'ОТВЕТ':'ПРЕДЛОЖЕНИЕ')+' собеседника','звонок'); }catch(e){}
+    оболочке({type:'rtc-remote-sdp',sdp:(sdp&&sdp.sdp)||sdp,'роль':роль});
     _drainRemoteIce();     // адреса, накопленные до описания, теперь можно отдать
     return;
   }
