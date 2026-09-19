@@ -2018,7 +2018,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.73', BUILD_ID='2026-09-19-metki';
+const APP_VERSION='5.0.74', BUILD_ID='2026-09-19-callnative';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -2718,6 +2718,12 @@ function handleBus(m){
   if(m.eid){if(seenE.has(m.eid))return;seenE.add(m.eid);if(seenE.size>400)seenE=new Set([...seenE].slice(-200));}
   // События звонков чувствительны ко времени: не воспроизводим устаревшие (повтор из шины при перезагрузке)
   if(m.type&&m.type.indexOf('call:')>=0&&m.t&&(Date.now()-m.t)>60000)return;
+  /* Звонок ведёт оболочка — отдаём событие ей как есть и ничего не решаем.
+     Групповые (gcall:) сюда не попадают: они остаются на странице. */
+  if(звонкиНативно()&&m.type&&m.type.indexOf('call:')===0){
+    try{ window.ReactNativeWebView.postMessage(JSON.stringify({type:'шина',событие:m.type,payload:m.payload})); }catch(e){}
+    return;
+  }
   switch(m.type){
     case 'msg': if(me&&m.payload.to===me.id){onIncomingMessage(m.payload);} break;
     case 'typing': if(me&&m.payload.to===me.id&&current&&current.id===m.payload.from){showTyping(m.payload.on);} break;
@@ -6131,6 +6137,31 @@ function автоприёмДействует(от){
 function сбросАвтоприёма(){ _autoAcceptFrom=null; _autoAcceptAt=0; }
 let pc=null, pendingOffer=null, callPollTimer=null;
 /* Разговор держит оболочка? Признак ставит только сборка с нативным движком. */
+/* Звонок целиком ведёт оболочка? */
+function звонкиНативно(){
+  try{ return !!(window.__OLESYA_NATIVE__ && window.ReactNativeWebView && window.__OLESYA_ЗВОНКИ__); }
+  catch(e){ return false; }
+}
+/* Отправить в шину по просьбе оболочки: подпись и адрес сервера знает страница. */
+window.olesyaОтправить=function(тип,данные){
+  try{ if(!me)return; emit(тип, Object.assign({}, данные||{}, {from:me.id})); }catch(e){}
+};
+/* Гудок в трубке: звук без решений, проигрыватель уже здесь. */
+window.olesyaГудок=function(что){
+  try{
+    if(что==='входящий')_ringStart('in');
+    else if(что==='исходящий')_ringStart('out');
+    else _ringStop();
+  }catch(e){}
+};
+/* Строка в журнале звонков. */
+window.olesyaЗаписьЗвонка=function(з){
+  try{
+    if(!з||!з.кто||!з.кто.id)return;
+    logCall(з.кто.id,'audio',(з.направление==='исходящий')?'out':'in',з.длительность||0);
+    try{ if(typeof renderCalls==='function')renderCalls(); }catch(e){}
+  }catch(e){}
+};
 function разговорНативный(){
   try{ return !!(window.__OLESYA_NATIVE__ && window.ReactNativeWebView && window.__OLESYA_RTC__); }
   catch(e){ return false; }
@@ -6442,7 +6473,19 @@ function startCall(kind){
   if(!micAllowed()){toast('🎤 Включите доступ к микрофону в Настройках, чтобы звонить');return;}
   if(kind==='video'&&!camAllowed()){kind='audio';toast('📷 Камера выключена — звоню только со звуком');}
   if(recState==='recording')pauseRecForCall();
-  if(!current)return;callKind=kind;callPeerId=current.id;callIncoming=false;callStart=0;callAnswered=false;
+  if(!current)return;
+  if(звонкиНативно()){
+    /* Ретрансляторы достаём здесь: их адрес знает страница. Дальше звонком
+       занимается оболочка целиком — свой экран не поднимаем. */
+    (async()=>{
+      let ice=[]; try{ await ensureTurn(); const c=rtcConfig(); ice=(c&&c.iceServers)||[]; }catch(e){}
+      try{ крошка('страница: прошу оболочку позвонить, ретрансляторов '+ice.length,'звоню'); }catch(e){}
+      оболочке({type:'звонить',кому:current.id,имя:current.name||'',
+        аватар:current.avatar||'',цвет:current.color||'',вид:kind,ice});
+    })();
+    return;
+  }
+  callKind=kind;callPeerId=current.id;callIncoming=false;callStart=0;callAnswered=false;
   _callIceBuf=[];_callHasRemote=false;   // чистое состояние обмена адресами — В НАЧАЛЕ звонка
   av($('#callAvatar'),current);$('#callName').textContent=current.name;$('#callStatus').textContent='Вызов…';
   волныЗвонка(true,current);   // тот же вид, что у входящего в оболочке
