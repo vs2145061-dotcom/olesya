@@ -2018,7 +2018,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.75', BUILD_ID='2026-09-20-mic';
+const APP_VERSION='5.0.76', BUILD_ID='2026-09-20-accept';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -2717,7 +2717,11 @@ function handleBus(m){
   if(!m||m.tab===TAB)return;
   if(m.eid){if(seenE.has(m.eid))return;seenE.add(m.eid);if(seenE.size>400)seenE=new Set([...seenE].slice(-200));}
   // События звонков чувствительны ко времени: не воспроизводим устаревшие (повтор из шины при перезагрузке)
-  if(m.type&&m.type.indexOf('call:')>=0&&m.t&&(Date.now()-m.t)>60000)return;
+  if(m.type&&m.type.indexOf('call:')>=0&&m.t&&(Date.now()-m.t)>60000){
+    try{ крошка('страница: ОТБРОШЕН '+m.type+' как устаревший, часы разошлись на '
+      +Math.round((Date.now()-m.t)/1000)+' с','звонок'); }catch(e){}
+    return;
+  }
   switch(m.type){
     case 'msg': if(me&&m.payload.to===me.id){onIncomingMessage(m.payload);} break;
     case 'typing': if(me&&m.payload.to===me.id&&current&&current.id===m.payload.from){showTyping(m.payload.on);} break;
@@ -2726,7 +2730,15 @@ function handleBus(m){
     case 'react': if(me&&m.payload.to===me.id){applyRemoteReact(m.payload);} break;
     case 'presence': refreshIfPresence(); break;
     case 'call:invite': if(me&&m.payload.to===me.id)showIncomingCall(m.payload); break;
-    case 'call:accept': if(me&&callPeerId===m.payload.from)onCallAccepted(); break;
+    case 'call:accept':
+      if(me&&callPeerId===m.payload.from){
+        try{ крошка('страница: собеседник снял трубку','звонок'); }catch(e){}
+        onCallAccepted();
+      } else {
+        try{ крошка('страница: «снял трубку» пропущен — ждали от '
+          +(callPeerId||'НИКОГО')+', пришло от '+(m.payload&&m.payload.from||'?'),'звонок'); }catch(e){}
+      }
+      break;
     case 'call:offer': _onCallOffer(m.payload); break;
     case 'call:answer': if(me&&callPeerId===m.payload.from){
       if(разговорНативный()){ applyOfferAndAnswer(m.payload.sdp); }
