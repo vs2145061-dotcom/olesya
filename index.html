@@ -2018,7 +2018,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.76', BUILD_ID='2026-09-20-accept';
+const APP_VERSION='5.0.77', BUILD_ID='2026-09-21-odna-ochered';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6216,8 +6216,16 @@ function _iceAdd(c){
   try{ const r=pc.addIceCandidate(c); if(r&&r.then)r.then(()=>{_iceAdded++;},()=>{_iceRejected++;}); else _iceAdded++; }
   catch(e){ _iceRejected++; }
 }
-function _addRemoteIce(c){ if(!c)return; if((pc||разговорНативный())&&_callHasRemote){ _iceAdd(c); } else { _callIceBuf.push(c); } }
-function _drainRemoteIce(){ _callHasRemote=true; if(!pc&&!разговорНативный())return; const buf=_callIceBuf; _callIceBuf=[]; for(const c of buf){ _iceAdd(c); } }
+function _addRemoteIce(c){ if(!c)return;
+  /* Нативный режим: очередь одна и она в оболочке — отдаём сразу. Держать
+     вторую очередь здесь незачем: страница всё равно не знает, готово ли
+     соединение принимать адреса, а оболочка знает. */
+  if(разговорНативный()){ _iceAdd(c); return; }
+  if(pc&&_callHasRemote){ _iceAdd(c); } else { _callIceBuf.push(c); } }
+function _drainRemoteIce(){ _callHasRemote=true;
+  /* В нативном режиме копить было нечего — разбирать тоже нечего. */
+  if(разговорНативный())return;
+  if(!pc)return; const buf=_callIceBuf; _callIceBuf=[]; for(const c of buf){ _iceAdd(c); } }
 function stopCallInvite(){ if(callInviteTimer){clearInterval(callInviteTimer);callInviteTimer=null;} }
 // RTCIceCandidate нельзя структурно клонировать (BroadcastChannel/localStorage) → шлём простой объект
 function _iceToPlain(c){ if(!c)return c; try{ if(typeof c.toJSON==='function')return c.toJSON(); }catch(e){} return {candidate:c.candidate,sdpMid:c.sdpMid,sdpMLineIndex:c.sdpMLineIndex,usernameFragment:c.usernameFragment}; }
