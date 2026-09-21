@@ -2018,7 +2018,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.80', BUILD_ID='2026-09-21-palec-i-zvon';
+const APP_VERSION='5.0.81', BUILD_ID='2026-09-21-prichina-otboya';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -2745,8 +2745,8 @@ function handleBus(m){
       else if(pc){ Promise.resolve(pc.setRemoteDescription(m.payload.sdp)).then(()=>_drainRemoteIce()).catch(e=>console.error('setRemote',e)); }
     } break;
     case 'call:ice': if(me){ if(callPeerId===m.payload.from){ _addRemoteIce(m.payload.candidate); } else { _preCallPut(m.payload.from,'ice',m.payload.candidate); } } break;
-    case 'call:end': if(me&&callPeerId===m.payload.from)endCall(true); break;
-    case 'call:reject': if(me&&callPeerId===m.payload.from){clearTimeout(callRingTO);stopCallInvite();const rr=m.payload.reason;$('#callStatus').textContent=rr==='busy'?'Занято':(rr==='blocked'?'Абонент недоступен':(rr==='screen'?'Вызов отклонён':'Вызов отклонён'));setTimeout(()=>endCall(true),1300);} break;
+    case 'call:end': if(me&&callPeerId===m.payload.from){_причинаОтбоя='собеседник положил трубку (call:end)';endCall(true);} break;
+    case 'call:reject': if(me&&callPeerId===m.payload.from){clearTimeout(callRingTO);stopCallInvite();const rr=m.payload.reason;$('#callStatus').textContent=rr==='busy'?'Занято':(rr==='blocked'?'Абонент недоступен':(rr==='screen'?'Вызов отклонён':'Вызов отклонён'));setTimeout(()=>{_причинаОтбоя='собеседник отклонил ('+String(rr||'')+')';endCall(true);},1300);} break;
     case 'session:kill': if(me&&m.payload.uid===me.id&&m.payload.sid===TAB){forceLogout('⚠️ Сеанс завершён с другого устройства');} break;
     case 'security:login': if(me&&m.payload.uid===me.id){logSec('⚠️ Новый вход в аккаунт: '+m.payload.device);toast('⚠️ Новый вход: '+m.payload.device);} break;
     case 'directory': renderChats(); break;
@@ -6383,7 +6383,7 @@ async function setupPeer(isCaller,kind){
       if(st==='connected'){ try{onCallConnected();}catch(e){} }
       // endCall(false), а не (true): завершаем МЫ, и собеседник должен об этом узнать,
       // иначе у него экран вызова висит, пока он сам не нажмёт отбой.
-      if(st==='failed'){ const cs=$('#callStatus'); if(cs)cs.textContent='Не удалось соединиться (сеть/NAT)'; setTimeout(()=>{try{endCall(false);}catch(e){}},1800); }
+      if(st==='failed'){ const cs=$('#callStatus'); if(cs)cs.textContent='Не удалось соединиться (сеть/NAT)'; setTimeout(()=>{try{_причинаОтбоя='соединение не собралось (failed)';endCall(false);}catch(e){}},1800); }
     };
     pc.oniceconnectionstatechange=()=>{ if(pc&&pc.iceConnectionState==='failed'){ try{pc.restartIce&&pc.restartIce();}catch(e){} } };
     try{clearInterval(_vidWatch);}catch(e){}
@@ -6492,7 +6492,7 @@ function startCall(kind){
   else{ startCallPoll(); _ringStart('out'); setupPeer(true,kind);
     // endCall(false): по таймауту трубку кладём МЫ — собеседника надо известить,
     // иначе у него продолжает звонить телефон от того, кто уже ушёл.
-    callRingTO=setTimeout(()=>{$('#callStatus').textContent='Не отвечает';setTimeout(()=>endCall(false),1200);},30000);
+    callRingTO=setTimeout(()=>{$('#callStatus').textContent='Не отвечает';setTimeout(()=>{_причинаОтбоя='не ответили за 30 с';endCall(false);},1200);},30000);
     // Надёжная доставка приглашения: облачная шина best-effort, одна отправка может не дойти →
     // повторяем call:invite каждые 2с, пока не ответят (callStart>0) или звонок не завершится.
     stopCallInvite();
@@ -6554,7 +6554,7 @@ function showIncomingCall(p){
     if(!callIncoming||callAnswered||!callPeerId){ clearInterval(_inviteWatch); _inviteWatch=null; return; }
     if(Date.now()-_lastInviteAt>8000){
       clearInterval(_inviteWatch); _inviteWatch=null;
-      toast('Вызов отменён'); try{endCall(true);}catch(e){}
+      toast('Вызов отменён'); try{_причинаОтбоя='сторож: звонящий замолчал дольше 8 с';endCall(true);}catch(e){}
     }
   },2000);
   const u=userById(from)||{name:p.name||'Неизвестный номер',avatar:'🙂',color:'#FF6B6B'};
@@ -6566,6 +6566,8 @@ function showIncomingCall(p){
   пометитьЗвонокНаЭкране(true);
   if(currentScreenId()==='lockScreen'&&_callShowOverLock()){} else go('callScreen');
   try{window.__omResetLocalVid&&window.__omResetLocalVid();}catch(e){}renderCallActions(true,false,{unknown:!known,from:from});
+  try{ крошка('страница: показываю входящий, поднял звонок '
+    +((typeof _звонокВПути!=='undefined'&&_звонокВПути)?'да':'нет'),'звонок'); }catch(e){}
   волныЗвонка(true,u);
   if(!_звенитОболочка&&!_оболочкаЗвенитСама)_ringStart('in');
   /* Спрашиваем оболочку напрямую: звенит ли уведомление. Старая оболочка
@@ -6625,12 +6627,18 @@ window.olesyaCallAction=function(action,from,kind,name){
     if(!me||!from)return;
     _звонокОтОболочки=from;   // этот вызов уже звенит рингтоном уведомления
     if(action==='accept'){ _autoAcceptFrom=from; _autoAcceptAt=Date.now(); if(callPeerId===from&&callIncoming){ сбросАвтоприёма(); acceptCall(); } return; }
-    if(action==='decline'){ if(callPeerId===from){ endCall(false); } else { try{emit('call:reject',{to:from,from:me.id,reason:'screen'});}catch(e){} } return; }
+    if(action==='decline'){ if(callPeerId===from){ _причинаОтбоя='нажали «Отклонить» на нативном экране'; endCall(false); } else { try{emit('call:reject',{to:from,from:me.id,reason:'screen'});}catch(e){} } return; }
     if(callPeerId===from)return;   // show — показать входящий сразу, не дожидаясь опроса
     showIncomingCall({from:from,to:me.id,name:name||'',kind:(kind==='video'?'video':'audio')});
   }catch(e){}
 };
+let _причинаОтбоя='';
 function endCall(remote){
+  try{ крошка('страница: КОНЕЦ ЗВОНКА — '+(_причинаОтбоя||'причина не отмечена')
+    +(remote?' (решение собеседника)':' (решение наше)')
+    +', отвечен '+(callAnswered?'да':'нет')
+    +', поднял звонок '+((typeof _звонокВПути!=='undefined'&&_звонокВПути)?'да':'нет'),'звонок'); }catch(e){}
+  _причинаОтбоя='';
   _ringStop();
   сбросАвтоприёма();
   волныЗвонка(false);
@@ -6718,7 +6726,7 @@ function renderCallActions(incoming,active,opt){
   if(incoming){
     a.classList.add('answer-row');
     const col=(cls,svg,label,fn,anim)=>{const c=document.createElement('div');c.className='ca-col';const b=document.createElement('button');b.className='callbtn '+cls+(anim?(' '+anim):'');b.innerHTML=svg;b.onclick=fn;const t=document.createElement('span');t.className='ca-label';t.textContent=label;c.appendChild(b);c.appendChild(t);return c;};
-    a.appendChild(col('end',ICON.end,'Отклонить',()=>endCall(false)));
+    a.appendChild(col('end',ICON.end,'Отклонить',()=>{_причинаОтбоя='нажали «Отклонить»';endCall(false);}));
     if(opt&&opt.unknown){a.appendChild(col('',"<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><circle cx='12' cy='12' r='10'/><path d='m4.9 4.9 14.2 14.2'/></svg>",'Блок',()=>{const s=getSec();if(!s.blocked.includes(opt.from))s.blocked.push(opt.from);saveSec(s);logSec('🚫 Заблокирован номер из входящего звонка');toast('Номер заблокирован');emit('call:reject',{to:opt.from,from:me.id,reason:'blocked'});refreshSettings();endCall(true);}));}
     a.appendChild(col('accept',ICON.accept,'Ответить',acceptCall,'ans-pulse'));
   }else{
@@ -6778,7 +6786,7 @@ function renderCallActions(incoming,active,opt){
     };
     sb.classList.toggle('active',_spkOn);
     a.appendChild(sb);applySpk();
-    a.appendChild(btn('end',ICON.end,()=>endCall(false)));
+    a.appendChild(btn('end',ICON.end,()=>{_причинаОтбоя='нажали отбой в разговоре';endCall(false);}));
     if(callKind==='video'){
       const cb=btn('',ICON.cam,()=>{camOff=!camOff;cb.classList.toggle('active',camOff);if(localStream)localStream.getVideoTracks().forEach(t=>t.enabled=!camOff);});a.appendChild(cb);
       const fb=btn('',ICON.flip,()=>switchCamera(fb));a.appendChild(fb);   // переключение фронтальная/тыловая
