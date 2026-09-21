@@ -2018,7 +2018,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.78', BUILD_ID='2026-09-21-ot-kogo';
+const APP_VERSION='5.0.79', BUILD_ID='2026-09-21-palec-ne-poverh';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -8766,7 +8766,14 @@ function попроситьОтпечатокЕслиЗаперто(){
 }
 window.olesyaResumed=function(){ попроситьОтпечатокЕслиЗаперто(); };
 document.addEventListener('visibilitychange',function(){
-  if(document.visibilityState==='visible')попроситьОтпечатокЕслиЗаперто();
+  if(document.visibilityState!=='visible')return;
+  /* В нативной обёртке решает ОБОЛОЧКА (olesyaResumed), а не мы. Она знает
+     про входящий звонок на секунду раньше страницы: уведомление показал
+     нативный приёмник, а приглашение с сервера сюда ещё не дошло. Спросив
+     палец самостоятельно, страница ставила системное окно поверх экрана
+     вызова — человек тянулся ответить, а его просили разблокироваться. */
+  if(window.__OLESYA_NATIVE__)return;
+  попроситьОтпечатокЕслиЗаперто();
 });
 window.olesyaBiometricResult=function(ok){ if(pinMode!=='check')return; if(ok){pinFails=0;pinBuffer='';_unlockReturn();} };  // после разблокировки — вернуться на экран, где были
 {const _lb=$('#lockBio'); if(_lb)_lb.onclick=()=>tryBiometricUnlock();}
