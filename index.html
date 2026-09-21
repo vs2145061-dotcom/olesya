@@ -2018,7 +2018,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.79', BUILD_ID='2026-09-21-palec-ne-poverh';
+const APP_VERSION='5.0.80', BUILD_ID='2026-09-21-palec-i-zvon';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6254,6 +6254,17 @@ let _pendingRemoteAudio=false, _spkOn=true;
 /* Кто звонит, если вызов принесла нативная оболочка. Нужен ровно для одного:
    не включать второй рингтон поверх того, что уже звенит в уведомлении. */
 let _звонокОтОболочки=null;
+/* Звенит ли за нас оболочка. В приложении по умолчанию ДА: нативный приёмник
+   показывает уведомление с рингтоном на каждый входящий, и свой рингтон
+   поверх него давал двойной звук. Оболочка может уточнить (olesyaЗвенит):
+   если уведомления нет, звонить должна страница — молчащий звонок хуже
+   двойного. */
+let _оболочкаЗвенитСама=false;
+try{ _оболочкаЗвенитСама=!!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView); }catch(e){}
+window.olesyaЗвенит=function(звенит){
+  _оболочкаЗвенитСама=!!звенит;
+  if(!звенит&&callIncoming&&!callAnswered&&callPeerId){ try{_ringStart('in');}catch(e){} }
+};
 /* Куда идёт звук в начале разговора. В оболочке — разговорный динамик: так
    устроен любой телефон, и оболочка тоже начинает каждый звонок с наушника
    (stopCallService сбрасывает свой признак). В браузере маршрута нет, там
@@ -6556,7 +6567,11 @@ function showIncomingCall(p){
   if(currentScreenId()==='lockScreen'&&_callShowOverLock()){} else go('callScreen');
   try{window.__omResetLocalVid&&window.__omResetLocalVid();}catch(e){}renderCallActions(true,false,{unknown:!known,from:from});
   волныЗвонка(true,u);
-  if(!_звенитОболочка)_ringStart('in');
+  if(!_звенитОболочка&&!_оболочкаЗвенитСама)_ringStart('in');
+  /* Спрашиваем оболочку напрямую: звенит ли уведомление. Старая оболочка
+     промолчит — останется как сейчас, звенит уведомление. */
+  try{ if(window.__OLESYA_NATIVE__&&window.ReactNativeWebView)
+        window.ReactNativeWebView.postMessage(JSON.stringify({type:'кто-звенит'})); }catch(e){}
   if(appHidden())showNotif('📞 Входящий '+(p.kind==='video'?'видеозвонок':'звонок'),(u.name||p.name||'Неизвестный номер'),from);
   if(автоприёмДействует(from)){ сбросАвтоприёма(); setTimeout(()=>{try{acceptCall();}catch(e){}},150); }   // человек нажал «Ответить» на нативном экране только что
   else сбросАвтоприёма();   // просроченный признак не должен ждать следующего звонка
@@ -8743,7 +8758,11 @@ function maybeLock(безОтпечатка){const c=lockCfg();if(!c.pin)return;
      Правильное место для этого решения — оболочка: она знает про звонок раньше
      страницы и может просто не запрашивать отпечаток. Делается в следующей
      сборке; здесь возвращаем мгновенный запрос, как было. */
-  if(!безОтпечатка)tryBiometricUnlock();}
+  /* Страницы нет на экране — палец не заказываем. Замок ставится как раз
+     при уходе в фон: заказанное там системное окно остаётся висеть и потом
+     всплывает поверх входящего звонка, а убрать его страница не может.
+     Вернулись — спросит оболочка (olesyaResumed). */
+  if(!безОтпечатка&&document.visibilityState==='visible')tryBiometricUnlock();}
 /* Биометрия (Face ID/отпечаток) — только в нативной обёртке, как быстрая замена PIN. */
 function bioAvailable(){try{const c=lockCfg();return !!(c&&c.pin&&c.bio!==false&&window.__OLESYA_NATIVE__&&window.ReactNativeWebView);}catch(e){return false;}}   // биометрия ВКЛЮЧЕНА по умолчанию (пока явно не выключили)
 function tryBiometricUnlock(){
