@@ -711,7 +711,11 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 .callbtn.end{background:var(--red);width:76px;height:76px}
 .callbtn.accept{background:var(--green)}
 /* Входящий звонок: крупные кнопки «Отклонить»/«Ответить» с подписями, как в обычном звонке */
-.call-actions.answer-row{width:100%;justify-content:space-around;align-items:flex-start;gap:0}
+/* Разгон по краям, как в нативной заставке: там ряд прижат к 44 px от краёв
+   экрана. У .call-wrap свои 24 px по бокам, поэтому здесь добавляем 20 —
+   24+20=44, и кружки встают кромка в кромку с эталоном. space-around,
+   стоявший здесь раньше, сводил их примерно к 25 % и 75 % ширины. */
+.call-actions.answer-row{width:100%;justify-content:space-between;align-items:flex-start;gap:0;padding:0 20px;box-sizing:border-box}
 .ca-col{display:flex;flex-direction:column;align-items:center;gap:9px}
 .ca-label{color:#fff;font-size:14px;font-weight:600;letter-spacing:.2px;text-shadow:0 1px 4px rgba(0,0,0,.5)}
 .call-actions.answer-row .callbtn{width:76px;height:76px}
@@ -2018,7 +2022,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.81', BUILD_ID='2026-09-21-prichina-otboya';
+const APP_VERSION='5.0.82', BUILD_ID='2026-09-22-knopki-i-zamok';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -8745,7 +8749,20 @@ function уйтиИЗапереть(){
 const _звонокВПути = (function(){ try{ return /[?&]call=1/.test(location.search) ? Date.now() : 0; }catch(e){ return 0; } })();
 function maybeLock(безОтпечатка){const c=lockCfg();if(!c.pin)return;
   const inCall=(typeof callPeerId!=='undefined'&&!!callPeerId);
-  if(!inCall && _звонокВПути && (Date.now()-_звонокВПути)<4000){ setTimeout(maybeLock,250); return; }
+  if(!inCall && _звонокВПути && (Date.now()-_звонокВПути)<4000){
+    /* Ждём вызов. Метку ставим один раз на ожидание, а не каждые 250 мс,
+       иначе одна попытка входа зальёт весь журнал. */
+    if(!maybeLock._ждём){ maybeLock._ждём=1;
+      try{ крошка('замок: жду звонок, он уже в пути','замок'); }catch(e){}
+    }
+    setTimeout(maybeLock,250); return;
+  }
+  try{
+    крошка('замок: решаю — звонок '+(inCall?'ПРИШЁЛ':'не пришёл')
+      +', поднял звонок '+(_звонокВПути?'да':'нет')
+      +(_звонокВПути?(', ждал '+Math.round((Date.now()-_звонокВПути)/100)/10+' с'):'')
+      +', экран сейчас '+currentScreenId(),'замок');
+  }catch(e){}
   const cur=currentScreenId();
   if(inCall&&cur==='callScreen'){
     /* Вызов уже на экране и НЕ поверх замка — не перерисовываем ничего.
@@ -8756,7 +8773,11 @@ function maybeLock(безОтпечатка){const c=lockCfg();if(!c.pin)return;
   }
   if(cur!=='lockScreen'&&cur!=='callScreen')_preLockScreen=cur;
   pinMode='check';pinBuffer='';$('#lockTitle').textContent='Введите PIN-код';renderPinDots();go('lockScreen');
-  if(inCall){_callShowOverLock();return;}
+  if(inCall){
+    try{ крошка('замок: кладу звонок ПОВЕРХ замка, PIN не показываю','замок'); }catch(e){}
+    _callShowOverLock();return;
+  }
+  try{ крошка('замок: показываю ввод PIN','замок'); }catch(e){}
   /* Задержка отпечатка на холодном старте УБРАНА 08.09.2026.
      Она была попыткой обогнать системное окно отпечатка таймингом — и владелец
      сразу поймал цену: отпечаток стал появляться с задержкой при КАЖДОМ открытии
