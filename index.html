@@ -2022,7 +2022,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.83', BUILD_ID='2026-09-22-zamok-zhdyot';
+const APP_VERSION='5.0.84', BUILD_ID='2026-09-22-bez-vspyshki';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6675,13 +6675,21 @@ function endCall(remote){
   callPeerId=null;callStart=0;callAnswered=false;clearTimeout(callRingTO);$('#callSpamBadge').style.display='none';
   /* Разговор шёл поверх замка — возвращаем замок, а не пускаем в переписку. */
   if(_callOverLock){ _callHideOverLock(); if(remote)toast('Звонок завершён'); if(уйтиИЗапереть())return; try{maybeLock();}catch(e){} return; }
-  go(dest);
-  if(dest==='scrHome')renderHome();
-  else if(dest==='scrChats')renderChats();
-  else if(dest==='scrContacts')renderContacts();
-  else if(dest==='scrCalls')renderCalls();
-  else if(dest==='scrHome')renderHome();
-  if(!fromHub&&current)refreshVoiceDraft();
+  /* Замок всё равно сейчас встанет — рисовать под ним чужой экран незачем:
+     между вызовом и вводом кода человек видит вспышку главного экрана.
+     Куда вернуться после разблокировки, запоминаем явно. */
+  const _сразуЗамок = _замокПослеЗвонка && (function(){ try{ return !!lockCfg().pin; }catch(e){ return false; } })();
+  if(_сразуЗамок){
+    _preLockScreen = dest;
+    try{ крошка('страница: сразу замок, экран под ним не рисую','после звонка'); }catch(e){}
+  } else {
+    go(dest);
+    if(dest==='scrHome')renderHome();
+    else if(dest==='scrChats')renderChats();
+    else if(dest==='scrContacts')renderContacts();
+    else if(dest==='scrCalls')renderCalls();
+    if(!fromHub&&current)refreshVoiceDraft();
+  }
   if(remote)toast('Звонок завершён');
   /* Разговор кончился — возвращаем замок, который не стали показывать поверх
      вызова. Отпечаток при этом запрашивается как обычно. */
