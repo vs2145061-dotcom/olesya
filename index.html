@@ -2022,7 +2022,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.87', BUILD_ID='2026-09-22-metka-na-opros';
+const APP_VERSION='5.0.88', BUILD_ID='2026-09-22-otkaz-ne-molchit';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6555,19 +6555,33 @@ function _callHideOverLock(){
   _callOverLock=false;
   try{omSyncNativeTheme();}catch(e){}
 }
+/* Мы отказались от вызова — оболочка должна об этом узнать. Её запись о
+   вызове лежит на диске и стирается только по концу разговора; молчаливый
+   отказ оставлял её жить, и следующий разворот приложения показывал звонок,
+   которого нет.
+   Говорим, только если сами ни с кем не говорим: «занято» второму звонящему
+   не должно гасить текущий разговор. */
+function отказалисьОтВызова(почему){
+  try{
+    if(typeof callPeerId!=='undefined'&&callPeerId)return;
+    крошка('страница: отказ от вызова ('+почему+') — говорю оболочке','звонок');
+    if(window.__OLESYA_NATIVE__&&window.ReactNativeWebView)
+      window.ReactNativeWebView.postMessage(JSON.stringify({type:'call-ended'}));
+  }catch(e){}
+}
 function showIncomingCall(p){
   const sec=getSec();const from=p.from;const known=isContact(from);const now=Date.now();
   // Повтор приглашения — это ПУЛЬС: пока он идёт, звонящий на линии (см. сторож ниже).
   if(callPeerId===from){ _lastInviteAt=now; return; }
   // Только что отклонили этого абонента — не открываем экран заново, пока идут
   // остаточные повторы приглашения (они летят ещё до 30 секунд).
-  if(_declined[from]>now){ emit('call:reject',{to:from,from:me.id,reason:'busy'}); return; }
+  if(_declined[from]>now){ emit('call:reject',{to:from,from:me.id,reason:'busy'}); отказалисьОтВызова('отклонён недавно'); return; }
   if(callPeerId&&callPeerId!==from){emit('call:reject',{to:from,from:me.id,reason:'busy'});return;}
-  if(sec.blocked.includes(from)||(sec.tmp[from]&&sec.tmp[from]>now)){emit('call:reject',{to:from,from:me.id,reason:'blocked'});logSec('🚫 Отклонён звонок от заблокированного: '+(p.name||from));return;}
+  if(sec.blocked.includes(from)||(sec.tmp[from]&&sec.tmp[from]>now)){emit('call:reject',{to:from,from:me.id,reason:'blocked'});logSec('🚫 Отклонён звонок от заблокированного: '+(p.name||from));отказалисьОтВызова('номер заблокирован');return;}
   const h=(sec.hist[from]||[]).filter(t=>now-t<60000);h.push(now);sec.hist[from]=h.slice(-10);
-  if(h.length>4&&!known){sec.tmp[from]=now+600000;saveSec(sec);emit('call:reject',{to:from,from:me.id,reason:'blocked'});logSec('⛔ Анти-спам: авто-блокировка на 10 мин — частые звонки ('+(p.name||from)+')');toast('⛔ Анти-спам: спам-номер заблокирован');return;}   // контакты НЕ блокируем — только чужие номера (иначе при частых звонках блокируется свой же собеседник)
+  if(h.length>4&&!known){sec.tmp[from]=now+600000;saveSec(sec);emit('call:reject',{to:from,from:me.id,reason:'blocked'});logSec('⛔ Анти-спам: авто-блокировка на 10 мин — частые звонки ('+(p.name||from)+')');toast('⛔ Анти-спам: спам-номер заблокирован');отказалисьОтВызова('антиспам');return;}   // контакты НЕ блокируем — только чужие номера (иначе при частых звонках блокируется свой же собеседник)
   saveSec(sec);
-  if(sec.callsFrom==='contacts'&&!known){emit('call:reject',{to:from,from:me.id,reason:'screen'});logSec('📵 Отклонён звонок (только контакты): '+(p.name||from));toast('📵 Звонок не из контактов отклонён');return;}
+  if(sec.callsFrom==='contacts'&&!known){emit('call:reject',{to:from,from:me.id,reason:'screen'});logSec('📵 Отклонён звонок (только контакты): '+(p.name||from));toast('📵 Звонок не из контактов отклонён');отказалисьОтВызова('только из контактов');return;}
   сбросВыводЗвука();
   запомнитьЭкранДоЗвонка();
   callPeerId=from;callKind=p.kind;callIncoming=true;callStart=0;callAnswered=false;
