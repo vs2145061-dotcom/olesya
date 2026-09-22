@@ -2022,7 +2022,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.89', BUILD_ID='2026-09-22-dozvon-vsegda';
+const APP_VERSION='5.0.90', BUILD_ID='2026-09-22-tishe-diagnostika';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -2387,16 +2387,11 @@ const POLL_TIMEOUT_MS=8000;  // опрос, который идёт раз в с
 let _pollBusy=false, _pollFail=0, _pollTO=null, _pollHot=false;
 
 /* Один заход. Возвращает число разобранных событий, либо -1 при ошибке. */
-let _опросСчёт=0;
 async function cloudPoll(){
   if(!cloudOn||!me)return 0;
   if(_pollBusy)return 0;                       // страховка сверх самого цикла
   _pollBusy=true;
-  /* Метка на сам опрос — только во время звонка и только первые шесть
-     заходов. Без неё не отличить «сервер отдал пустоту» от «опрос не шёл». */
-  const _метить=(_pollHot&&_опросСчёт<6);
-  if(_метить)_опросСчёт++;
-  const _откуда=busSeq;
+
   try{
     let n=0;
     if(CFG.provider==='worker'){
@@ -2409,11 +2404,8 @@ async function cloudPoll(){
       evs.forEach(ev=>{busSeq=Math.max(busSeq,ev.seq||busSeq);try{handleBus(JSON.parse(ev.payload));}catch(_){}});
       if(n)saveBusSeq();}}
     _pollFail=0;
-    if(_метить){ try{ крошка('опрос '+_опросСчёт+': пришло '+n+', читаю с места '+_откуда,'звонок'); }catch(e){} }
     return n;
-  }catch(e){ _pollFail=Math.min(_pollFail+1,8);
-    if(_метить){ try{ крошка('опрос '+_опросСчёт+': СБОЙ — '+String((e&&e.message)||e).slice(0,50),'звонок'); }catch(_){} }
-    return -1; }
+  }catch(e){ _pollFail=Math.min(_pollFail+1,8); return -1; }
   finally{ _pollBusy=false; }
 }
 
@@ -2741,13 +2733,6 @@ function handleBus(m){
     try{ крошка('страница: ОТБРОШЕН '+m.type+' как устаревший, часы разошлись на '
       +Math.round((Date.now()-m.t)/1000)+' с','звонок'); }catch(e){}
     return;
-  }
-  /* Метка на ПРИХОД, до всякого разбора. Без неё не отличить «сигнал не
-     пришёл» от «пришёл и молча выброшен» — а это разные болезни с разными
-     виновниками. Только сигналы звонка: обычные сообщения залили бы журнал. */
-  if(m.type&&m.type.indexOf('call:')===0){
-    try{ крошка('шина: пришло '+m.type+' от '+((m.payload&&m.payload.from)||'?')
-      +', говорим с '+(callPeerId||'НИ С КЕМ'),'звонок'); }catch(e){}
   }
   switch(m.type){
     case 'msg': if(me&&m.payload.to===me.id){onIncomingMessage(m.payload);} break;
@@ -6610,7 +6595,7 @@ function showIncomingCall(p){
      попытке при пробуждении: не вышла — предложение собеседника не приходило
      никогда, человек смотрел на молчащий экран вызова. Гасится опрос там же,
      где и раньше, — в closePeer по концу разговора. */
-  try{ startCallPoll(); _опросСчёт=0; }catch(e){}
+  try{ startCallPoll(); }catch(e){}
   _lastInviteAt=Date.now();
   try{clearInterval(_inviteWatch);}catch(e){}
   /* Сторож: звонящий повторяет приглашение каждые 2 секунды. Замолчал дольше 8 —
