@@ -2022,7 +2022,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.88', BUILD_ID='2026-09-22-otkaz-ne-molchit';
+const APP_VERSION='5.0.89', BUILD_ID='2026-09-22-dozvon-vsegda';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6204,6 +6204,10 @@ let callAnswered=false, _connectTO=null, _lastInviteAt=0, _inviteWatch=null;
    (приглашение могло задержаться). Раньше такие сигналы отбрасывались навсегда:
    повторяется только call:invite, offer второй раз не присылают. Теперь копим по отправителю. */
 const _preCall={}, _declined={};
+/* Когда от этого номера последний раз приходило приглашение. По паузе между
+   приглашениями отличаем остаточные повторы отклонённого вызова от нового
+   звонка: повторы идут каждые две секунды, новый звонок — после тишины. */
+const _последнийЗвон={};
 function _preCallPut(from,kind,val){
   if(!from)return; const now=Date.now();
   for(const k in _preCall){ if(now-_preCall[k].t>60000)delete _preCall[k]; }   // мусор старше минуты не нужен
@@ -6575,7 +6579,22 @@ function showIncomingCall(p){
   if(callPeerId===from){ _lastInviteAt=now; return; }
   // Только что отклонили этого абонента — не открываем экран заново, пока идут
   // остаточные повторы приглашения (они летят ещё до 30 секунд).
-  if(_declined[from]>now){ emit('call:reject',{to:from,from:me.id,reason:'busy'}); отказалисьОтВызова('отклонён недавно'); return; }
+  const _пауза = now - (_последнийЗвон[from]||0);
+  _последнийЗвон[from] = now;
+  if(_declined[from]>now){
+    if(_пауза < 4000){
+      /* Хвост отклонённого вызова: звонящий ещё не узнал об отказе и
+         повторяет приглашение. Показать экран заново — значит отменить
+         нажатие «Отклонить». */
+      emit('call:reject',{to:from,from:me.id,reason:'busy'});
+      отказалисьОтВызова('остаточный повтор отклонённого');
+      return;
+    }
+    /* Была тишина — значит звонят ЗАНОВО. Дозвон должен быть всегда и от
+       всех, поэтому запрет снимаем и вызов показываем. */
+    delete _declined[from];
+    try{ крошка('страница: перезвонили после тишины '+Math.round(_пауза/100)/10+' с — показываю','звонок'); }catch(e){}
+  }
   if(callPeerId&&callPeerId!==from){emit('call:reject',{to:from,from:me.id,reason:'busy'});return;}
   if(sec.blocked.includes(from)||(sec.tmp[from]&&sec.tmp[from]>now)){emit('call:reject',{to:from,from:me.id,reason:'blocked'});logSec('🚫 Отклонён звонок от заблокированного: '+(p.name||from));отказалисьОтВызова('номер заблокирован');return;}
   const h=(sec.hist[from]||[]).filter(t=>now-t<60000);h.push(now);sec.hist[from]=h.slice(-10);
