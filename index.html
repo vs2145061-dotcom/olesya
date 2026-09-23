@@ -2022,7 +2022,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.95', BUILD_ID='2026-09-23-gudok-nativnyy';
+const APP_VERSION='5.0.96', BUILD_ID='2026-09-23-klyuchi-obolochke';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -2253,7 +2253,8 @@ function evStartup(){
   }catch(e){}
 }
 let sessionToken=localStorage.getItem('om_session_token')||'';
-function saveSessionToken(t){sessionToken=t||'';if(t)localStorage.setItem('om_session_token',t);else localStorage.removeItem('om_session_token');}
+function saveSessionToken(t){sessionToken=t||'';if(t)localStorage.setItem('om_session_token',t);else localStorage.removeItem('om_session_token');
+  try{ отдатьКлючиОболочке(); }catch(e){}}
 function apiHeaders(){return{'content-type':'application/json','x-session-token':sessionToken};}
 async function jpost(url,body){
   const r=await apiFetchAny(url,{method:'POST',headers:{'Content-Type':'application/json','x-session-token':sessionToken||''},body:JSON.stringify(body),timeout:API_TIMEOUT_MS});
@@ -6160,6 +6161,16 @@ function разговорНативный(){
   catch(e){ return false; }
 }
 function оболочке(о){ try{ window.ReactNativeWebView.postMessage(JSON.stringify(о)); }catch(e){} }
+/* Ключи к серверу — оболочке. С ними она сама отправляет и принимает сигналы
+   звонка, не дожидаясь, пока проснётся страница. Свёрнутая страница сервер не
+   опрашивает, и раньше предложение собеседника до движка не доходило. */
+function отдатьКлючиОболочке(){
+  try{
+    if(!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView))return;
+    if(!me||!me.id||!sessionToken)return;
+    оболочке({type:'ключи',адрес:getApiUrl(),uid:me.id,токен:sessionToken});
+  }catch(e){}
+}
 /* Оболочка отвечает: наше описание, наш адрес, состояние соединения. */
 window.olesyaRtc=function(д){
   try{
@@ -6345,6 +6356,7 @@ async function setupPeer(isCaller,kind){
     let ice=[]; try{ await ensureTurn(); const c=rtcConfig(); ice=(c&&c.iceServers)||[]; }catch(e){}
     _callHasRemote=false;
     if(callPeerId)_preCallTake(callPeerId);
+    try{ отдатьКлючиОболочке(); }catch(e){}
     оболочке({type:'rtc-start',caller:!!isCaller,kind:kind,ice:ice,'кто':(callPeerId||'')});
     try{ крошка('страница: оболочке сказано начинать, ретрансляторов '+((ice&&ice.length)||0),'звонок'); }catch(e){}
     /* Предложение могло прийти РАНЬШЕ, чем мы узнали, кто звонит: тогда оно
