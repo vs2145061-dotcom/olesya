@@ -2022,7 +2022,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.92', BUILD_ID='2026-09-23-bez-gonki';
+const APP_VERSION='5.0.93', BUILD_ID='2026-09-23-shtorka-do-vyzova';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6601,6 +6601,8 @@ function showIncomingCall(p){
      никогда, человек смотрел на молчащий экран вызова. Гасится опрос там же,
      где и раньше, — в closePeer по концу разговора. */
   try{ startCallPoll(); }catch(e){}
+  /* Вызов на экране — шторка больше не нужна. */
+  try{ clearTimeout(_шторкаТаймер); hidePrivacyCover(); }catch(e){}
   _lastInviteAt=Date.now();
   try{clearInterval(_inviteWatch);}catch(e){}
   /* Сторож: звонящий повторяет приглашение каждые 2 секунды. Замолчал дольше 8 —
@@ -8751,6 +8753,9 @@ function showPrivacyCover(){
   cov.style.display='block';
 }
 function hidePrivacyCover(){ const cov=document.getElementById('privacyCover'); if(cov)cov.style.display='none'; }
+/* Предохранитель шторки: держим её не дольше двух секунд, что бы ни случилось
+   с оболочкой. Под шторкой человек не должен застревать никогда. */
+let _шторкаТаймер=null;
 document.addEventListener('visibilitychange',()=>{
   if(!me)return;
   let c={};try{c=lockCfg();}catch(e){}
@@ -8759,14 +8764,19 @@ document.addEventListener('visibilitychange',()=>{
     if(c&&c.pin&&!_omInCall()) showPrivacyCover();   // только шторка, экран не трогаем
     return;
   }
-  // Вернулись из фона: сначала мгновенно снять шторку (экран под ней не менялся → без мелькания).
-  hidePrivacyCover();
-  /* Придерживаем замок САМИ, в этот же миг. Иначе он успевает встать на
-     считанные миллисекунды раньше, чем оболочка скажет «идёт звонок», и
-     перед вызовом мелькает ввод кода. Оболочка отвечает за 5 мс — задержка
-     незаметна; предохранитель внутри maybeLock поставит замок через две
-     секунды, даже если она промолчит. */
-  try{ if(window.__OLESYA_NATIVE__&&window.ReactNativeWebView) _замокЖдётСлова=Date.now()+2000; }catch(e){}
+  /* Вернулись из фона. В обёртке шторку НЕ снимаем сразу: между возвратом и
+     появлением экрана вызова около 380 мс, и всё это время было видно то, что
+     лежало под ней, — главный экран. Ждём слова оболочки: «звонка нет» —
+     снимаем тут же, «звонок в пути» — держим до самого вызова.
+     Предохранитель на две секунды не даёт застрять под шторкой. */
+  const _вОболочке=(function(){ try{ return !!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView); }catch(e){ return false; } })();
+  if(_вОболочке){
+    _замокЖдётСлова=Date.now()+2000;   // тем же движением придерживаем замок
+    clearTimeout(_шторкаТаймер);
+    _шторкаТаймер=setTimeout(()=>{ try{ hidePrivacyCover(); }catch(e){} },2000);
+  } else {
+    hidePrivacyCover();
+  }
   const thr=(c&&c.autolock!=null)?c.autolock:60000;
   if(c&&c.pin&&!_omInCall() && hidAt && thr>=0 && Date.now()-hidAt>=thr){
     maybeLock();   // прошёл порог → настоящий экран блокировки + PIN/отпечаток; после — возврат на свой экран
@@ -8829,6 +8839,9 @@ window.olesyaПроверяюЗвонок=function(){
 };
 window.olesyaЗвонокВПути=function(есть){
   _замокЖдётСлова=0;
+  /* Звонка нет — шторку долой немедленно. Есть — держим до экрана вызова,
+     его поднимет showIncomingCall. */
+  if(!есть){ clearTimeout(_шторкаТаймер); try{ hidePrivacyCover(); }catch(e){} }
   _звонокПоСловуОболочки=есть?Date.now():0;
   try{ крошка('замок: оболочка ответила — звонок '+(есть?'В ПУТИ':'не идёт'),'замок'); }catch(e){}
   if(есть){ try{ maybeLock(true); }catch(e){} }
