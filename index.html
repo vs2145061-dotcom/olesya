@@ -2022,7 +2022,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.93', BUILD_ID='2026-09-23-shtorka-do-vyzova';
+const APP_VERSION='5.0.94', BUILD_ID='2026-09-23-gudok-slyshno';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6454,8 +6454,17 @@ function _ringCtxGet(){
 }
 function _ringBeep(freq,dur,vol){
   const c=_ringCtxGet(); if(!c)return;
+  /* Спящий движок будим и ЖДЁМ пробуждения. Раньше играли сразу после
+     просьбы проснуться — то есть в тишину, а следующая попытка была только
+     через пять секунд. Именно так гудок вызова пропадал целиком. */
+  if(c.state==='suspended'&&c.resume){
+    try{ c.resume().then(()=>_ringTone(c,freq,dur,vol)).catch(()=>{}); }catch(e){}
+    return;
+  }
+  _ringTone(c,freq,dur,vol);
+}
+function _ringTone(c,freq,dur,vol){
   try{
-    if(c.state==='suspended'&&c.resume)c.resume().catch(()=>{});
     const o=c.createOscillator(), g=c.createGain(), t=c.currentTime;
     o.type='sine'; o.frequency.value=freq;
     g.gain.setValueAtTime(0.0001,t);                       // без плавных краёв тон щёлкает
@@ -6469,6 +6478,12 @@ function _ringBeep(freq,dur,vol){
 function _ringStart(kind){
   if(_ringOn)return;
   _ringOn=true;
+  /* Без этой метки «тишину» не отличить от «тихо»: в первом случае гудок не
+     заводился или движок спал, во втором играл, но не слышно. */
+  try{
+    const c=_ringCtxGet();
+    крошка('звук: завожу гудок «'+kind+'», движок '+((c&&c.state)||'НЕТ'),'звонок');
+  }catch(e){}
   const tick=()=>{
     if(!_ringOn)return;
     if(kind==='in'){
@@ -6477,7 +6492,9 @@ function _ringStart(kind){
       try{ doVibe(600); }catch(e){}
       _ringTO=setTimeout(tick,2600);
     }else{
-      _ringBeep(425,0.9,0.09);          // длинный гудок, как в телефонной сети: 1 с через 4
+      /* Было 0.09 — девять процентов, владелец гудка попросту не слышал.
+         0.34 слышно отчётливо и при этом тише голоса собеседника. */
+      _ringBeep(425,0.9,0.34);          // длинный гудок, как в телефонной сети: 1 с через 4
       _ringTO=setTimeout(tick,4900);
     }
   };
