@@ -2022,7 +2022,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.98', BUILD_ID='2026-09-24-chasy-po-serveru';
+const APP_VERSION='5.0.99', BUILD_ID='2026-09-24-bez-sverki-chasov';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -2329,7 +2329,16 @@ let busSeq=0;
 /* busSeq храним по пользователю — после перезагрузки продолжаем с последнего события,
    а не перечитываем всю шину с нуля (история всё равно подтянется через /messages). */
 function busSeqKey(){return 'om_busseq_'+(me?me.id:'x');}
-function loadBusSeq(){try{busSeq=parseInt(localStorage.getItem(busSeqKey())||'0',10)||0;}catch(e){busSeq=0;}}
+/* Читаем шину впервые — закладки нет. Тогда первая пачка может содержать
+   старьё за несколько часов, и звонки из неё трогать нельзя: экран вызова
+   откроется сам, а звонить уже некому. Обычные сообщения обрабатываем — их
+   повтор безвреден, они отсеиваются по своему номеру. */
+let _шинаВпервые=false;
+function loadBusSeq(){try{
+  const сохранено=localStorage.getItem(busSeqKey());
+  _шинаВпервые=!(сохранено&&parseInt(сохранено,10)>0);
+  busSeq=parseInt(сохранено||'0',10)||0;
+}catch(e){busSeq=0;_шинаВпервые=true;}}
 function saveBusSeq(){try{localStorage.setItem(busSeqKey(),String(busSeq));}catch(e){}}
 let _busОшибка='', _busУспех=0;
 async function cloudBusSend(msg){
@@ -2399,7 +2408,13 @@ async function cloudPoll(){
     if(CFG.provider==='worker'){
       const d=await jget(wapi('/poll?uid='+encodeURIComponent(me.id)+'&since='+busSeq),POLL_TIMEOUT_MS,учестьВремяСервера);
       const evs=d.events||[];n=evs.length;
-      evs.forEach(ev=>{busSeq=Math.max(busSeq,ev.seq||busSeq);try{handleBus(ev.payload);}catch(_){}});
+      const первая=_шинаВпервые; if(первая&&evs.length)_шинаВпервые=false;
+      evs.forEach(ev=>{busSeq=Math.max(busSeq,ev.seq||busSeq);
+        /* Первое чтение: ставим закладку в конец, но звонки из этой пачки не
+           трогаем — им может быть несколько часов. */
+        if(первая&&ev.payload&&typeof ev.payload.type==='string'&&ev.payload.type.indexOf('call:')===0)return;
+        try{handleBus(ev.payload);}catch(_){}});
+      if(первая)try{ крошка('шина: первое чтение — закладка в конец, звонки из пачки пропущены','звонок'); }catch(e){}
       if(n)saveBusSeq();
     }else{const c=sbClient();if(c){const {data}=await c.from('om_bus').select('*').or('to_id.eq.'+me.id+',to_id.eq.*').gt('seq',busSeq).order('seq').limit(100);
       const evs=data||[];n=evs.length;
@@ -2754,19 +2769,12 @@ function handleBus(m){
   if(!m||m.tab===TAB)return;
   if(m.eid){if(seenE.has(m.eid))return;seenE.add(m.eid);if(seenE.size>400)seenE=new Set([...seenE].slice(-200));}
   // События звонков чувствительны ко времени: не воспроизводим устаревшие (повтор из шины при перезагрузке)
-  /* Возраст меряем по СЕРВЕРНОМУ времени: часы двух телефонов расходятся на
-     часы, и раньше из-за этого в мусор летели приглашения, адреса и отбои —
-     больше половины всех сигналов.
-     Выбрасываем только ПРИГЛАШЕНИЕ: лишь оно способно открыть экран вызова,
-     которого никто не делал. Описание, адреса и отбой не выбрасываем никогда:
-     опоздавший адрес безвреден, а выброшенный — это несостоявшийся звонок.
-     Окно пять минут: сигнала, честно опоздавшего сильнее, не бывает — бывают
-     разошедшиеся часы. */
-  if(m.type==='call:invite'&&m.t&&(сейчасПоСерверу()-m.t)>5*60*1000){
-    try{ крошка('страница: ОТБРОШЕНО приглашение, возраст '
-      +Math.round((сейчасПоСерверу()-m.t)/1000)+' с','звонок'); }catch(e){}
-    return;
-  }
+  /* Часы здесь больше ничего не решают — и не должны. Сравнение времени двух
+     телефонов выбрасывало живые сигналы идущего звонка: 24.09.2026 таких
+     записей было 236 из 400. От старья защищает ЗАКЛАДКА на шине: сервер
+     отдаёт только то, что после неё, а при первом чтении звонки из пачки
+     пропускаются. Если призрак всё же проскочит, сторож гасит экран вызова
+     за восемь секунд. */
   switch(m.type){
     case 'msg': if(me&&m.payload.to===me.id){onIncomingMessage(m.payload);} break;
     case 'typing': if(me&&m.payload.to===me.id&&current&&current.id===m.payload.from){showTyping(m.payload.on);} break;
