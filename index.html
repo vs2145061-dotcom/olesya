@@ -2022,7 +2022,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.97', BUILD_ID='2026-09-23-gasim-zavisshee';
+const APP_VERSION='5.0.98', BUILD_ID='2026-09-24-chasy-po-serveru';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -2259,8 +2259,9 @@ function apiHeaders(){return{'content-type':'application/json','x-session-token'
 async function jpost(url,body){
   const r=await apiFetchAny(url,{method:'POST',headers:{'Content-Type':'application/json','x-session-token':sessionToken||''},body:JSON.stringify(body),timeout:API_TIMEOUT_MS});
   if(!r.ok){let e='http_'+r.status;try{const d=await r.json();e=d.message||d.error||e;}catch(_){}throw new Error(e);}return r.json();}
-async function jget(url,timeout){
+async function jget(url,timeout,подсмотреть){
   const r=await apiFetchAny(url,{headers:{'x-session-token':sessionToken||''},timeout:timeout||API_TIMEOUT_MS});
+  if(подсмотреть){try{подсмотреть(r);}catch(e){}}
   if(!r.ok)throw new Error('http_'+r.status);return r.json();}
 /* lookup/register/login + message+bus sync (worker & supabase) */
 async function cloudLookup(phone){
@@ -2396,7 +2397,7 @@ async function cloudPoll(){
   try{
     let n=0;
     if(CFG.provider==='worker'){
-      const d=await jget(wapi('/poll?uid='+encodeURIComponent(me.id)+'&since='+busSeq),POLL_TIMEOUT_MS);
+      const d=await jget(wapi('/poll?uid='+encodeURIComponent(me.id)+'&since='+busSeq),POLL_TIMEOUT_MS,учестьВремяСервера);
       const evs=d.events||[];n=evs.length;
       evs.forEach(ev=>{busSeq=Math.max(busSeq,ev.seq||busSeq);try{handleBus(ev.payload);}catch(_){}});
       if(n)saveBusSeq();
@@ -2716,7 +2717,30 @@ const BOT={id:'bot_olesya',name:'Олеся · помощник',phone:'+7 000 0
 function ensureBot(){const d=db();const ex=d.users[BOT.id];if(!ex){d.users[BOT.id]=BOT;save(d);}else if(ex.name!==BOT.name||ex.avatar!==BOT.avatar){ex.name=BOT.name;ex.avatar=BOT.avatar;ex.bot=true;save(d);}}
 
 /* ---------- realtime bus ---------- */
-function emit(type,payload){const msg={type,payload,from:me?me.id:null,tab:TAB,eid:TAB+'-'+(++emitSeq),t:Date.now()};
+/* Насколько наши часы врут относительно серверных. Часы телефонов расходятся
+   на часы — 24.09.2026 у владельца было 4.5 часа, у партнёра 13, — и сигналы
+   звонка летели в мусор как «устаревшие». Сервер сообщает своё время в
+   заголовке каждого ответа, брать его ниоткуда не надо. */
+let _сдвигЧасов=0, _сдвигЗнаем=false;
+function учестьВремяСервера(ответ){
+  try{
+    const d=ответ&&ответ.headers&&ответ.headers.get&&ответ.headers.get('date');
+    if(!d)return;
+    const сервер=Date.parse(d); if(!isFinite(сервер))return;
+    const был=_сдвигЧасов;
+    _сдвигЧасов=сервер-Date.now();
+    if(!_сдвигЗнаем){
+      _сдвигЗнаем=true;
+      if(Math.abs(_сдвигЧасов)>60000){
+        try{ крошка('часы: наши расходятся с серверными на '+Math.round(_сдвигЧасов/1000)+' с — поправил','звонок'); }catch(e){}
+      }
+    }
+    void был;
+  }catch(e){}
+}
+/* Время, одинаковое для всех: своё плюс поправка на сервер. */
+function сейчасПоСерверу(){ return Date.now()+_сдвигЧасов; }
+function emit(type,payload){const msg={type,payload,from:me?me.id:null,tab:TAB,eid:TAB+'-'+(++emitSeq),t:сейчасПоСерверу()};
   cloudBusSend(msg);
   bc&&bc.postMessage(msg);
   // localStorage ping for browsers without BroadcastChannel
@@ -2730,9 +2754,17 @@ function handleBus(m){
   if(!m||m.tab===TAB)return;
   if(m.eid){if(seenE.has(m.eid))return;seenE.add(m.eid);if(seenE.size>400)seenE=new Set([...seenE].slice(-200));}
   // События звонков чувствительны ко времени: не воспроизводим устаревшие (повтор из шины при перезагрузке)
-  if(m.type&&m.type.indexOf('call:')>=0&&m.t&&(Date.now()-m.t)>60000){
-    try{ крошка('страница: ОТБРОШЕН '+m.type+' как устаревший, часы разошлись на '
-      +Math.round((Date.now()-m.t)/1000)+' с','звонок'); }catch(e){}
+  /* Возраст меряем по СЕРВЕРНОМУ времени: часы двух телефонов расходятся на
+     часы, и раньше из-за этого в мусор летели приглашения, адреса и отбои —
+     больше половины всех сигналов.
+     Выбрасываем только ПРИГЛАШЕНИЕ: лишь оно способно открыть экран вызова,
+     которого никто не делал. Описание, адреса и отбой не выбрасываем никогда:
+     опоздавший адрес безвреден, а выброшенный — это несостоявшийся звонок.
+     Окно пять минут: сигнала, честно опоздавшего сильнее, не бывает — бывают
+     разошедшиеся часы. */
+  if(m.type==='call:invite'&&m.t&&(сейчасПоСерверу()-m.t)>5*60*1000){
+    try{ крошка('страница: ОТБРОШЕНО приглашение, возраст '
+      +Math.round((сейчасПоСерверу()-m.t)/1000)+' с','звонок'); }catch(e){}
     return;
   }
   switch(m.type){
