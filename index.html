@@ -2022,7 +2022,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.1.0', BUILD_ID='2026-09-24-vidno-klyuchi';
+const APP_VERSION='5.1.1', BUILD_ID='2026-09-24-latinica-na-granice';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6231,7 +6231,9 @@ function отдатьКлючиОболочке(){
         +', токен '+(sessionToken?('есть, длина '+sessionToken.length):'НЕТ'),'звонок'); }catch(e){}
     }
     if(!me||!me.id||!sessionToken||!адрес)return;
-    оболочке({type:'ключи',адрес:адрес,uid:me.id,токен:sessionToken});
+    /* Латиница: кириллические имена до оболочки не доходят (проверено
+       24.09.2026). Внутри кода они остаются, на проводе — нет. */
+    оболочке({type:'keys',addr:адрес,uid:me.id,token:sessionToken});
   }catch(e){}
 }
 /* Оболочка отвечает: наше описание, наш адрес, состояние соединения. */
@@ -6420,7 +6422,7 @@ async function setupPeer(isCaller,kind){
     _callHasRemote=false;
     if(callPeerId)_preCallTake(callPeerId);
     try{ отдатьКлючиОболочке(); }catch(e){}
-    оболочке({type:'rtc-start',caller:!!isCaller,kind:kind,ice:ice,'кто':(callPeerId||'')});
+    оболочке({type:'rtc-start',caller:!!isCaller,kind:kind,ice:ice,peer:(callPeerId||'')});
     try{ крошка('страница: оболочке сказано начинать, ретрансляторов '+((ice&&ice.length)||0),'звонок'); }catch(e){}
     /* Предложение могло прийти РАНЬШЕ, чем мы узнали, кто звонит: тогда оно
        лежит в pendingOffer. Обычный путь достаёт его в самом конце, уже после
@@ -6499,7 +6501,7 @@ async function applyOfferAndAnswer(sdp,от){
   if(разговорНативный()){
     const роль=((sdp&&sdp.type)==='answer')?'answer':'offer';
     try{ крошка('страница: отдал оболочке '+(роль==='answer'?'ОТВЕТ':'ПРЕДЛОЖЕНИЕ')+' собеседника','звонок'); }catch(e){}
-    оболочке({type:'rtc-remote-sdp',sdp:(sdp&&sdp.sdp)||sdp,'роль':роль,'от':(от||callPeerId||'')});
+    оболочке({type:'rtc-remote-sdp',sdp:(sdp&&sdp.sdp)||sdp,role:роль,from:(от||callPeerId||'')});
     _drainRemoteIce();     // адреса, накопленные до описания, теперь можно отдать
     return;
   }
@@ -6910,7 +6912,7 @@ function renderCallActions(incoming,active,opt){
     const mb=btn('mic',ICON.mic,()=>{muted=!muted;mb.classList.toggle('active',muted);mb.innerHTML=muted?ICON.micoff:ICON.mic;if(localStream)localStream.getAudioTracks().forEach(t=>t.enabled=!muted);
       /* В нативном режиме поток живёт в оболочке — просим её. Без этого кнопка
          только меняла цвет, а собеседник продолжал всё слышать. */
-      if(разговорНативный())оболочке({type:'rtc-mute',выключить:muted});
+      if(разговорНативный())оболочке({type:'rtc-mute',mute:muted});
       toast(muted?'Микрофон выключен':'Микрофон включён');});
     a.appendChild(mb);
     // Громкая связь: на мобильных медиа-звук идёт в динамик; кнопка управляет громкостью/выводом
