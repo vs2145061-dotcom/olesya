@@ -2022,7 +2022,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.0.99', BUILD_ID='2026-09-24-bez-sverki-chasov';
+const APP_VERSION='5.1.0', BUILD_ID='2026-09-24-vidno-klyuchi';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6216,11 +6216,22 @@ function оболочке(о){ try{ window.ReactNativeWebView.postMessage(JSON.s
     window.ReactNativeWebView.postMessage(JSON.stringify({type:'rtc-stop'}));
   }catch(e){}
 })();
+let _ключиОтданы=0;
 function отдатьКлючиОболочке(){
   try{
     if(!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView))return;
-    if(!me||!me.id||!sessionToken)return;
-    оболочке({type:'ключи',адрес:getApiUrl(),uid:me.id,токен:sessionToken});
+    const адрес=getApiUrl();
+    /* Метка на ОТПРАВКУ: без неё «ключи не доехали» не отличить от «мы их и не
+       посылали». Первые три раза, дальше молча — звонок не должен заливать
+       журнал. */
+    if(_ключиОтданы<3){
+      _ключиОтданы++;
+      try{ крошка('ключи: отдаю оболочке — адрес '+(адрес?'есть':'НЕТ')
+        +', я '+(me&&me.id?'есть':'НЕТ')
+        +', токен '+(sessionToken?('есть, длина '+sessionToken.length):'НЕТ'),'звонок'); }catch(e){}
+    }
+    if(!me||!me.id||!sessionToken||!адрес)return;
+    оболочке({type:'ключи',адрес:адрес,uid:me.id,токен:sessionToken});
   }catch(e){}
 }
 /* Оболочка отвечает: наше описание, наш адрес, состояние соединения. */
