@@ -2022,7 +2022,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.1.2', BUILD_ID='2026-09-25-svyaz-delom';
+const APP_VERSION='5.1.3', BUILD_ID='2026-09-25-gudok-obryvaem';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6558,9 +6558,18 @@ function _ringBeep(freq,dur,vol){
   }
   _ringTone(c,freq,dur,vol);
 }
+/* Все заведённые тоны — чтобы оборвать их принудительно. Надеяться, что
+   назначенный звук «сам не начнётся», нельзя: он уже в очереди движка. */
+let _ringТоны=[], _ringСыграно=0;
 function _ringTone(c,freq,dur,vol){
+  /* Гудок выключили — не звучим, даже если нас назначили секунду назад.
+     Раньше эту проверку делал только цикл, а сам звук — нет. */
+  if(!_ringOn)return;
   try{
     const o=c.createOscillator(), g=c.createGain(), t=c.currentTime;
+    _ringСыграно++;
+    _ringТоны.push(o);
+    if(_ringТоны.length>6)_ringТоны=_ringТоны.slice(-6);
     o.type='sine'; o.frequency.value=freq;
     g.gain.setValueAtTime(0.0001,t);                       // без плавных краёв тон щёлкает
     g.gain.linearRampToValueAtTime(vol,t+0.04);
@@ -6609,7 +6618,16 @@ function _ringStart(kind){
   tick();
 }
 function _ringStop(){
+  const былВключен=_ringOn;
   _ringOn=false;
+  /* Обрываем всё, что уже назначено движку. Без этого тон, начатый за миг до
+     ответа, доигрывал поверх разговора — на iPhone это и слышал владелец. */
+  try{ _ringТоны.forEach(o=>{ try{ o.stop(); }catch(e){} }); }catch(e){}
+  _ringТоны=[];
+  if(былВключен){
+    try{ крошка('звук: гудок остановлен, тонов сыграно '+_ringСыграно,'звонок'); }catch(e){}
+  }
+  _ringСыграно=0;
   if(_гудокОтОболочки||window.__OLESYA_NATIVE__){
     try{ if(window.ReactNativeWebView)
       window.ReactNativeWebView.postMessage(JSON.stringify({type:'ringback',on:false})); }catch(e){}
