@@ -2022,7 +2022,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.1.3', BUILD_ID='2026-09-25-gudok-obryvaem';
+const APP_VERSION='5.1.4', BUILD_ID='2026-09-25-nomer-zvonka';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -2773,7 +2773,16 @@ function учестьВремяСервера(ответ){
 }
 /* Время, одинаковое для всех: своё плюс поправка на сервер. */
 function сейчасПоСерверу(){ return Date.now()+_сдвигЧасов; }
-function emit(type,payload){const msg={type,payload,from:me?me.id:null,tab:TAB,eid:TAB+'-'+(++emitSeq),t:сейчасПоСерверу()};
+/* Номер текущего звонка. Нужен ровно для одного: отличить сигналы ЭТОГО
+   разговора от сигналов прошлого с тем же человеком. Без него опоздавший отбой
+   убивал новый звонок — 25.09.2026 звонок с iPhone падал через секунду. */
+let callCid='';
+function новыйНомерЗвонка(){ callCid=TAB+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,6); return callCid; }
+function emit(type,payload){
+  /* Номер подставляем ЗДЕСЬ, а не в шестнадцати местах отправки: так его
+     нельзя забыть в новом сигнале. */
+  if(type&&type.indexOf('call:')===0&&callCid&&payload&&!payload.cid){ try{ payload.cid=callCid; }catch(e){} }
+  const msg={type,payload,from:me?me.id:null,tab:TAB,eid:TAB+'-'+(++emitSeq),t:сейчасПоСерверу()};
   cloudBusSend(msg);
   bc&&bc.postMessage(msg);
   // localStorage ping for browsers without BroadcastChannel
@@ -2793,6 +2802,12 @@ function handleBus(m){
      отдаёт только то, что после неё, а при первом чтении звонки из пачки
      пропускаются. Если призрак всё же проскочит, сторож гасит экран вызова
      за восемь секунд. */
+  /* Сигнал от ЧУЖОГО звонка не наш. Сигналы без номера пропускаем: их шлёт
+     необновлённая сторона, и глушить её нельзя. */
+  if(m.type&&m.type.indexOf('call:')===0&&m.payload&&m.payload.cid&&callCid&&m.payload.cid!==callCid){
+    try{ крошка('страница: ОТБРОШЕН '+m.type+' — от другого звонка','звонок'); }catch(e){}
+    return;
+  }
   switch(m.type){
     case 'msg': if(me&&m.payload.to===me.id){onIncomingMessage(m.payload);} break;
     case 'typing': if(me&&m.payload.to===me.id&&current&&current.id===m.payload.from){showTyping(m.payload.on);} break;
@@ -6649,6 +6664,7 @@ function startCall(kind){
   волныЗвонка(true,current);   // тот же вид, что у входящего в оболочке
   go('callScreen');try{window.__omResetLocalVid&&window.__omResetLocalVid();}catch(e){}renderCallActions(false);
   closePeer();pendingOffer=null;
+  новыйНомерЗвонка();   // до первого приглашения: номер уедет вместе с ним
   emit('call:invite',{to:current.id,from:me.id,name:me.name,kind,avatar:me.avatar||'',color:me.color||''});   // сервер /bus сам шлёт пуш получателю (с антиспам-дедупом)
   проверитьПриглашение(current.id);
   clearTimeout(callRingTO);
@@ -6741,6 +6757,10 @@ function showIncomingCall(p){
   if(sec.callsFrom==='contacts'&&!known){emit('call:reject',{to:from,from:me.id,reason:'screen'});logSec('📵 Отклонён звонок (только контакты): '+(p.name||from));toast('📵 Звонок не из контактов отклонён');отказалисьОтВызова('только из контактов');return;}
   сбросВыводЗвука();
   запомнитьЭкранДоЗвонка();
+  /* Берём номер звонящего — дальше обе стороны говорят об одном звонке.
+     Если звонящий старой версии и номера не прислал, заводим свой: тогда наши
+     сигналы будут помечены, а его — приниматься как раньше. */
+  callCid=(p&&p.cid)?String(p.cid):новыйНомерЗвонка();
   callPeerId=from;callKind=p.kind;callIncoming=true;callStart=0;callAnswered=false;
   _callIceBuf=[];_callHasRemote=false;   // чистое состояние обмена адресами — В НАЧАЛЕ звонка
   /* Жадный опрос — с ПОЯВЛЕНИЯ вызова, а не с ответа на него. Свёрнутое
@@ -6874,7 +6894,7 @@ function endCall(remote){
              : (_callOrigin || _экранДоЗвонка || (current?'scrConv':'scrChats'));
   _callOrigin=null; _экранДоЗвонка='';
   if(fromHub)current=null;
-  callPeerId=null;callStart=0;callAnswered=false;clearTimeout(callRingTO);$('#callSpamBadge').style.display='none';
+  callPeerId=null;callStart=0;callAnswered=false;callCid='';clearTimeout(callRingTO);$('#callSpamBadge').style.display='none';
   /* Разговор шёл поверх замка — возвращаем замок, а не пускаем в переписку. */
   if(_callOverLock){ _callHideOverLock(); if(remote)toast('Звонок завершён'); if(уйтиИЗапереть())return; try{maybeLock();}catch(e){} return; }
   /* Замок всё равно сейчас встанет — рисовать под ним чужой экран незачем:
