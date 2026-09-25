@@ -2022,7 +2022,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.1.4', BUILD_ID='2026-09-25-nomer-zvonka';
+const APP_VERSION='5.1.5', BUILD_ID='2026-09-25-nomer-ne-vydumyvaem';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -6757,10 +6757,14 @@ function showIncomingCall(p){
   if(sec.callsFrom==='contacts'&&!known){emit('call:reject',{to:from,from:me.id,reason:'screen'});logSec('📵 Отклонён звонок (только контакты): '+(p.name||from));toast('📵 Звонок не из контактов отклонён');отказалисьОтВызова('только из контактов');return;}
   сбросВыводЗвука();
   запомнитьЭкранДоЗвонка();
-  /* Берём номер звонящего — дальше обе стороны говорят об одном звонке.
-     Если звонящий старой версии и номера не прислал, заводим свой: тогда наши
-     сигналы будут помечены, а его — приниматься как раньше. */
-  callCid=(p&&p.cid)?String(p.cid):новыйНомерЗвонка();
+  /* Номер звонка берём у ЗВОНЯЩЕГО и только у него.
+     Раньше здесь стояло «нет номера — заведём свой». Это и сломало звонки с
+     iPhone 25.09.2026: вызов, пришедший пушем, номера не несёт, андроид
+     придумывал собственный, помечал им своё «взял трубку» — и звонящий выбрасывал
+     ответ как чужой. Выдуманный номер хуже пустого: пустой честно значит «не
+     знаю, какой это звонок» и никого не глушит. */
+  callCid=(p&&p.cid)?String(p.cid):'';
+  if(!callCid){ try{ крошка('страница: входящий БЕЗ номера звонка — не отбрасываю ничего','звонок'); }catch(e){} }
   callPeerId=from;callKind=p.kind;callIncoming=true;callStart=0;callAnswered=false;
   _callIceBuf=[];_callHasRemote=false;   // чистое состояние обмена адресами — В НАЧАЛЕ звонка
   /* Жадный опрос — с ПОЯВЛЕНИЯ вызова, а не с ответа на него. Свёрнутое
@@ -6848,14 +6852,18 @@ function acceptCall(){
 }
 /* Мост из нативной оболочки (Android): полноэкранный входящий звонок поверх блокировки.
    Оболочка по пушу показывает нативный звонящий экран; действия («Ответить»/«Отклонить»/показать) идут сюда. */
-window.olesyaCallAction=function(action,from,kind,name){
+/* Пятое поле — номер звонка из пуша. Оболочка начнёт его присылать со
+   следующей сборки; пока приходит пусто, и это правильно: пусто значит
+   «не знаю», а не «придумаю». Имя поля латиницей — кириллица на границе
+   страница↔оболочка не выживает (проверено 24.09.2026). */
+window.olesyaCallAction=function(action,from,kind,name,cid){
   try{
     if(!me||!from)return;
     _звонокОтОболочки=from;   // этот вызов уже звенит рингтоном уведомления
     if(action==='accept'){ _autoAcceptFrom=from; _autoAcceptAt=Date.now(); if(callPeerId===from&&callIncoming){ сбросАвтоприёма(); acceptCall(); } return; }
     if(action==='decline'){ if(callPeerId===from){ _причинаОтбоя='нажали «Отклонить» на нативном экране'; endCall(false); } else { try{emit('call:reject',{to:from,from:me.id,reason:'screen'});}catch(e){} } return; }
     if(callPeerId===from)return;   // show — показать входящий сразу, не дожидаясь опроса
-    showIncomingCall({from:from,to:me.id,name:name||'',kind:(kind==='video'?'video':'audio')});
+    showIncomingCall({from:from,to:me.id,name:name||'',kind:(kind==='video'?'video':'audio'),cid:cid||''});
   }catch(e){}
 };
 let _причинаОтбоя='';
