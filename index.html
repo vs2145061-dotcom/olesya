@@ -2022,7 +2022,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.1.5', BUILD_ID='2026-09-25-nomer-ne-vydumyvaem';
+const APP_VERSION='5.1.6', BUILD_ID='2026-09-26-podpiska-sama';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -3581,6 +3581,11 @@ function enterApp(){
   {const d=db();if(!d.users[me.id]){d.users[me.id]=me;save(d);}}
   loadBusSeq();
   try{settingsPull();}catch(e){}   // настройки из аккаунта
+  /* Подписка на уведомления — при КАЖДОМ входе. Раньше она заводилась только в
+     момент нажатия переключателя в настройках: одна неудачная секунда — и
+     уведомлений нет навсегда. Вызов безобиден, существующая подписка
+     переиспользуется. Отложен на 3 с: службе браузера нужно успеть подняться. */
+  try{ setTimeout(function(){ try{ pushSubscribe(); }catch(e){} }, 3000); }catch(e){}
   startOutboxWatch();   // досылка сообщений, не ушедших из-за связи
   ensureBot();
   setOnline(true);
@@ -9641,16 +9646,31 @@ async function loadVapidPublicKey(){
 }
 async function pushSubscribe(){
   try{
-    if(!me||!cloudOn||CFG.provider!=='worker'||!isCloudReady())return;
-    if(!('serviceWorker'in navigator)||!('PushManager'in window))return;
-    if(typeof Notification==='undefined'||Notification.permission!=='granted')return;
+    /* Признак cloudOn убран нарочно. Он выставлялся разовой проверкой при
+       загрузке и мог остаться ложным до перезагрузки — тогда единственная
+       попытка подписаться проваливалась молча и навсегда. Связь доказываем
+       делом: отправкой ниже. */
+    if(!me||CFG.provider!=='worker'||!isCloudReady())return;
+    if(!('serviceWorker'in navigator)||!('PushManager'in window)){
+      try{ крошка('пуш: браузер не умеет уведомления при закрытом приложении','пуш'); }catch(e){}
+      return;
+    }
+    if(typeof Notification==='undefined'||Notification.permission!=='granted'){
+      try{ крошка('пуш: разрешения нет ('+(typeof Notification==='undefined'?'нет самих уведомлений':Notification.permission)+')','пуш'); }catch(e){}
+      return;
+    }
     const reg=_swReg||(navigator.serviceWorker.ready?await navigator.serviceWorker.ready:null);
     if(!reg||!reg.pushManager)return;
     let sub=await reg.pushManager.getSubscription();
     if(!sub){ sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToU8(VAPID_PUBLIC_KEY)}); }
     const json=sub.toJSON?sub.toJSON():sub;
     await jpost(wapi('/push/subscribe'),{subscription:json});
-  }catch(e){}
+    try{ крошка('пуш: подписка отправлена на сервер','пуш'); }catch(e){}
+  }catch(e){
+    /* Молчать здесь нельзя: именно молчание 26.09.2026 скрыло, что подписки нет
+       ни у одного телефона, и сервер месяц слал уведомления в пустоту. */
+    try{ крошка('пуш: подписаться не вышло — '+String((e&&e.message)||e).slice(0,50),'пуш'); }catch(_){}
+  }
 }
 /* Нативный push (Expo): токен приходит из оболочки через window.olesyaNativePush / __OLESYA_PUSH_TOKEN__.
    Регистрируем его на воркере (POST /push/expo). Если ещё не залогинены — запомним и зарегистрируем позже (см. onCloudReady). */
