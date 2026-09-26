@@ -7,15 +7,27 @@ self.addEventListener('activate', e => { e.waitUntil(self.clients.claim()); });
 // Клик по уведомлению — фокусируем открытую вкладку (или открываем) и сообщаем, какой чат открыть
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  const peer = event.notification.data && event.notification.data.peer;
+  const дан = event.notification.data || {};
+  const peer = дан.peer;
+  const звонок = !!дан.звонок;
   event.waitUntil((async () => {
     const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const c of all) {
-      if ('focus' in c) { try { await c.focus(); } catch (e) {} if (peer) c.postMessage({ type: 'open-chat', peer }); return; }
+      if ('focus' in c) {
+        try { await c.focus(); } catch (e) {}
+        /* Звонок приложение покажет само — оно уже слышит шину. Лезть туда с
+           открытием переписки нельзя: перебьём экран вызова. */
+        if (peer && !звонок) c.postMessage({ type: 'open-chat', peer });
+        return;
+      }
     }
     if (self.clients.openWindow) {
-      const u = await self.clients.openWindow('./' + (peer ? ('#chat=' + encodeURIComponent(peer)) : ''));
-      if (u && peer) { try { u.postMessage({ type: 'open-chat', peer }); } catch (e) {} }
+      /* Приложение закрыто. Метка в адресе — единственный способ сказать ему,
+         куда идти, ещё до того как оно поднимется. «#call=» страница понимает
+         как «сейчас будет вызов, не рисуй главный экран». */
+      const метка = peer ? ((звонок ? '#call=' : '#chat=') + encodeURIComponent(peer)) : '';
+      const u = await self.clients.openWindow('./' + метка);
+      if (u && peer && !звонок) { try { u.postMessage({ type: 'open-chat', peer }); } catch (e) {} }
     }
   })());
 });
@@ -65,9 +77,13 @@ self.addEventListener('push', event => {
     let title = d.title || 'ZORVELD';
     let body = d.body || '';
     let tag = d.tag || 'om-msg';
+    let собеседник = d.peer || null;   // кого открывать по нажатию
+    let звонок = false;
     if (!body) {
       const что = await чтоПришло();
       const кто = какЗовут(что);
+      if (что && что.кто) собеседник = что.кто;
+      звонок = !!(что && что.вид === 'звонок');
       if (что && что.вид === 'звонок') {
         title = '📞 ZORVELD';
         body = кто ? ('Входящий звонок от ' + кто) : 'Входящий звонок';
@@ -80,7 +96,9 @@ self.addEventListener('push', event => {
     }
     await self.registration.showNotification(title, {
       body: body, icon: d.icon, tag: tag,
-      data: { peer: d.peer || null }
+      /* peer — кого открыть; звонок — какой экран. Без этого приложение
+         открывалось на главном и человек искал, что же случилось. */
+      data: { peer: собеседник, звонок: звонок }
     });
   })());
 });
