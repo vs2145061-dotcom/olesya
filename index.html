@@ -318,6 +318,21 @@ html.нативный-список #btnNewChat{display:none}
 .e2ee-banner{display:flex;align-items:center;justify-content:center;gap:7px;padding:7px;font-size:11.5px;
   color:var(--amber);background:rgba(245,181,68,.07);border-bottom:1px solid var(--line-soft)}
 .e2ee-banner svg{width:13px;height:13px}
+/* Плашка «включить уведомления». Живёт на главной, поэтому сделана в языке
+   карточек: то же скругление, та же кнопка, цвета из темы — в тёмной и светлой
+   выглядит одинаково уместно. */
+.notif-plash{margin:0 0 14px;padding:14px 15px;border-radius:20px;
+  background:rgba(245,181,68,.10);border:1px solid var(--line-soft)}
+.notif-plash .np-head{display:flex;align-items:center;gap:9px}
+.notif-plash .np-ic{font-size:20px;line-height:1}
+.notif-plash .np-t{font-family:var(--disp);font-weight:600;font-size:15px;color:var(--text)}
+.notif-plash .np-d{font-size:12.5px;color:var(--muted);line-height:1.4;margin:7px 0 0}
+.notif-plash .np-row{display:flex;align-items:center;gap:10px;margin-top:12px}
+.notif-plash .np-btn{padding:10px 18px;border-radius:13px;font-size:14px;font-weight:600;
+  background:linear-gradient(135deg,var(--primary),#8a7bff);color:#fff;
+  box-shadow:0 10px 22px -12px var(--primary)}
+.notif-plash .np-btn:active{transform:scale(.97)}
+.notif-plash .np-later{padding:10px 6px;font-size:13.5px;color:var(--muted);background:none}
 .msgs{flex:1;overflow-y:auto;padding:14px 14px 8px;display:flex;flex-direction:column;gap:3px;
   background:
    radial-gradient(900px 500px at 70% 0%, rgba(108,123,255,.05), transparent 50%);}
@@ -1236,6 +1251,13 @@ body.call-open #toast{bottom:190px}
         <div class="avatar lg" id="homeAvatar" style="cursor:pointer"></div>
         <div><div class="greet" id="homeGreet">Привет!</div><div class="subg">Чем займёмся сегодня?</div></div>
       </div>
+      <!-- Плашка про уведомления: без них звонок при закрытом приложении не придёт.
+           Показывается только там, где может помочь (см. плашкаУведомленийНужна). -->
+      <div class="notif-plash" id="notifPlash" style="display:none">
+        <div class="np-head"><span class="np-ic">🔔</span><span class="np-t">Уведомления выключены</span></div>
+        <div class="np-d">Пока они выключены, звонок при закрытом приложении не придёт — телефону неоткуда о нём узнать.</div>
+        <div class="np-row"><button class="np-btn" id="npOn">Включить</button><button class="np-later" id="npLater">Позже</button></div>
+      </div>
       <div class="home-grid">
         <div class="home-card hc-chats" id="cardChats"><div class="hc-badge" id="homeUnread" style="display:none">0</div><div class="orb o-chats hc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"><path d="M21 11.5a8.5 8.5 0 0 1-12.6 7.4L3 20.5l1.6-5.3A8.5 8.5 0 1 1 21 11.5Z"/><circle cx="8.5" cy="11.5" r="1.1" fill="#fff" stroke="none"/><circle cx="12" cy="11.5" r="1.1" fill="#fff" stroke="none"/><circle cx="15.5" cy="11.5" r="1.1" fill="#fff" stroke="none"/></svg></div><div><div class="hc-t">Чаты</div><div class="hc-d">переписка и медиа</div></div></div>
         <div class="home-card hc-calls" id="cardCalls"><div class="hc-badge" id="homeMissed" style="display:none">0</div><div class="orb o-calls hc-ic"><svg viewBox="0 0 24 24" fill="#fff"><path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1l-2.2 2.2Z"/></svg></div><div><div class="hc-t">Звонки</div><div class="hc-d">аудио и видео</div></div></div>
@@ -2022,7 +2044,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.1.6', BUILD_ID='2026-09-26-podpiska-sama';
+const APP_VERSION='5.1.7', BUILD_ID='2026-09-26-plashka-uvedomleniy';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -3586,6 +3608,7 @@ function enterApp(){
      уведомлений нет навсегда. Вызов безобиден, существующая подписка
      переиспользуется. Отложен на 3 с: службе браузера нужно успеть подняться. */
   try{ setTimeout(function(){ try{ pushSubscribe(); }catch(e){} }, 3000); }catch(e){}
+  try{ показатьПлашкуУведомлений(); }catch(e){}
   startOutboxWatch();   // досылка сообщений, не ушедших из-за связи
   ensureBot();
   setOnline(true);
@@ -8178,6 +8201,21 @@ $('#notifToggle').onclick=async function(){
   this.classList.toggle('on',ok&&notifPref()&&notifGranted());
   if(ok&&notifGranted())toast('🔔 Уведомления включены');
 };
+/* Те же действия с плашки на главной. ensureNotif зовётся ПРЯМО из нажатия,
+   без ожиданий перед ним: iOS показывает системный запрос только в ответ на
+   живое действие человека, и любое await раньше него запрос отменит. */
+{const б=$('#npOn'); if(б)б.onclick=async function(){
+  const ok=await ensureNotif();
+  try{ localStorage.setItem(ПЛАШКА_КЛЮЧ,String(Date.now())); }catch(e){}
+  try{ крошка('пуш: плашка — ответ '+(typeof Notification!=='undefined'?Notification.permission:'?'),'пуш'); }catch(e){}
+  const э=$('#notifPlash'); if(э)э.style.display='none';
+  if(ok&&notifGranted())toast('🔔 Уведомления включены');
+};}
+{const б=$('#npLater'); if(б)б.onclick=function(){
+  try{ localStorage.setItem(ПЛАШКА_КЛЮЧ,String(Date.now())); }catch(e){}
+  const э=$('#notifPlash'); if(э)э.style.display='none';
+  try{ крошка('пуш: плашку отложили на неделю','пуш'); }catch(e){}
+};}
 
 /* ================== SETTINGS SUB-SHEETS (v2) ================== */
 let _subBuilder=null;
@@ -9643,6 +9681,30 @@ async function loadVapidPublicKey(){
   if(VAPID_PUBLIC_KEY)return VAPID_PUBLIC_KEY;
   try{const r=await jget(wapi('/push/vapid'));if(r&&r.publicKey){VAPID_PUBLIC_KEY=r.publicKey;return VAPID_PUBLIC_KEY;}}catch(e){}
   return VAPID_PUBLIC_KEY;
+}
+/* Когда плашка про уведомления имеет смысл. Каждое «нет» здесь — не придирка,
+   а случай, в котором кнопка ничего не изменит. */
+const ПЛАШКА_КЛЮЧ='om_notif_plash_at';
+function плашкаУведомленийНужна(){
+  try{
+    if(window.__OLESYA_NATIVE__)return false;                 // наша оболочка: пуши идут через Google
+    if(typeof Notification==='undefined')return false;        // предлагать нечего
+    if(!('serviceWorker'in navigator)||!('PushManager'in window))return false;
+    /* granted — уже всё хорошо. denied — системный запрос второй раз не покажут,
+       и кнопка была бы обманом: это лечится только в настройках телефона. */
+    if(Notification.permission!=='default')return false;
+    const т=Number(localStorage.getItem(ПЛАШКА_КЛЮЧ)||0);
+    if(т&&Date.now()-т<7*86400000)return false;               // «Позже» — на неделю
+    return true;
+  }catch(e){return false;}
+}
+function показатьПлашкуУведомлений(){
+  try{
+    const э=$('#notifPlash'); if(!э)return;
+    if(!плашкаУведомленийНужна()){ э.style.display='none'; return; }
+    э.style.display='';
+    крошка('пуш: показал плашку про уведомления','пуш');
+  }catch(e){}
 }
 async function pushSubscribe(){
   try{
