@@ -2189,7 +2189,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.1', BUILD_ID='2026-09-26-fajl-prosmotrom';
+const APP_VERSION='5.2.2', BUILD_ID='2026-09-26-fajly-i-kalendar';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -7787,6 +7787,36 @@ function workDueClass(t,k,now){
 /* Событие в Google Календаре по ссылке — без разрешений. Время — в UTC
    (…Z): календарь сам покажет его в поясе человека. Только день (00:00) —
    событие на весь день; иначе — час. */
+/* Положить запись в календарь. Умеет оболочка — кладём прямо в телефон, с
+   напоминанием за час; не умеет (старая сборка, браузер, айфон) — открываем
+   готовое событие в Google Календаре, как раньше. */
+function workВКалендарь(title,due,details){
+  if(!workDueOk(due)){ toast('У записи нет срока'); return; }
+  if(window.__ZV_CALENDAR__&&window.ReactNativeWebView){
+    try{
+      const d=new Date(Number(due));
+      /* Ровно полночь — значит срок задан днём, без часа: такое кладём на весь
+         день, иначе человек увидит «00:00» и решит, что это ошибка. */
+      const весьДень=(!d.getHours()&&!d.getMinutes());
+      const конец=весьДень?new Date(d.getFullYear(),d.getMonth(),d.getDate()+1).getTime():(d.getTime()+3600000);
+      window.ReactNativeWebView.postMessage(JSON.stringify({type:'calendar-add',
+        title:String(title||'Запись'),start:d.getTime(),end:конец,allDay:весьДень,notes:String(details||'')}));
+      toast('Добавляю в календарь…');
+      return;
+    }catch(e){}
+  }
+  const u=workCalUrl(title,due,details);
+  if(u)workOpenExternal(u,'Календарь'); else toast('Не удалось собрать событие');
+}
+/* Ответ оболочки о записи в календарь: молчать нельзя — человек нажал кнопку и
+   должен узнать исход. */
+window.olesyaCalendarAdded=function(ok,почему){
+  try{
+    if(ok)toast('📅 Добавлено в календарь телефона');
+    else if(почему==='не разрешили')toast('Доступ к календарю не разрешён');
+    else toast('Не удалось добавить в календарь');
+  }catch(e){}
+};
 function workCalUrl(title,due,details){
   if(!workDueOk(due))return null;
   const d=new Date(Number(due)), дд=x=>String(x).padStart(2,'0');
@@ -7849,9 +7879,8 @@ function workEditTicket(x){
   if(workDueOk(x.due_at)){
     const кал=el('<button class="btn ghost sub-btn" style="margin-top:6px">📅 В календарь</button>');
     кал.onclick=()=>{
-      const u=workCalUrl((x.title||'Заявка')+(x.client_name?(' — '+x.client_name):''),x.due_at,
+      workВКалендарь((x.title||'Заявка')+(x.client_name?(' — '+x.client_name):''),x.due_at,
         [x.client_phone?('Телефон: '+x.client_phone):'',x.price?('Сумма: '+workPrice(x.price).replace(/^ · /,'')):''].filter(Boolean).join('\n'));
-      if(u)workOpenExternal(u,'Календарь');
     };
     box.appendChild(кал);
   }
@@ -8600,8 +8629,7 @@ function workPrjTaskCard(t){
   if(workDueOk(t.due_at)&&t.status!=='done'){
     const кал=el('<button class="wk-mail" title="Добавить в календарь" aria-label="Добавить в календарь">📅</button>');
     кал.onclick=()=>{
-      const u=workCalUrl(t.title||'Задача',t.due_at,'Проект «'+_prj.project.name+'»'+(t.note?('\n'+t.note):''));
-      if(u)workOpenExternal(u,'Календарь');
+      workВКалендарь(t.title||'Задача',t.due_at,'Проект «'+_prj.project.name+'»'+(t.note?('\n'+t.note):''));
     };
     acts.appendChild(кал);
   }
@@ -8977,6 +9005,18 @@ function workPdfLib(){
 function workFileSave(f){
   const внутриПриложения=!!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView);
   if(внутриПриложения){
+    /* Оболочка умеет сохранять сама (сборка 161 и новее): отдаём ей файл, она
+       открывает системное окно «Сохранить в файлы / Отправить в…». Годится и
+       для ссылки из хранилища, и для вложения прямо из переписки. */
+    if(window.__ZV_SAVE_FILE__){
+      try{
+        window.ReactNativeWebView.postMessage(JSON.stringify({type:'save-file',
+          url:f.src||'',name:f.name||'файл',mime:f.mime||''}));
+        toast('Открываю «Поделиться»…');
+        return;
+      }catch(e){}
+    }
+    /* Оболочка старая — как раньше. */
     if(/^https:/.test(f.src||''))workOpenExternal(f.src,f.name||'Файл');
     else toast('Сохранение файлов появится в следующей версии приложения');
     return;
