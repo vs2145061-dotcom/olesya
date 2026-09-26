@@ -2189,7 +2189,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.0', BUILD_ID='2026-09-26-biznes-rezhim';
+const APP_VERSION='5.2.1', BUILD_ID='2026-09-26-fajl-prosmotrom';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -4151,7 +4151,13 @@ function fileEl(m){
   const w=el('<div class="filemsg"><div class="fm-ic">'+fileIcon(m.name,m.mime)+'</div><div class="fm-info"><div class="fm-name"></div><div class="fm-sub"></div></div></div>');
   w.querySelector('.fm-name').textContent=m.name||'Документ';
   w.querySelector('.fm-sub').textContent=(m.size?fmtBytes(m.size)+' · ':'')+'нажмите, чтобы открыть';
-  w.onclick=ev=>{ev.stopPropagation(); if(m.src)dl(m.src,m.name||('olesya-file.'+extFromDataUrl(m.src,'bin'))); else toast('Файл недоступен (история без вложения)');};
+  /* Нажатие — просмотр внутри приложения (workFileView, бизнес-режим, правка 18).
+     Раньше здесь было dl() — скачивание, а в Android WebView оно заблокировано:
+     присланный документ нельзя было открыть вовсе (26.09.2026). */
+  w.onclick=ev=>{ev.stopPropagation();
+    if(!m.src){ toast('Файл недоступен (история без вложения)'); return; }
+    if(typeof workFileView==='function')workFileView({src:m.src,name:m.name||'Документ',mime:m.mime||'',size:m.size||0});
+    else dl(m.src,m.name||('olesya-file.'+extFromDataUrl(m.src,'bin')));};
   return w;
 }
 function sendDocument(file){
