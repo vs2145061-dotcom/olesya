@@ -1255,7 +1255,7 @@ body.call-open #toast{bottom:190px}
            Показывается только там, где может помочь (см. плашкаУведомленийНужна). -->
       <div class="notif-plash" id="notifPlash" style="display:none">
         <div class="np-head"><span class="np-ic">🔔</span><span class="np-t">Уведомления выключены</span></div>
-        <div class="np-d">Пока они выключены, звонок при закрытом приложении не придёт — телефону неоткуда о нём узнать.</div>
+        <div class="np-d">Пока они выключены, звонки и сообщения при закрытом приложении не будут приходить.</div>
         <div class="np-row"><button class="np-btn" id="npOn">Включить</button><button class="np-later" id="npLater">Позже</button></div>
       </div>
       <div class="home-grid">
@@ -2044,7 +2044,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.1.7', BUILD_ID='2026-09-26-plashka-uvedomleniy';
+const APP_VERSION='5.1.8', BUILD_ID='2026-09-26-tekst-plashki';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
