@@ -2044,7 +2044,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.1.8', BUILD_ID='2026-09-26-tekst-plashki';
+const APP_VERSION='5.1.9', BUILD_ID='2026-09-26-kuda-idti';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -8972,6 +8972,35 @@ function showPrivacyCover(){
   cov.style.display='block';
 }
 function hidePrivacyCover(){ const cov=document.getElementById('privacyCover'); if(cov)cov.style.display='none'; }
+/* Метка в адресе от служебного потока: «#call=кто» или «#chat=кто». */
+function разобратьМеткуУведомления(){
+  const h=String(location.hash||'');
+  if(h.indexOf('#call=')===0){
+    /* Экран вызова появится через секунду — из шины. До тех пор главный экран
+       показывать нельзя: 26.09.2026 владелец видел именно эту вспышку.
+       Шторку снимает сам показ вызова (см. showIncomingCall). */
+    try{
+      showPrivacyCover();
+      clearTimeout(_шторкаТаймер);
+      _шторкаТаймер=setTimeout(function(){ try{ hidePrivacyCover(); }catch(e){} },5000);
+      крошка('пуш: открыли по звонку — держу шторку до экрана вызова','пуш');
+    }catch(e){}
+    return;
+  }
+  if(h.indexOf('#chat=')!==0)return;
+  const кто=decodeURIComponent(h.slice(6));
+  if(!кто)return;
+  /* Собеседника может ещё не быть в местной базе — сообщение от него как раз
+     едет опросом. Ждём его, а не молчим: раньше в этом случае не открывалось
+     ничего и человек оставался на главном экране. */
+  let попыток=0;
+  (function ждём(){
+    попыток++;
+    try{ if(db().users[кто]){ openConv(кто); крошка('пуш: открыл переписку по уведомлению','пуш'); return; } }catch(e){}
+    if(попыток<12)setTimeout(ждём,400);           // до ~5 секунд
+    else try{ крошка('пуш: собеседник так и не появился в базе','пуш'); }catch(e){}
+  })();
+}
 /* Предохранитель шторки: держим её не дольше двух секунд, что бы ни случилось
    с оболочкой. Под шторкой человек не должен застревать никогда. */
 let _шторкаТаймер=null;
@@ -10037,7 +10066,10 @@ async function boot(){
   if(localMe){
     me=localMe;
     enterApp();refreshLockToggle();
-    try{ if(location.hash.indexOf('#chat=')===0){const pid=decodeURIComponent(location.hash.slice(6)); if(pid&&db().users[pid])setTimeout(()=>openConv(pid),50);} }catch(e){}
+    /* Пришли из уведомления. Метку ставит служебный поток, когда приложение
+       было закрыто: иначе оно поднимается на главном экране и человек не
+       понимает, что случилось. */
+    try{ разобратьМеткуУведомления(); }catch(e){}
     // фоновая ревалидация серверной сессии — не блокирует показ приложения
     if(rememberEnabled()&&sessionToken&&isCloudReady()){
       restoreRememberedSession().then(r=>{
