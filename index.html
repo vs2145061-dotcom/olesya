@@ -2189,7 +2189,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.2', BUILD_ID='2026-09-26-fajly-i-kalendar';
+const APP_VERSION='5.2.3', BUILD_ID='2026-10-04-vapid-s-servera';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -11553,10 +11553,28 @@ async function ensureNotif(){ // согласие + системное разр�
 let VAPID_PUBLIC_KEY='BNTzKmX_eW7P79BEvJm-XHnTDHJnerx5DsPnaTpKS2Bo70-8lfU0hwyM2el0e6dWcrDeX-OLI4JzISH1tXt3p28';
 function urlB64ToU8(s){s=String(s||'').replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';const bin=atob(s);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u;}
 
+/* Главный — ключ сервера; вписанный выше только запасной. 03.10.2026: раньше
+   здесь сначала возвращался вписанный ключ, и до сервера дело не доходило
+   никогда. Смена ключа на сервере тихо убила бы уведомления у всех, кто уже
+   подписан: сервер подписывает новым ключом, а браузер ждёт старый.
+   _vapidСервера заполнен — значит ключ подтверждён сервером в этой загрузке. */
+let _vapidСервера=null;
 async function loadVapidPublicKey(){
-  if(VAPID_PUBLIC_KEY)return VAPID_PUBLIC_KEY;
-  try{const r=await jget(wapi('/push/vapid'));if(r&&r.publicKey){VAPID_PUBLIC_KEY=r.publicKey;return VAPID_PUBLIC_KEY;}}catch(e){}
+  if(_vapidСервера)return _vapidСервера;
+  try{const r=await jget(wapi('/push/vapid'));if(r&&r.publicKey){_vapidСервера=VAPID_PUBLIC_KEY=r.publicKey;return _vapidСервера;}}catch(e){}
   return VAPID_PUBLIC_KEY;
+}
+/* Сделана ли подписка на этот ключ. Если браузер ключ не сообщает или
+   сравнить не вышло — считаем, что да: рабочую подписку зря не трогаем. */
+function подпискаНаКлюче(sub,ключ){
+  try{
+    const k=sub&&sub.options&&sub.options.applicationServerKey;
+    if(!k||!ключ)return true;
+    const a=new Uint8Array(k), b=urlB64ToU8(ключ);
+    if(a.length!==b.length)return false;
+    for(let i=0;i<a.length;i++)if(a[i]!==b[i])return false;
+    return true;
+  }catch(e){return true;}
 }
 /* Когда плашка про уведомления имеет смысл. Каждое «нет» здесь — не придирка,
    а случай, в котором кнопка ничего не изменит. */
@@ -11599,8 +11617,17 @@ async function pushSubscribe(){
     }
     const reg=_swReg||(navigator.serviceWorker.ready?await navigator.serviceWorker.ready:null);
     if(!reg||!reg.pushManager)return;
+    const ключ=await loadVapidPublicKey();
     let sub=await reg.pushManager.getSubscription();
-    if(!sub){ sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToU8(VAPID_PUBLIC_KEY)}); }
+    /* Подписка на старый ключ мертва: пересоздаём. Только если ключ пришёл
+       от сервера — по запасному вписанному можно, наоборот, снести свежую
+       подписку на новый ключ, если сервер просто не ответил. */
+    if(sub&&_vapidСервера&&!подпискаНаКлюче(sub,ключ)){
+      try{ крошка('пуш: ключ сервера сменился — переподписываюсь','пуш'); }catch(e){}
+      try{ await sub.unsubscribe(); }catch(e){}
+      sub=null;
+    }
+    if(!sub){ sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToU8(ключ)}); }
     const json=sub.toJSON?sub.toJSON():sub;
     await jpost(wapi('/push/subscribe'),{subscription:json});
     try{ крошка('пуш: подписка отправлена на сервер','пуш'); }catch(e){}
