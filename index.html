@@ -2189,7 +2189,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.3', BUILD_ID='2026-10-04-vapid-s-servera';
+const APP_VERSION='5.2.4', BUILD_ID='2026-10-05-istoriya-grupp';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -3769,6 +3769,7 @@ function enterApp(){
   try{if(typeof e2ePublishKey==='function')setTimeout(e2ePublishKey,1800);}catch(e){}   // подписка на push (если уведомления разрешены)
   try{applyProAccent();refreshProUI();if(typeof cloudProStatus==='function')setTimeout(cloudProStatus,1500);}catch(e){}   // статус ZORVELD Pro
   try{if(typeof cloudSyncChats==='function'){_chatsSynced=false;_chatsSyncTries=0;setTimeout(cloudSyncChats,1500);}}catch(e){}   // server-as-source: восстановить все диалоги с сервера
+  try{ setTimeout(()=>cloudSyncGroups(true),2500); }catch(e){}   // и пропущенные сообщения групп
   // ensure a chat with the bot exists for first-timers
   ensureChat(BOT.id,true);
   paintMe();renderChats();renderHome();
@@ -3844,6 +3845,60 @@ function avDot(el,u){av(el,u);const d=document.createElement('span');d.className
 function chatKey(a,b){return [a,b].sort().join('__');}
 /* ── Server-as-source: при входе тянем ВСЕ диалоги + историю с сервера (localStorage = кэш).
    Так переписка восстанавливается при смене телефона / очистке браузера / переустановке APK. ── */
+/* ── Пропущенные сообщения групп (05.10.2026) ──
+   Раньше сообщение группы приходило только по шине, а сервер держит шину
+   6 часов: кто был без сети дольше, не получал его никогда, а на новом
+   телефоне истории групп не было вовсе. Теперь сервер хранит сообщения групп
+   (GET /group/messages), а мы догружаем всё, что пришло после курсора.
+   Курсор — время СЕРВЕРА из ответа, по нему не пропустить сообщение, которое
+   дошло до сервера позже, чем было написано. Догруженное кладём тихо: без
+   звука и всплывашек, но непрочитанным — человек его ещё не видел. */
+let _gsyncBusy=false,_gsyncAt=0;
+function _gsyncKey(){return 'om_gsync_'+((me&&me.id)||'');}
+async function cloudSyncGroups(force){
+  if(!me||_gsyncBusy)return;
+  if(!(cloudOn&&isCloudReady()&&CFG.provider==='worker'))return;
+  if(!force&&Date.now()-_gsyncAt<30000)return;          // не чаще раза в 30 секунд
+  _gsyncBusy=true;_gsyncAt=Date.now();
+  try{
+    let since=0;try{since=Number(localStorage.getItem(_gsyncKey()))||0;}catch(e){}
+    for(let страница=0;страница<10;страница++){
+      let r=null;
+      try{ r=await jget(getApiUrl()+'/group/messages?since='+since); }catch(e){ return; }
+      const список=(r&&Array.isArray(r.messages))?r.messages:[];
+      if(список.length) влитьСообщенияГрупп(список);
+      if(r&&Number(r.next)>since){ since=Number(r.next); try{localStorage.setItem(_gsyncKey(),String(since));}catch(e){} }
+      if(!(r&&r.more))break;
+    }
+  }finally{_gsyncBusy=false;}
+}
+function влитьСообщенияГрупп(список){
+  const d=db();let изменено=false;const тронутые=new Set();
+  список.forEach(p=>{
+    if(!p||!p.gid||!p.id)return;
+    let g=d.chats[p.gid];
+    if(p.deleted){                                       // удалённое: только отметка у уже лежащего
+      const mm=g&&g.messages&&g.messages.find(x=>x.id===p.id);
+      if(mm&&!mm.deleted){mm.deleted=1;delete mm.text;delete mm.src;delete mm.audio;изменено=true;тронутые.add(p.gid);}
+      return;
+    }
+    if(!g||!g.group){g=d.chats[p.gid]={id:p.gid,gid:p.gid,group:true,name:p.gname||'Группа',members:p.gmembers||[me.id,p.from],color:senderColor(p.gid),messages:[]};}
+    else{ if(p.gmembers)g.members=Array.from(new Set([...(g.members||[]),...p.gmembers])); if(p.gname&&(!g.name||g.name==='Группа'))g.name=p.gname; }
+    if(!d.users[p.from]&&p.from!==me.id){d.users[p.from]={id:p.from,name:p.gsender||'Участник',avatar:'🙂',color:senderColor(p.from),online:false,lastSeen:p.t||Date.now()};}
+    if(g.messages.some(x=>x.id===p.id))return;
+    const свой=p.from===me.id;
+    g.messages.push(Object.assign({},p,{readBy:свой?[me.id]:[p.from]}));
+    изменено=true;тронутые.add(p.gid);
+  });
+  if(!изменено)return;
+  тронутые.forEach(gid=>{const g=d.chats[gid];if(g&&g.messages)g.messages.sort((a,b)=>(a.t||0)-(b.t||0));});
+  save(d);
+  try{renderChats();}catch(e){}
+  try{if(current&&current.group&&тронутые.has(current.id))renderMessages();}catch(e){}
+}
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&me){ try{cloudSyncGroups();}catch(e){} } });
+window.addEventListener('online',()=>{ if(me){ try{cloudSyncGroups(true);}catch(e){} } });
+
 let _chatsSynced=false,_chatsSyncTries=0;
 async function cloudSyncChats(){
   if(!me)return;
@@ -11550,7 +11605,7 @@ async function ensureNotif(){ // согласие + системное разр�
   return false;
 }
 /* ── Push-подписка (Web Push / VAPID) — уведомления при закрытом приложении ── */
-let VAPID_PUBLIC_KEY='BNTzKmX_eW7P79BEvJm-XHnTDHJnerx5DsPnaTpKS2Bo70-8lfU0hwyM2el0e6dWcrDeX-OLI4JzISH1tXt3p28';
+let VAPID_PUBLIC_KEY='BKOBT3ZdLT0QmoQnlUN4TPj5xSX6Gk8VgujhWRX0vwVVK2FnUvgG75NA-fV5KRviX5l4-AA_ZsXSAi6Y9SXdOjo';
 function urlB64ToU8(s){s=String(s||'').replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';const bin=atob(s);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u;}
 
 /* Главный — ключ сервера; вписанный выше только запасной. 03.10.2026: раньше
