@@ -235,6 +235,10 @@ h1.brandname{font-family:var(--brand);font-weight:400;font-size:52px;line-height
 /* Шапку рисует оболочка — своя не нужна. Двух шапок быть не должно: одна
    мелькала бы из-под другой, как это уже случилось с кнопкой «+». */
 .screen.шапка-нативная>.topbar{display:none}
+/* Новые оболочки (сборка 177+) кладут свою шапку ПОВЕРХ страницы, не сдвигая её:
+   место своей шапки экран держит пустым, и при уходе с экрана страница не
+   прыгает вверх — не было ни второй шапки, ни белой полосы снизу (07.10.2026). */
+html.шапки-поверх .screen.шапка-нативная>.topbar{display:flex;visibility:hidden}
 .iconbtn{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;color:var(--muted);transition:background .15s,color .15s,transform .12s}
 .iconbtn:hover{background:var(--raised);color:var(--text)}
 .iconbtn:active{transform:scale(.9)}
@@ -296,6 +300,10 @@ h1.brandname{font-family:var(--brand);font-weight:400;font-size:52px;line-height
 /* Список чатов рисует оболочка — её кнопка «+» единственная. Свою убираем,
    иначе при закрытии списка она мелькает из-под нативной. */
 html.нативный-список #btnNewChat{display:none}
+/* Список рисует оболочка. Свой список страница под ним не показывает: при входе
+   в «Чаты» он на миг проглядывал до появления нативного (запись 07.10.2026,
+   20-43-20, 0:18). Экран остаётся пустой подложкой того же цвета. */
+html.нативный-список #scrChats>*{visibility:hidden}
 .fab svg{width:26px;height:26px;color:#fff}
 
 /* ===== Conversation ===== */
@@ -2200,7 +2208,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.6', BUILD_ID='2026-10-07-plashka-obnovleniya';
+const APP_VERSION='5.2.7', BUILD_ID='2026-10-07-shapki-poverh';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -9489,7 +9497,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    приложении старше APK_NEW_BUILD: в старой сборке встроенный браузер не
    скачивает APK, поэтому даём скопировать ссылку и вставить её в Chrome.
    «Позже» прячет на сутки. В обычном браузере плашки нет. */
-const APK_NEW_BUILD=176, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-176.apk';
+const APK_NEW_BUILD=177, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-177.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
@@ -11247,6 +11255,7 @@ try{ OM_OVERLAYS.forEach(_omWatchOverlay); _omWatchDialogs(); }catch(e){}
 /* Экраны, шапку которых рисует оболочка. Переписка, главный и список чатов
    сюда не входят: у первых двух шапка своя особенная, у списка она уже
    нативная. */
+try{ if(window.__OLESYA_ШАПКИ_ПОВЕРХ__)document.documentElement.classList.add('шапки-поверх'); }catch(e){}
 const ШАПКИ_НАТИВНО=['scrNews','scrSocial','scrChannels','scrPro','scrContacts','scrCalls','scrWork'];
 function шапкиНативно(){
   try{ return !!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView&&window.__OLESYA_ШАПКИ__); }
@@ -11258,8 +11267,15 @@ function отдатьШапку(id){
   try{
     const сек=document.getElementById(id);
     const своя=ШАПКИ_НАТИВНО.includes(id)&&сек&&сек.querySelector(':scope>.topbar');
-    document.querySelectorAll('.screen.шапка-нативная').forEach(s=>{ if(s.id!==id)s.classList.remove('шапка-нативная'); });
-    if(!своя){ window.ReactNativeWebView.postMessage(JSON.stringify({type:'шапка',экран:null})); return; }
+    /* Уходящему экрану свою шапку возвращаем не сразу, а когда он уедет:
+       иначе на время перехода видны сразу две шапки (запись 06.10.2026, 0:18). */
+    document.querySelectorAll('.screen.шапка-нативная').forEach(s=>{ if(s.id!==id)setTimeout(()=>{
+      try{ if(typeof currentScreenId==='function'&&currentScreenId()===s.id)return; s.classList.remove('шапка-нативная'); }catch(e){}
+    },420); });
+    /* текущий — какой экран сейчас у страницы. Оболочке он нужен для замка:
+       нативные экраны лежат поверх страницы и иначе закрывали бы ввод PIN
+       (владелец, 07.10.2026: после разворачивания был виден чат и отпечаток). */
+    if(!своя){ window.ReactNativeWebView.postMessage(JSON.stringify({type:'шапка',экран:null,текущий:id})); return; }
     const т=своя.querySelector('.title'), п=своя.querySelector('.sub');
     const кнопки=[...своя.querySelectorAll('button[data-знак]')].map(b=>({
       ключ:b.id||'', знак:b.dataset.знак||'ellipsis-horizontal', цвет:b.dataset.цвет||'#6C7BFF',
@@ -11267,7 +11283,7 @@ function отдатьШапку(id){
     const назад=своя.querySelector('[data-back]');
     сек.classList.add('шапка-нативная');
     window.ReactNativeWebView.postMessage(JSON.stringify({type:'шапка',
-      экран:id,
+      экран:id,текущий:id,
       заголовок:(т&&т.textContent||'').trim(),
       подпись:(п&&п.textContent||'').trim(),
       домой:!!(назад&&назад.dataset.back==='scrHome'),
