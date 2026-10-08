@@ -376,17 +376,19 @@ html.нативный-список #scrChats>*{visibility:hidden}
 .row.me .reacts{justify-content:flex-end}
 .react .n{font-family:var(--mono);font-size:10px;color:var(--muted)}
 
-.upd-banner{background:var(--raised);border:1px solid var(--line);border-radius:18px;padding:13px 14px;margin:0 0 12px}
-.upd-row{display:flex;gap:10px;align-items:flex-start}
-.upd-ic{width:36px;height:36px;border-radius:12px;background:linear-gradient(135deg,var(--primary),#8a7bff);display:grid;place-items:center;flex:none}
-.upd-ic svg{width:19px;height:19px}
-.upd-t{font-size:14.5px;font-weight:600;color:var(--text)}
+.upd-banner{background:var(--raised);border:1px solid var(--line);border-radius:18px;padding:14px;margin:0 0 12px}
+.upd-row{display:flex;gap:11px;align-items:flex-start}
+.upd-ic{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,var(--primary),#8a7bff);display:grid;place-items:center;flex:none;box-shadow:0 6px 16px -8px rgba(108,123,255,.7)}
+.upd-ic svg{width:20px;height:20px}
+.upd-t{font-size:15px;font-weight:600;color:var(--text)}
 .upd-d{font-size:12.5px;line-height:1.45;color:var(--muted);margin-top:3px}
-.upd-acts{display:flex;gap:8px;margin-top:11px}
-.upd-acts button{border:none;font-family:inherit;font-size:13.5px;font-weight:600;border-radius:12px;padding:10px 14px;cursor:pointer}
-.upd-go{flex:1;background:linear-gradient(135deg,var(--primary),#8a7bff);color:#fff}
-.upd-later{background:var(--raised-2);color:var(--muted)}
-.upd-link{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:8px;word-break:break-all;-webkit-user-select:text;user-select:text}
+.upd-banner button{border:none;font-family:inherit;font-weight:600;border-radius:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px}
+.upd-banner button svg{width:17px;height:17px;flex:none}
+.upd-banner button:active{transform:scale(.98)}
+.upd-go{width:100%;margin-top:12px;padding:12px;font-size:14.5px;background:linear-gradient(135deg,var(--primary),#8a7bff);color:#fff;box-shadow:0 8px 20px -10px rgba(108,123,255,.8)}
+.upd-acts{display:flex;gap:8px;margin-top:8px}
+.upd-copy{flex:1;padding:10px;font-size:13px;background:var(--raised-2);color:var(--text)}
+.upd-later{padding:10px 16px;font-size:13px;background:var(--raised-2);color:var(--muted)}
 .react-menu{position:absolute;background:var(--raised-2);border:1px solid var(--line);border-radius:24px;
   padding:6px 8px;display:flex;gap:4px;flex-wrap:wrap;max-width:calc(100% - 16px);box-shadow:var(--shadow);z-index:30}
 .react-menu button{font-size:22px;width:36px;height:36px;border-radius:50%;transition:transform .1s}
@@ -2208,7 +2210,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.7', BUILD_ID='2026-10-07-shapki-poverh';
+const APP_VERSION='5.2.8', BUILD_ID='2026-10-08-plashka-skachat';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -9493,11 +9495,14 @@ function contactDisplayName(u){if(!u)return '';const b=getBook();return (b[u.id]
 function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me.id&&!u.bot);}
 
 /* ---- Лицевая страница (хаб) ---- */
-/* Плашка «Вышла новая версия приложения» (07.10.2026). Видна только в
-   приложении старше APK_NEW_BUILD: в старой сборке встроенный браузер не
-   скачивает APK, поэтому даём скопировать ссылку и вставить её в Chrome.
-   «Позже» прячет на сутки. В обычном браузере плашки нет. */
-const APK_NEW_BUILD=177, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-177.apk';
+/* Плашка «Вышла новая версия приложения» (07–08.10.2026). Видна только в
+   приложении старше APK_NEW_BUILD. «Скачать» — загрузка прямо из приложения:
+   встроенный браузер отдаёт файл системному «Загрузчику» Android (сервер шлёт
+   Content-Disposition: attachment), потом установка из уведомления.
+   «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
+   Удалять старое приложение нужно только сборкам старше APK_OWN_KEY: до
+   12.09.2026 их подписывал EAS другим ключом, наша поверх них не встанет. */
+const APK_NEW_BUILD=178, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-178.apk', APK_OWN_KEY=143;
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
@@ -9507,18 +9512,51 @@ function renderUpdateBanner(){
     const need=!!window.__OLESYA_NATIVE__ && !(b>=APK_NEW_BUILD) && (Date.now()-later>86400000);
     if(!need){ if(el)el.remove(); return; }
     if(el)return;
+    const удалить=!(b>=APK_OWN_KEY);   // номер неизвестен — значит, оболочка совсем старая
     el=document.createElement('div'); el.id='updBanner'; el.className='upd-banner';
     el.innerHTML='<div class="upd-row"><div class="upd-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg></div>'
-      +'<div class="upd-txt"><div class="upd-t">Вышла новая версия приложения</div><div class="upd-d">Быстрее и удобнее чаты. Скопируйте ссылку, вставьте её в браузер Chrome и установите. Старое приложение ZORVELD сначала удалите — переписка сохранится.</div></div></div>'
-      +'<div class="upd-acts"><button class="upd-go" type="button">Скопировать ссылку</button><button class="upd-later" type="button">Позже</button></div><div class="upd-link selectable">'+APK_NEW_URL+'</div>';
+      +'<div class="upd-txt"><div class="upd-t">Вышла новая версия приложения</div><div class="upd-d">'
+      +(удалить
+        ?'Быстрее и удобнее чаты. Ваша версия устарела, поверх неё новая не встанет. Нажмите «Скачать» и дождитесь загрузки, затем удалите старое приложение ZORVELD и установите новое из папки «Загрузки». Переписка сохранится, войти нужно будет заново по номеру телефона.'
+        :(window.__ZV_APK_UPDATE__
+          ?'Быстрее и удобнее чаты. Нажмите «Скачать», затем «Установить». Когда установка закончится, нажмите «Открыть» — переписка сохранится.'
+          :'Быстрее и удобнее чаты. Нажмите «Скачать», дождитесь загрузки, откройте уведомление «Загрузка завершена» и нажмите «Установить» — новая версия встанет поверх, переписка сохранится.'))
+      +'</div></div></div>'
+      +'<button class="upd-go" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>Скачать</button>'
+      +'<div class="upd-acts"><button class="upd-copy" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>Скопировать ссылку</button><button class="upd-later" type="button">Позже</button></div>';
+    const кн=el.querySelector('.upd-go');
+    const ЗН_КАЧАТЬ='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>';
+    const ЗН_УСТАНОВИТЬ='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>';
+    let этап='';   // '' | 'качаю' | 'готово'
+    const вид=function(т,зн,процент){ кн.innerHTML=(зн||'')+'<span>'+т+'</span>';
+      кн.style.backgroundImage=(процент!=null)?'linear-gradient(90deg,rgba(255,255,255,.24) '+процент+'%,rgba(255,255,255,0) '+процент+'%),linear-gradient(135deg,var(--primary),#8a7bff)':''; };
+    /* Новые оболочки (сборка 178+) качают сами и шлют прогресс сюда. */
+    window.olesyaОбновление=function(д){ try{
+      if(!д)return;
+      if(д.этап==='качаю'){ этап='качаю'; вид('Скачивание… '+(д.процент||0)+'%',null,д.процент||0); }
+      else if(д.этап==='готово'){ этап='готово'; вид('Установить',ЗН_УСТАНОВИТЬ,null); }
+      else if(д.этап==='ошибка'){ этап=''; вид('Повторить',ЗН_КАЧАТЬ,null); toast('Не удалось скачать — проверьте связь и нажмите «Повторить»'); }
+      else if(д.этап==='ошибка-установки'){ этап='готово'; вид('Установить',ЗН_УСТАНОВИТЬ,null); toast('Разрешите установку из ZORVELD в открывшихся настройках и нажмите «Установить» ещё раз'); }
+    }catch(x){} };
+    кн.onclick=function(e){ e.stopPropagation();
+      if(window.__ZV_APK_UPDATE__&&window.ReactNativeWebView){
+        if(этап==='качаю')return;
+        if(этап==='готово'){ window.ReactNativeWebView.postMessage(JSON.stringify({type:'apk-install'}));
+          try{ toast('После установки нажмите «Открыть»'); }catch(x){} return; }
+        этап='качаю'; вид('Скачивание… 0%',null,0);
+        window.ReactNativeWebView.postMessage(JSON.stringify({type:'apk-download',url:APK_NEW_URL})); return;
+      }
+      /* Старые оболочки: файл забирает системный «Загрузчик», ход — в уведомлении. */
+      try{ location.href=APK_NEW_URL; }catch(x){}
+      try{ toast('Загрузка началась — когда закончится, откройте уведомление и установите'); }catch(x){} };
     /* Своё копирование: в части WebView буфер обмена недоступен — тогда запасной
-       способ через выделение; не вышло и так — ссылка видна текстом под кнопками. */
-    const готово=function(){ try{toast('Ссылка скопирована — вставьте её в Chrome');}catch(x){} };
+       способ через выделение. */
+    const скопировано=function(){ try{toast('Ссылка скопирована — вставьте её в браузер');}catch(x){} };
     const запасной=function(){ try{ const ta=document.createElement('textarea'); ta.value=APK_NEW_URL; document.body.appendChild(ta); ta.select();
-        const ok=document.execCommand('copy'); ta.remove(); if(ok){готово();return;} }catch(x){}
-      try{toast('Скопируйте ссылку под кнопками — долгим нажатием');}catch(x){} };
-    el.querySelector('.upd-go').onclick=function(e){ e.stopPropagation();
-      try{ if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(APK_NEW_URL).then(готово).catch(запасной); return; } }catch(x){}
+        const ok=document.execCommand('copy'); ta.remove(); if(ok){скопировано();return;} }catch(x){}
+      try{toast('Не удалось скопировать — нажмите «Скачать»');}catch(x){} };
+    el.querySelector('.upd-copy').onclick=function(e){ e.stopPropagation();
+      try{ if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(APK_NEW_URL).then(скопировано).catch(запасной); return; } }catch(x){}
       запасной(); };
     el.querySelector('.upd-later').onclick=function(e){ e.stopPropagation(); try{localStorage.setItem('om_upd_later',String(Date.now()));}catch(x){} el.remove(); };
     grid.parentNode.insertBefore(el,grid);
