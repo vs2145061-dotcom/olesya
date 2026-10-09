@@ -2210,7 +2210,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.8', BUILD_ID='2026-10-08-plashka-skachat';
+const APP_VERSION='5.2.9', BUILD_ID='2026-10-08-plashka-odna';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -9500,9 +9500,9 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    встроенный браузер отдаёт файл системному «Загрузчику» Android (сервер шлёт
    Content-Disposition: attachment), потом установка из уведомления.
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
-   Удалять старое приложение нужно только сборкам старше APK_OWN_KEY: до
-   12.09.2026 их подписывал EAS другим ключом, наша поверх них не встанет. */
-const APK_NEW_BUILD=178, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-178.apk', APK_OWN_KEY=143;
+   Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
+   нет, все обновления встают поверх. */
+const APK_NEW_BUILD=179, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-179.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
@@ -9512,15 +9512,10 @@ function renderUpdateBanner(){
     const need=!!window.__OLESYA_NATIVE__ && !(b>=APK_NEW_BUILD) && (Date.now()-later>86400000);
     if(!need){ if(el)el.remove(); return; }
     if(el)return;
-    const удалить=!(b>=APK_OWN_KEY);   // номер неизвестен — значит, оболочка совсем старая
     el=document.createElement('div'); el.id='updBanner'; el.className='upd-banner';
     el.innerHTML='<div class="upd-row"><div class="upd-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg></div>'
-      +'<div class="upd-txt"><div class="upd-t">Вышла новая версия приложения</div><div class="upd-d">'
-      +(удалить
-        ?'Быстрее и удобнее чаты. Ваша версия устарела, поверх неё новая не встанет. Нажмите «Скачать» и дождитесь загрузки, затем удалите старое приложение ZORVELD и установите новое из папки «Загрузки». Переписка сохранится, войти нужно будет заново по номеру телефона.'
-        :(window.__ZV_APK_UPDATE__
-          ?'Быстрее и удобнее чаты. Нажмите «Скачать», затем «Установить». Когда установка закончится, нажмите «Открыть» — переписка сохранится.'
-          :'Быстрее и удобнее чаты. Нажмите «Скачать», дождитесь загрузки, откройте уведомление «Загрузка завершена» и нажмите «Установить» — новая версия встанет поверх, переписка сохранится.'))
+      +'<div class="upd-txt"><div class="upd-t">Вышла новая версия ZORVELD</div><div class="upd-d">'
+      +'Нажмите «Скачать», затем «Установить» — новая версия встанет поверх старой. Переписка и настройки сохранятся.'
       +'</div></div></div>'
       +'<button class="upd-go" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>Скачать</button>'
       +'<div class="upd-acts"><button class="upd-copy" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>Скопировать ссылку</button><button class="upd-later" type="button">Позже</button></div>';
@@ -9548,7 +9543,8 @@ function renderUpdateBanner(){
       }
       /* Старые оболочки: файл забирает системный «Загрузчик», ход — в уведомлении. */
       try{ location.href=APK_NEW_URL; }catch(x){}
-      try{ toast('Загрузка началась — когда закончится, откройте уведомление и установите'); }catch(x){} };
+      вид('Загрузка — в уведомлениях',ЗН_КАЧАТЬ,null);
+      try{ toast('Когда загрузка закончится, нажмите на уведомление и «Установить»'); }catch(x){} };
     /* Своё копирование: в части WebView буфер обмена недоступен — тогда запасной
        способ через выделение. */
     const скопировано=function(){ try{toast('Ссылка скопирована — вставьте её в браузер');}catch(x){} };
