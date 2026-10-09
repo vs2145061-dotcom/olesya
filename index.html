@@ -2210,7 +2210,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.9', BUILD_ID='2026-10-08-plashka-odna';
+const APP_VERSION='5.2.10', BUILD_ID='2026-10-09-shtorka-natív';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -9502,7 +9502,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=179, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-179.apk';
+const APK_NEW_BUILD=180, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-180.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
@@ -10957,8 +10957,13 @@ function showPrivacyCover(){
     cov.style.cssText='position:fixed;inset:0;z-index:2147483646;background:var(--bg,#0e1020)';
     document.body.appendChild(cov); }
   cov.style.display='block';
+  шторкаОболочке(true);
 }
-function hidePrivacyCover(){ const cov=document.getElementById('privacyCover'); if(cov)cov.style.display='none'; }
+function hidePrivacyCover(){ const cov=document.getElementById('privacyCover'); if(cov)cov.style.display='none'; шторкаОболочке(false); }
+/* Нативные экраны оболочки лежат поверх страницы, и наша шторка их не
+   закрывает: при разворачивании на миг был виден последний чат (09.10.2026).
+   Говорим оболочке поднять и снять свою шторку вместе с нашей. */
+function шторкаОболочке(есть){ try{ if(window.__OLESYA_NATIVE__&&window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify({type:'шторка',on:есть?1:0})); }catch(e){} }
 /* Метка в адресе от служебного потока: «#call=кто» или «#chat=кто». */
 function разобратьМеткуУведомления(){
   const h=String(location.hash||'');
@@ -11309,7 +11314,8 @@ function отдатьШапку(id){
     /* текущий — какой экран сейчас у страницы. Оболочке он нужен для замка:
        нативные экраны лежат поверх страницы и иначе закрывали бы ввод PIN
        (владелец, 07.10.2026: после разворачивания был виден чат и отпечаток). */
-    if(!своя){ window.ReactNativeWebView.postMessage(JSON.stringify({type:'шапка',экран:null,текущий:id})); return; }
+    const замок=(function(){ try{ return !!(me&&lockCfg().pin); }catch(e){ return false; } })();   // оболочке: прятать ли её экраны при уходе в фон
+    if(!своя){ window.ReactNativeWebView.postMessage(JSON.stringify({type:'шапка',экран:null,текущий:id,замок})); return; }
     const т=своя.querySelector('.title'), п=своя.querySelector('.sub');
     const кнопки=[...своя.querySelectorAll('button[data-знак]')].map(b=>({
       ключ:b.id||'', знак:b.dataset.знак||'ellipsis-horizontal', цвет:b.dataset.цвет||'#6C7BFF',
@@ -11317,7 +11323,7 @@ function отдатьШапку(id){
     const назад=своя.querySelector('[data-back]');
     сек.classList.add('шапка-нативная');
     window.ReactNativeWebView.postMessage(JSON.stringify({type:'шапка',
-      экран:id,текущий:id,
+      экран:id,текущий:id,замок,
       заголовок:(т&&т.textContent||'').trim(),
       подпись:(п&&п.textContent||'').trim(),
       домой:!!(назад&&назад.dataset.back==='scrHome'),
