@@ -2210,7 +2210,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.10', BUILD_ID='2026-10-09-shtorka-natív';
+const APP_VERSION='5.2.11', BUILD_ID='2026-10-09-zamok-bez-migania';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -9502,7 +9502,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=180, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-180.apk';
+const APK_NEW_BUILD=181, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-181.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
@@ -11013,12 +11013,14 @@ document.addEventListener('visibilitychange',()=>{
   if(_вОболочке){
     _замокЖдётСлова=Date.now()+2000;   // тем же движением придерживаем замок
     clearTimeout(_шторкаТаймер);
-    _шторкаТаймер=setTimeout(()=>{ try{ hidePrivacyCover(); }catch(e){} },2000);
+    /* предохранитель: шторку снимаем через 2 с, если замок не встаёт; встаёт — ещё через 2 с на всякий случай */
+    _шторкаТаймер=setTimeout(function снять(){ try{ if(_замокВстанет&&!снять.раз){ снять.раз=1; _шторкаТаймер=setTimeout(снять,2000); return; } _замокВстанет=false; hidePrivacyCover(); }catch(e){} },2000);
   } else {
     hidePrivacyCover();
   }
   const thr=(c&&c.autolock!=null)?c.autolock:60000;
-  if(c&&c.pin&&!_omInCall() && hidAt && thr>=0 && Date.now()-hidAt>=thr){
+  _замокВстанет=!!(c&&c.pin&&!_omInCall() && hidAt && thr>=0 && Date.now()-hidAt>=thr);
+  if(_замокВстанет){
     maybeLock();   // прошёл порог → настоящий экран блокировки + PIN/отпечаток; после — возврат на свой экран
   }
   // в пределах порога / без PIN — ничего не делаем: экран под шторкой тот же, что был.
@@ -11036,6 +11038,7 @@ document.addEventListener('visibilitychange',()=>{
 const _pageStart=Date.now(); let _bioWait=null;
 /* Замок отложен до конца разговора — см. maybeLock ниже. */
 let _замокПослеЗвонка=false;
+let _замокВстанет=false;   // вернулись из фона и сейчас встанет замок — шторку не снимать
 /* Входили ли по-настоящему (PIN или отпечаток) с момента запуска страницы.
    Если нет, а приложение подняли звонком с запертого телефона — после разговора
    уходим с экрана, вместо того чтобы показывать ввод кода. */
@@ -11081,7 +11084,10 @@ window.olesyaЗвонокВПути=function(есть){
   _замокЖдётСлова=0;
   /* Звонка нет — шторку долой немедленно. Есть — держим до экрана вызова,
      его поднимет showIncomingCall. */
-  if(!есть){ clearTimeout(_шторкаТаймер); try{ hidePrivacyCover(); }catch(e){} }
+  /* Звонка нет — шторку долой, НО если сейчас встанет замок, держим её до
+     экрана PIN: иначе на миг был виден прежний экран, например Главная
+     (владелец, 09.10.2026). Снимет её maybeLock, когда покажет замок. */
+  if(!есть){ clearTimeout(_шторкаТаймер); if(!_замокВстанет){ try{ hidePrivacyCover(); }catch(e){} } }
   _звонокПоСловуОболочки=есть?Date.now():0;
   try{ крошка('замок: оболочка ответила — звонок '+(есть?'В ПУТИ':'не идёт'),'замок'); }catch(e){}
   if(есть){ try{ maybeLock(true); }catch(e){} }
@@ -11118,6 +11124,7 @@ function maybeLock(безОтпечатка){const c=lockCfg();if(!c.pin)return;
   }
   if(cur!=='lockScreen'&&cur!=='callScreen')_preLockScreen=cur;
   pinMode='check';pinBuffer='';$('#lockTitle').textContent='Введите PIN-код';renderPinDots();go('lockScreen');
+  _замокВстанет=false; try{ clearTimeout(_шторкаТаймер); hidePrivacyCover(); }catch(e){}   // замок на экране — шторка больше не нужна
   if(inCall){
     try{ крошка('замок: кладу звонок ПОВЕРХ замка, PIN не показываю','замок'); }catch(e){}
     _callShowOverLock();return;
