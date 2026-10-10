@@ -2222,7 +2222,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.12', BUILD_ID='2026-10-09-bez-staroy-perepiski';
+const APP_VERSION='5.2.13', BUILD_ID='2026-10-10-gruppy-nativno';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -2412,6 +2412,52 @@ function loadSupabaseSDK(){
 }
 function sbClient(){if(CFG.provider==='supabase'&&window.supabase&&CFG.supabaseUrl&&CFG.supabaseKey){if(!sb)sb=window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseKey);return sb;}return null;}
 function wapi(path){return getApiUrl()+path;}
+/* ── Закрытые файлы (5.2.13, безопасность) ──
+   Фото, голосовые и файлы лежат в хранилище, которое закрывается для
+   посторонних. Ссылка на файл переписывается на сервер: /m/<ключ>?mt=<пропуск>.
+   Пропуск выдаёт сервер только вошедшему, на сутки; сервер отдаёт подписанную
+   ссылку хранилища на 10 минут. Перехват — в одном месте: src/href/poster,
+   фон-картинки, fetch и вставка разметкой. Пока пропуска нет (вход не выполнен,
+   старый сервер) — ссылка остаётся как была. */
+let _медиаПропуск='',_медиаПропускДо=0;
+const _ХРАНИЛИЩЕ=/^https:\/\/zorveld-media\.storage\.yandexcloud\.net\/([^?#]+)/i;
+function медиаАдрес(u){
+  if(typeof u!=='string'||!_медиаПропуск)return u;
+  const м=u.match(_ХРАНИЛИЩЕ); if(!м)return u;
+  return getApiUrl()+'/m/'+м[1]+'?mt='+encodeURIComponent(_медиаПропуск);
+}
+async function обновитьМедиаПропуск(){
+  if(!sessionToken||CFG.provider!=='worker')return;
+  try{const д=await jget(wapi('/media/token'));if(д&&д.mt){_медиаПропуск=д.mt;_медиаПропускДо=+д.exp||0;}}catch(e){}
+}
+(function(){
+  /* подписанные ссылки (загрузка PUT, X-Amz-…) не трогаем — только постоянные ссылки на файл */
+  const поправить=(v)=>(typeof v==='string'&&_ХРАНИЛИЩЕ.test(v)&&!/[?&]X-Amz-/i.test(v))?медиаАдрес(v):v;
+  const фон=(v)=>(typeof v==='string'&&v.indexOf('zorveld-media')>=0)?v.replace(/https:\/\/zorveld-media\.storage\.yandexcloud\.net\/[^"')\s]+/gi,(x)=>медиаАдрес(x)):v;
+  try{
+    for(const C of [HTMLImageElement,HTMLMediaElement,HTMLSourceElement]){
+      const d=Object.getOwnPropertyDescriptor(C.prototype,'src'); if(!d||!d.set)continue;
+      Object.defineProperty(C.prototype,'src',{configurable:true,enumerable:d.enumerable,get:d.get,set(v){d.set.call(this,поправить(v));}});
+    }
+    const dh=Object.getOwnPropertyDescriptor(HTMLAnchorElement.prototype,'href');
+    if(dh&&dh.set)Object.defineProperty(HTMLAnchorElement.prototype,'href',{configurable:true,enumerable:dh.enumerable,get:dh.get,set(v){dh.set.call(this,поправить(v));}});
+    for(const св of ['backgroundImage','background']){
+      const d=Object.getOwnPropertyDescriptor(CSSStyleDeclaration.prototype,св); if(!d||!d.set)continue;
+      Object.defineProperty(CSSStyleDeclaration.prototype,св,{configurable:true,enumerable:d.enumerable,get:d.get,set(v){d.set.call(this,фон(v));}});
+    }
+    const sa=Element.prototype.setAttribute;
+    Element.prototype.setAttribute=function(n,v){ if(n==='src'||n==='href'||n==='poster')v=поправить(v); else if(n==='style')v=фон(v); return sa.call(this,n,v); };
+    const ф=window.fetch; window.fetch=function(i,o){ const м=String((o&&o.method)||'GET').toUpperCase(); return ф.call(this,(м==='GET'||м==='HEAD')?поправить(i):i,o); };
+    /* разметка строкой (innerHTML): поправить уже вставленное */
+    new MutationObserver((сп)=>{ if(!_медиаПропуск)return; for(const з of сп){ for(const n of з.addedNodes){ if(n.nodeType!==1)continue;
+      const все=[n,...(n.querySelectorAll?n.querySelectorAll('[src*="zorveld-media"],[href*="zorveld-media"],[poster*="zorveld-media"],[style*="zorveld-media"]'):[])];
+      for(const e of все){ if(!e.getAttribute)continue; for(const а of ['src','href','poster','style']){ const v=e.getAttribute(а); if(v&&v.indexOf('zorveld-media')>=0)e.setAttribute(а,v); } } } } })
+      .observe(document.documentElement,{childList:true,subtree:true});
+  }catch(e){}
+  /* пропуск: сразу при входе и заранее, за час до истечения */
+  setInterval(()=>{ if(sessionToken&&Date.now()>_медиаПропускДо-3600000)обновитьМедиаПропуск(); },60000);
+  setTimeout(()=>{ if(sessionToken)обновитьМедиаПропуск(); },1500);
+})();
 /* ── ВОРОНКА: шесть чисел, без которых решения о продукте — угадывание ──
    install → register → first_msg → first_reply → d7_return → pay.
    Сервер пишет каждое событие ОДИН раз на устройство, поэтому повтор безвреден:
@@ -2453,7 +2499,7 @@ function evStartup(){
   }catch(e){}
 }
 let sessionToken=localStorage.getItem('om_session_token')||'';
-function saveSessionToken(t){sessionToken=t||'';if(t)localStorage.setItem('om_session_token',t);else localStorage.removeItem('om_session_token');
+function saveSessionToken(t){sessionToken=t||'';if(t)localStorage.setItem('om_session_token',t);else localStorage.removeItem('om_session_token');_медиаПропуск='';_медиаПропускДо=0;if(t)setTimeout(()=>{try{обновитьМедиаПропуск();}catch(e){}},500);
   try{ отдатьКлючиОболочке(); }catch(e){}}
 function apiHeaders(){return{'content-type':'application/json','x-session-token':sessionToken};}
 async function jpost(url,body){
@@ -3864,7 +3910,7 @@ function av(el,u){if(!el)return;u=u||{};
   el.style.backgroundImage='';
   const a=u.avatar;
   /* фото-аватар (data/http/blob) */
-  if(a&&/^(https?:|data:|blob:|img\/)/i.test(a)){el.innerHTML='';el.style.fontFamily='';el.style.background='var(--raised)';el.style.backgroundImage='url("'+a+'")';el.style.backgroundSize='cover';el.style.backgroundPosition='center';return;}
+  if(a&&/^(https?:|data:|blob:|img\/)/i.test(a)){el.innerHTML='';el.style.fontFamily='';el.style.background='var(--raised)';el.style.backgroundImage='url("'+медиаАдрес(a)+'")';el.style.backgroundSize='cover';el.style.backgroundPosition='center';return;}
   el.style.background=gradCss(u.color);el.style.color='#fff';
   /* фирменный 3D-глиф */
   if(a&&GLYPHS[a]){el.style.fontFamily='';el.innerHTML='<svg viewBox="0 0 24 24">'+GLYPHS[a]+'</svg>';return;}
@@ -4047,7 +4093,48 @@ function отдатьСписокЧатов(строки){
    из её шапки начинается сразу, а старая переписка, если осталась открытой,
    уходит из-под нативной — иначе экраны накладывались (запись 09.10.2026). */
 window.olesyaЗвонок=function(peer,kind){
-  try{ ensureChat(peer,true); current=userById(peer); if(!current)return; startCall(kind==='video'?'video':'audio'); }catch(e){}
+  try{
+    /* Группа (нативный экран группы, 5.2.13): звонок всем участникам. */
+    const _g=db().chats[peer];
+    if(_g&&_g.group){ current=groupCurrent(_g); startCall(kind==='video'?'video':'audio'); return; }
+    ensureChat(peer,true); current=userById(peer); if(!current)return; startCall(kind==='video'?'video':'audio');
+  }catch(e){}
+};
+/* Управление группой из нативного профиля группы (5.2.13). Те же права и те
+   же события, что у кнопок groupSheet, но без диалогов страницы: спросила уже
+   оболочка. Возвращает true, если сделано. */
+window.olesyaГруппа=function(действие,gid,данные){
+  try{
+    if(!me)return false;
+    const d=db();const g=d.chats[gid];if(!g||!g.group)return false;
+    if(действие==='выйти'){
+      g.members.filter(x=>x!==me.id).forEach(uidT=>emit('group:leave',{to:uidT,gid,from:me.id}));
+      delete d.chats[gid];save(d);
+      if(current&&current.id===gid)current=null;
+      renderChats();try{if(typeof renderHome==='function')renderHome();}catch(e){}
+      return true;
+    }
+    if(!isGroupAdmin(g))return false;
+    if(действие==='имя'){
+      const nm=String(данные||'').trim().slice(0,60);if(!nm)return false;
+      g.name=nm;save(d);groupUpdateBroadcast(gid,{name:nm});renderChats();return true;
+    }
+    if(действие==='добавить'){ addGroupMembers(gid,Array.isArray(данные)?данные.map(String):[]); return true; }
+    if(действие==='удалить'){
+      const uid=String(данные||'');if(!uid||uid===g.owner||uid===me.id)return false;
+      g.members=g.members.filter(x=>x!==uid);save(d);
+      emit('group:update',{to:uid,gid,members:g.members,removed:uid,by:me.id});
+      groupUpdateBroadcast(gid,{members:g.members.slice()});renderChats();return true;
+    }
+    if(действие==='админ'||действие==='неадмин'){
+      if(!isGroupOwnerOf(g))return false;
+      const uid=String(данные||'');if(!uid)return false;
+      g.admins=g.admins||[];
+      if(действие==='админ'){ if(!g.admins.includes(uid))g.admins.push(uid); } else g.admins=g.admins.filter(x=>x!==uid);
+      save(d);groupUpdateBroadcast(gid,{admins:g.admins.slice()});return true;
+    }
+  }catch(e){}
+  return false;
 };
 window.olesyaНаСписок=function(){
   try{ if(currentScreenId()==='scrConv'){ current=null; go('scrChats'); } }catch(e){}
@@ -7565,7 +7652,7 @@ function renderGroupPicked(){
   groupPicked.forEach(id=>{
     const u=d.users[id]||{};const chip=document.createElement('div');chip.className='gp-chip';
     const av0=document.createElement('div');av0.className='gp-av';
-    if(typeof u.avatar==='string'&&/^(https?:|data:|blob:)/i.test(u.avatar)){av0.style.backgroundImage='url("'+u.avatar+'")';av0.style.backgroundSize='cover';av0.style.backgroundPosition='center';}
+    if(typeof u.avatar==='string'&&/^(https?:|data:|blob:)/i.test(u.avatar)){av0.style.backgroundImage='url("'+медиаАдрес(u.avatar)+'")';av0.style.backgroundSize='cover';av0.style.backgroundPosition='center';}
     else{av0.style.background=gradCss(u.color);av0.textContent=avMonogram(u.name);}
     chip.appendChild(av0);
     const nm=document.createElement('span');nm.textContent=u.name||'Участник';chip.appendChild(nm);
@@ -9523,7 +9610,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=182, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-182.apk';
+const APK_NEW_BUILD=183, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-183.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
