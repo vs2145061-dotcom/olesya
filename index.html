@@ -1344,8 +1344,9 @@ body.call-open #toast{bottom:190px}
 .web-fallback .wf-d{font-size:13.5px;color:var(--muted);line-height:1.55;max-width:300px}
 </style>
   <!-- Firebase SDK (Phone Auth) — подгружается только при наличии FIREBASE_CONFIG -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" defer></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js" defer></script>
+  <!-- 5.2.14: отпечатки (SRI) — подменённый на чужом сервере файл браузер не выполнит -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" integrity="sha384-AQ3POAMqIhwS81FrUH95ekxqBZHeP5tG2JfEL3+7GuTtfRLWnrRh32UxwzM+//A9" crossorigin="anonymous" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js" integrity="sha384-TnlRYaR4JYz/lpaGuaiU61PjNberSA4vjLjtF+oRC/IkohkJqnWxw5EmDSOt1vA1" crossorigin="anonymous" defer></script>
 </head>
 <body>
 <div id="recaptcha-container" style="display:none"></div>
@@ -2222,7 +2223,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.13', BUILD_ID='2026-10-10-gruppy-nativno';
+const APP_VERSION='5.2.14', BUILD_ID='2026-10-10-sri';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -9177,6 +9178,7 @@ function workPdfLib(){
   const база='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
   _workPdfLib=new Promise((готово,ошибка)=>{
     const s=document.createElement('script'); s.src=база+'pdf.min.js'; s.async=true;
+    s.integrity='sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e'; s.crossOrigin='anonymous';   // отпечаток (5.2.14)
     s.onload=()=>{ try{ window.pdfjsLib.GlobalWorkerOptions.workerSrc=база+'pdf.worker.min.js'; готово(window.pdfjsLib); }catch(e){ _workPdfLib=null; ошибка(e); } };
     s.onerror=()=>{ _workPdfLib=null; ошибка(new Error('pdf_lib')); };
     document.head.appendChild(s);
