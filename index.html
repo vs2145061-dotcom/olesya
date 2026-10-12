@@ -2224,7 +2224,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.15', BUILD_ID='2026-10-11-novyi-chat';
+const APP_VERSION='5.2.16', BUILD_ID='2026-10-12-185';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -9635,7 +9635,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=184, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-184.apk';
+const APK_NEW_BUILD=185, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-185.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
