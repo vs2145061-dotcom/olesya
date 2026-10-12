@@ -2224,7 +2224,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.17', BUILD_ID='2026-10-12-186';
+const APP_VERSION='5.2.18', BUILD_ID='2026-10-13-188';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -9635,7 +9635,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=186, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-186.apk';
+const APK_NEW_BUILD=188, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-188.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
@@ -10966,6 +10966,7 @@ $('#rowBlocked').onclick=()=>openSub('Заблокированные',buildBlock
 $('#rowLang').onclick=()=>openSub('Мой язык',buildLang);
 $('#rowTheme').onclick=()=>openSub('Внешний вид',buildTheme);
 {const r=$('#rowTapSound'); if(r)r.onclick=()=>openSub('Звук нажатия',buildTapSound);}
+try{ setTimeout(zvTapToShell,0); }catch(e){}
 {const r=$('#rowMediaQ'); if(r)r.onclick=()=>openSub('Качество фото и видео',buildMediaQ); refreshMediaQLabel();}
 $('#rowChatBg').onclick=()=>openSub('Фон чатов',buildChatBg);
 $('#btnTheme').onclick=toggleThemeQuick;
@@ -11664,9 +11665,9 @@ function волныЗвонка(включить,кто){
 let toastTO=null;function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');clearTimeout(toastTO);toastTO=setTimeout(()=>el.classList.remove('show'),2600);}
 /* ── Отклик при нажатии: звук и вибрация настраиваются РАЗДЕЛЬНО (миграция со старого om_tapfx) ── */
 function tapSoundOn(){try{const v=localStorage.getItem('om_tapsnd');if(v!=null)return v!=='0';return localStorage.getItem('om_tapfx')!=='0';}catch(e){return true;}}   // по умолчанию включено
-function setTapSound(on){try{localStorage.setItem('om_tapsnd',on?'1':'0');}catch(e){}}
+function setTapSound(on){try{localStorage.setItem('om_tapsnd',on?'1':'0');}catch(e){} zvTapToShell();}
 function tapVibeOn(){try{const v=localStorage.getItem('om_tapvib');if(v!=null)return v!=='0';return localStorage.getItem('om_tapfx')!=='0';}catch(e){return true;}}
-function setTapVibe(on){try{localStorage.setItem('om_tapvib',on?'1':'0');}catch(e){}}
+function setTapVibe(on){try{localStorage.setItem('om_tapvib',on?'1':'0');}catch(e){} zvTapToShell();}
 /* Вибрация: в Android WebView navigator.vibrate ОТКЛЮЧЁН — просим нативную оболочку (мостик haptic) */
 function doVibe(ms){
   try{
@@ -11699,11 +11700,14 @@ const TAP_SOUNDS=[
   ['none','Без звука','останется только вибрация']
 ];
 function tapSoundName(){try{return localStorage.getItem('om_tapsnd_name')||'drop';}catch(e){return 'drop';}}
-function setTapSoundName(n){try{localStorage.setItem('om_tapsnd_name',n);}catch(e){}}
+function setTapSoundName(n){try{localStorage.setItem('om_tapsnd_name',n);}catch(e){} zvTapToShell();}
 function tapSoundTitle(){const f=TAP_SOUNDS.find(s=>s[0]===tapSoundName());return f?f[1]:'Капля';}
 const TAP_VOLS=[['low','Тихо',0.5],['mid','Обычно',0.85],['high','Громче',1.3]];
 function tapVolKey(){try{return localStorage.getItem('om_tapsnd_vol')||'mid';}catch(e){return 'mid';}}
-function setTapVolKey(k){try{localStorage.setItem('om_tapsnd_vol',k);}catch(e){}}
+function setTapVolKey(k){try{localStorage.setItem('om_tapsnd_vol',k);}catch(e){} zvTapToShell();}
+/* 5.2.18: звук и вибрацию нажатий нативных экранов делает оболочка — говорим ей настройки,
+   чтобы на всех кнопках был один выбранный звук и одна вибрация (12.10.2026). */
+function zvTapToShell(){ try{ if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify({type:'tap-settings',звук:tapSoundOn(),имя:tapSoundName(),громкость:tapVol(),вибро:tapVibeOn()})); }catch(e){} }
 function tapVol(){const f=TAP_VOLS.find(v=>v[0]===tapVolKey());return f?f[2]:0.85;}
 /* В нативной оболочке звук проигрывает САМА оболочка через системный аудио-канал —
    тогда он НЕ зависит от ползунка громкости «Мультимедиа». В браузере / на iPhone
