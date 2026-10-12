@@ -1799,6 +1799,7 @@ body.call-open #toast{bottom:190px}
       <div class="setting"><div class="ic">📸</div><div class="lbl"><div class="t">Защита от скриншотов</div><div class="d">Предупреждать о копировании экрана</div></div><div class="switch" id="screenToggle"></div></div>
       <div class="setting"><div class="ic">🔓</div><div class="lbl"><div class="t">Запоминать вход</div><div class="d">Без СМС при следующем запуске на этом устройстве</div></div><div class="switch on" id="rememberToggle"></div></div>
       <div class="setting"><div class="ic">💾</div><div class="lbl"><div class="t">Сохранять медиа на устройство</div><div class="d">Фото, видео, голосовые и документы — в галерею/загрузки (экономит место на сервере)</div></div><div class="switch" id="autosaveToggle"></div></div>
+      <div class="setting" id="rowMediaQ" style="cursor:pointer;display:none"><div class="ic">📸</div><div class="lbl"><div class="t">Качество фото и видео</div><div class="d" id="stMediaQ">Стандарт</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting"><div class="ic">🔔</div><div class="lbl"><div class="t">Уведомления</div><div class="d">Оповещения о сообщениях и звонках, когда приложение свёрнуто</div></div><div class="switch" id="notifToggle"></div></div>
       <div class="setting"><div class="ic">🔉</div><div class="lbl"><div class="t">Звук при нажатии</div><div class="d">Короткий звук при нажатиях на кнопки</div></div><div class="switch on" id="tapSndToggle"></div></div>
       <div class="setting" id="rowTapSound" style="cursor:pointer"><div class="ic">🎵</div><div class="lbl"><div class="t">Какой звук</div><div class="d" id="stTapSound">Капля</div></div><div style="color:var(--faint)">›</div></div>
@@ -2223,7 +2224,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.14', BUILD_ID='2026-10-10-sri';
+const APP_VERSION='5.2.15', BUILD_ID='2026-10-11-novyi-chat';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -4093,6 +4094,10 @@ function отдатьСписокЧатов(строки){
 /* Нативная переписка (оболочка 182+) не открывает наш экран переписки: звонок
    из её шапки начинается сразу, а старая переписка, если осталась открытой,
    уходит из-под нативной — иначе экраны накладывались (запись 09.10.2026). */
+/* 5.2.15: собеседник найден нативным окном «Новый чат» — запомнить человека и чат */
+window.olesyaНовыйСобеседник=function(u){
+  try{ if(!me||!u||!u.id||u.id===me.id)return; cacheUser(u); ensureChat(String(u.id),true); renderChats(); }catch(e){}
+};
 window.olesyaЗвонок=function(peer,kind){
   try{
     /* Группа (нативный экран группы, 5.2.13): звонок всем участникам. */
@@ -4107,6 +4112,19 @@ window.olesyaЗвонок=function(peer,kind){
 window.olesyaГруппа=function(действие,gid,данные){
   try{
     if(!me)return false;
+    /* 5.2.15: группа создана нативным окном «Новая группа» — id даёт оболочка,
+       здесь то же, что createGroup, но без окон страницы. */
+    if(действие==='создать'){
+      const d0=db(); if(!gid||d0.chats[gid])return false;
+      const members=Array.from(new Set([me.id,...(((данные&&данные.members)||[]).map(String))]));
+      if(members.length<2)return false;
+      const g0={id:gid,gid:gid,group:true,name:String((данные&&данные.name)||'Новая группа').slice(0,40),members,owner:me.id,admins:[me.id],color:senderColor(gid),created:Date.now(),messages:[]};
+      d0.chats[gid]=g0;save(d0);
+      const roster=rosterFor(members);
+      members.filter(x=>x!==me.id).forEach(uidT=>{ emit('group:invite',{to:uidT,gid,name:g0.name,members,owner:me.id,admins:g0.admins,roster,by:me.id}); });
+      renderChats();try{if(typeof renderHome==='function')renderHome();}catch(e){}
+      return true;
+    }
     const d=db();const g=d.chats[gid];if(!g||!g.group)return false;
     if(действие==='выйти'){
       g.members.filter(x=>x!==me.id).forEach(uidT=>emit('group:leave',{to:uidT,gid,from:me.id}));
@@ -4121,6 +4139,11 @@ window.olesyaГруппа=function(действие,gid,данные){
       g.name=nm;save(d);groupUpdateBroadcast(gid,{name:nm});renderChats();return true;
     }
     if(действие==='добавить'){ addGroupMembers(gid,Array.isArray(данные)?данные.map(String):[]); return true; }
+    /* 5.2.15: фото группы из нативного профиля — ссылка на файл в хранилище */
+    if(действие==='фото'){
+      const url=String(данные||''); if(!/^https:\/\//i.test(url))return false;
+      g.avatar=url;save(d);groupUpdateBroadcast(gid,{avatar:url});renderChats();return true;
+    }
     if(действие==='удалить'){
       const uid=String(данные||'');if(!uid||uid===g.owner||uid===me.id)return false;
       g.members=g.members.filter(x=>x!==uid);save(d);
@@ -9612,7 +9635,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=183, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-183.apk';
+const APK_NEW_BUILD=184, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-184.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
@@ -10831,6 +10854,36 @@ function buildTheme(body){
   body.appendChild(w);}
 /* Подпись в строке настроек. Обновляем напрямую, а не через refreshSettings():
    тот выходит сразу, если пользователь ещё не вошёл, и не вызывается при смене громкости. */
+/* 5.2.15: качество отправляемых фото и видео. Сжимает и улучшает оболочка
+   (нативный модуль на телефоне); страница только хранит выбор и показывает
+   его. Строка видна, когда оболочка сказала, что умеет (olesyaКачество). */
+const MEDIAQ_PHOTO=[['эконом','Экономия','до 1280 px, лёгкие файлы'],['стандарт','Стандарт','до 2048 px — как в большинстве мессенджеров'],['hd','HD','до 4096 px, высокое качество'],['оригинал','Оригинал','без сжатия']];
+const MEDIAQ_VIDEO=[['эконом','Экономия','480p, меньше трафика'],['стандарт','Стандарт','720p'],['hd','HD','1080p'],['оригинал','Оригинал','без сжатия']];
+function mediaQ(){ try{ const q=JSON.parse(localStorage.getItem('om_mediaQ')||'{}')||{}; return {фото:q.фото||'стандарт',видео:q.видео||'стандарт',олеся:q.олеся!==false}; }catch(e){ return {фото:'стандарт',видео:'стандарт',олеся:true}; } }
+function setMediaQ(q,сказать){ try{ localStorage.setItem('om_mediaQ',JSON.stringify(q)); }catch(e){}
+  if(сказать){ try{ if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify({type:'качество-медиа',значение:q})); }catch(e){} }
+  refreshMediaQLabel(); }
+function refreshMediaQLabel(){ const s=$('#stMediaQ'); if(!s)return; const q=mediaQ();
+  const п=(MEDIAQ_PHOTO.find(x=>x[0]===q.фото)||MEDIAQ_PHOTO[1])[1], в=(MEDIAQ_VIDEO.find(x=>x[0]===q.видео)||MEDIAQ_VIDEO[1])[1];
+  s.textContent='Фото: '+п+' · видео: '+в+(q.олеся?' · Олеся подскажет':''); }
+window.olesyaКачество=function(q){ try{ if(!q)return; const r=$('#rowMediaQ'); if(r&&q.есть)r.style.display='';
+  setMediaQ({фото:q.фото||'стандарт',видео:q.видео||'стандарт',олеся:q.олеся!==false},false); }catch(e){} };
+function buildMediaQ(body){
+  const q=mediaQ();
+  body.appendChild(el('<div class="note">Как сжимать фото и видео перед отправкой. Сжатие идёт на телефоне. На экране отправки качество можно поменять для одного раза — выбор запоминается.</div>'));
+  body.appendChild(el('<div class="sec-head">Фото</div>'));
+  const wp=el('<div></div>');
+  MEDIAQ_PHOTO.forEach(s=>wp.appendChild(optRow(s[1]+' <span style="color:var(--faint)">· '+s[2]+'</span>',q.фото===s[0],()=>{ setMediaQ(Object.assign(mediaQ(),{фото:s[0]}),true); buildSubRefresh(); })));
+  body.appendChild(wp);
+  body.appendChild(el('<div class="sec-head">Видео</div>'));
+  const wv=el('<div></div>');
+  MEDIAQ_VIDEO.forEach(s=>wv.appendChild(optRow(s[1]+' <span style="color:var(--faint)">· '+s[2]+'</span>',q.видео===s[0],()=>{ setMediaQ(Object.assign(mediaQ(),{видео:s[0]}),true); buildSubRefresh(); })));
+  body.appendChild(wv);
+  body.appendChild(el('<div class="sec-head">Олеся</div>'));
+  const wo=el('<div></div>');
+  [[true,'Предлагать улучшение','если снимок тёмный, блёклый или нечёткий'],[false,'Не предлагать','']].forEach(s=>wo.appendChild(optRow(s[1]+(s[2]?' <span style="color:var(--faint)">· '+s[2]+'</span>':''),q.олеся===s[0],()=>{ setMediaQ(Object.assign(mediaQ(),{олеся:s[0]}),true); buildSubRefresh(); })));
+  body.appendChild(wo);
+}
 function refreshTapSoundLabel(){
   const sts=$('#stTapSound'); if(!sts)return;
   const v=TAP_VOLS.find(x=>x[0]===tapVolKey());
@@ -10913,6 +10966,7 @@ $('#rowBlocked').onclick=()=>openSub('Заблокированные',buildBlock
 $('#rowLang').onclick=()=>openSub('Мой язык',buildLang);
 $('#rowTheme').onclick=()=>openSub('Внешний вид',buildTheme);
 {const r=$('#rowTapSound'); if(r)r.onclick=()=>openSub('Звук нажатия',buildTapSound);}
+{const r=$('#rowMediaQ'); if(r)r.onclick=()=>openSub('Качество фото и видео',buildMediaQ); refreshMediaQLabel();}
 $('#rowChatBg').onclick=()=>openSub('Фон чатов',buildChatBg);
 $('#btnTheme').onclick=toggleThemeQuick;
 $('#bgFileInput').onchange=e=>{const f=e.target.files[0]; loadChatBgPhoto(f); e.target.value='';};
