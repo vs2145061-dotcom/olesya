@@ -2224,7 +2224,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.18', BUILD_ID='2026-10-13-188';
+const APP_VERSION='5.2.19', BUILD_ID='2026-10-13-189';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -9635,7 +9635,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=188, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-188.apk';
+const APK_NEW_BUILD=189, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-189.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
@@ -10859,15 +10859,15 @@ function buildTheme(body){
    его. Строка видна, когда оболочка сказала, что умеет (olesyaКачество). */
 const MEDIAQ_PHOTO=[['эконом','Экономия','до 1280 px, лёгкие файлы'],['стандарт','Стандарт','до 2048 px — как в большинстве мессенджеров'],['hd','HD','до 4096 px, высокое качество'],['оригинал','Оригинал','без сжатия']];
 const MEDIAQ_VIDEO=[['эконом','Экономия','480p, меньше трафика'],['стандарт','Стандарт','720p'],['hd','HD','1080p'],['оригинал','Оригинал','без сжатия']];
-function mediaQ(){ try{ const q=JSON.parse(localStorage.getItem('om_mediaQ')||'{}')||{}; return {фото:q.фото||'стандарт',видео:q.видео||'стандарт',олеся:q.олеся!==false}; }catch(e){ return {фото:'стандарт',видео:'стандарт',олеся:true}; } }
+function mediaQ(){ try{ const q=JSON.parse(localStorage.getItem('om_mediaQ')||'{}')||{}; return {фото:q.фото||'стандарт',видео:q.видео||'стандарт',олеся:q.олеся!==false,спрашивать:q.спрашивать!==false}; }catch(e){ return {фото:'стандарт',видео:'стандарт',олеся:true,спрашивать:true}; } }
 function setMediaQ(q,сказать){ try{ localStorage.setItem('om_mediaQ',JSON.stringify(q)); }catch(e){}
   if(сказать){ try{ if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify({type:'качество-медиа',значение:q})); }catch(e){} }
   refreshMediaQLabel(); }
 function refreshMediaQLabel(){ const s=$('#stMediaQ'); if(!s)return; const q=mediaQ();
   const п=(MEDIAQ_PHOTO.find(x=>x[0]===q.фото)||MEDIAQ_PHOTO[1])[1], в=(MEDIAQ_VIDEO.find(x=>x[0]===q.видео)||MEDIAQ_VIDEO[1])[1];
-  s.textContent='Фото: '+п+' · видео: '+в+(q.олеся?' · Олеся подскажет':''); }
+  s.textContent='Фото: '+п+' · видео: '+в+(q.спрашивать?' · выбор при отправке':'')+(q.олеся?' · Олеся подскажет':''); }
 window.olesyaКачество=function(q){ try{ if(!q)return; const r=$('#rowMediaQ'); if(r&&q.есть)r.style.display='';
-  setMediaQ({фото:q.фото||'стандарт',видео:q.видео||'стандарт',олеся:q.олеся!==false},false); }catch(e){} };
+  setMediaQ({фото:q.фото||'стандарт',видео:q.видео||'стандарт',олеся:q.олеся!==false,спрашивать:q.спрашивать!==false},false); }catch(e){} };
 function buildMediaQ(body){
   const q=mediaQ();
   body.appendChild(el('<div class="note">Как сжимать фото и видео перед отправкой. Сжатие идёт на телефоне. На экране отправки качество можно поменять для одного раза — выбор запоминается.</div>'));
@@ -10879,6 +10879,11 @@ function buildMediaQ(body){
   const wv=el('<div></div>');
   MEDIAQ_VIDEO.forEach(s=>wv.appendChild(optRow(s[1]+' <span style="color:var(--faint)">· '+s[2]+'</span>',q.видео===s[0],()=>{ setMediaQ(Object.assign(mediaQ(),{видео:s[0]}),true); buildSubRefresh(); })));
   body.appendChild(wv);
+  /* 5.2.19: показывать ли выбор качества на экране отправки (там есть «Больше не показывать») */
+  body.appendChild(el('<div class="sec-head">При отправке</div>'));
+  const wa=el('<div></div>');
+  [[true,'Спрашивать качество при отправке','выбор внизу экрана отправки'],[false,'Не спрашивать','всегда как выбрано выше']].forEach(s=>wa.appendChild(optRow(s[1]+' <span style="color:var(--faint)">· '+s[2]+'</span>',q.спрашивать===s[0],()=>{ setMediaQ(Object.assign(mediaQ(),{спрашивать:s[0]}),true); buildSubRefresh(); })));
+  body.appendChild(wa);
   body.appendChild(el('<div class="sec-head">Олеся</div>'));
   const wo=el('<div></div>');
   [[true,'Предлагать улучшение','если снимок тёмный, блёклый или нечёткий'],[false,'Не предлагать','']].forEach(s=>wo.appendChild(optRow(s[1]+(s[2]?' <span style="color:var(--faint)">· '+s[2]+'</span>':''),q.олеся===s[0],()=>{ setMediaQ(Object.assign(mediaQ(),{олеся:s[0]}),true); buildSubRefresh(); })));
