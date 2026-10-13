@@ -1819,7 +1819,6 @@ body.call-open #toast{bottom:190px}
       <div class="setting" id="rowTwoFA" style="cursor:pointer"><div class="ic">🔑</div><div class="lbl"><div class="t">Облачный пароль</div><div class="d">Второй фактор · <span id="st2fa">Отключён</span></div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowSessions" style="cursor:pointer"><div class="ic">📱</div><div class="lbl"><div class="t">Активные сеансы</div><div class="d" id="stSess">—</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowIdentity" style="cursor:pointer"><div class="ic">🪪</div><div class="lbl"><div class="t">Никнейм, QR и приглашения</div><div class="d" id="stIdentity">@username · ссылка для приглашения</div></div><div style="color:var(--faint)">›</div></div>
-      <div class="setting owner-only" id="rowServerContacts" style="cursor:pointer"><div class="ic">📇</div><div class="lbl"><div class="t">Серверные контакты</div><div class="d">синхронизация контактов между устройствами</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowBusiness" style="cursor:pointer"><div class="ic">💼</div><div class="lbl"><div class="t">Бизнес-режим</div><div class="d">заявки, карточка клиента, статусы, чек-листы</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowLog" style="cursor:pointer"><div class="ic">📜</div><div class="lbl"><div class="t">Журнал безопасности</div><div class="d">Входы, блокировки, анти-спам</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowLegal" style="cursor:pointer"><div class="ic">📄</div><div class="lbl"><div class="t">Документы и приватность</div><div class="d">Политика, соглашение, удаление аккаунта</div></div><div style="color:var(--faint)">›</div></div>
@@ -2224,7 +2223,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.19', BUILD_ID='2026-10-13-189';
+const APP_VERSION='5.2.20', BUILD_ID='2026-10-13-privacy';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -5976,15 +5975,19 @@ async function aiChat(history,opts){
   if(cloudOn&&isCloudReady()&&CFG.provider==='worker'&&cfg.provider!=='public'){
     try{const r=await jpost(wapi('/ai/chat'),{messages,web:!!opts.web,model:opts.model});if(r&&r.reply)return {text:String(r.reply).trim(),via:'worker'};}catch(e){}
   }
-  if(cfg.provider!=='worker-only'){
+  /* 5.2.20 (проверка ИБ): чужой ИИ — только если человек сам указал свой ключ или адрес.
+     Раньше при сбое сервера переписка молча уходила в публичный pollinations.ai. */
+  if(cfg.provider!=='worker-only'&&aiOwnProvider(cfg)){
     const pub=await aiPublic(messages,opts);
     if(pub)return {text:pub,via:'public'};
   }
   return null;
 }
+function aiOwnProvider(cfg){ cfg=cfg||aiCfg(); return !!((cfg.url||'').trim()&&!/pollinations/i.test(cfg.url)&&((cfg.key||'').trim()||/localhost|127\.0\.0\.1|192\.168\./.test(cfg.url))); }
 async function aiPublic(messages,opts){
   const cfg=aiCfg();
-  const url=(cfg.url||'https://text.pollinations.ai/openai').trim();
+  if(!aiOwnProvider(cfg))return null;
+  const url=String(cfg.url).trim();
   const key=(cfg.key||'').trim();
   const model=opts.web?(cfg.webModel||'searchgpt'):(cfg.model||'openai');
   const isPoll=/pollinations/.test(url);
@@ -9635,7 +9638,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=189, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-189.apk';
+const APK_NEW_BUILD=190, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-190.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
@@ -10718,7 +10721,7 @@ async function summarizeCurrentChat(){const txt=await aiCurrentChatText(80);if(!
 async function tasksFromCurrentChat(){const txt=await aiCurrentChatText(100);if(!txt){pushLocalNote('Нет текста для задач.');return;}pushLocalNote('✅ Извлекаю задачи из переписки…');try{const r=await jpost(wapi('/ai/tasks'),{text:txt});replaceLastNote('✅ Задачи:\n'+(r.text||'Пустой ответ'));}catch(e){const r=await aiChat([{role:'user',content:txt}],{system:'Извлеки задачи из переписки: действие, ответственный, срок, статус.'});replaceLastNote(r&&r.text?('✅ Задачи:\n'+r.text):'ИИ недоступен.');}}
 
 function buildAi(body){
-  body.appendChild(el('<div class="note">Олеся — встроенный <b>ИИ-ассистент</b>: рассуждает, анализирует, советует, ищет информацию в интернете и переводит на любой язык.<br><br>💚 <b>Бесплатно и приватно:</b> задеплойте свой воркер (он уже готов) — Олеся заработает через <b>Cloudflare Workers AI</b> без всяких ключей. Это рекомендуемый путь.<br>🔑 Либо подключите внешний ИИ: вставьте OpenAI-совместимый адрес и ключ (OpenAI, Groq — бесплатный, OpenRouter, pollinations).</div>'));
+  body.appendChild(el('<div class="note">Олеся — встроенный <b>ИИ-ассистент</b>: рассуждает, анализирует, советует, ищет информацию в интернете и переводит на любой язык.<br><br>💚 <b>Бесплатно и приватно:</b> задеплойте свой воркер (он уже готов) — Олеся заработает через <b>Cloudflare Workers AI</b> без всяких ключей. Это рекомендуемый путь.<br>🔑 Либо подключите внешний ИИ: вставьте OpenAI-совместимый адрес и ключ (OpenAI, Groq — бесплатный, OpenRouter).</div>'));
   const wrap=el('<div></div>');
   function render(){ wrap.innerHTML='';const a=aiCfg();
     const sw=el('<div class="setting"><div class="ic">🤖</div><div class="lbl"><div class="t">Умный ИИ-ассистент</div><div class="d">свободные вопросы → ответы ИИ</div></div><div class="switch'+(a.off?'':' on')+'"></div></div>');
@@ -10960,7 +10963,7 @@ $('#rowSessions').onclick=()=>openSub('Активные сеансы',buildSessi
 $('#rowLog').onclick=()=>openSub('Журнал безопасности',buildLog);
 if($('#rowLegal'))$('#rowLegal').onclick=()=>openSub('Документы и приватность',buildLegal);
 if($('#rowIdentity'))$('#rowIdentity').onclick=()=>openSub('Никнейм, QR и приглашения',buildIdentityQR);
-if($('#rowServerContacts'))$('#rowServerContacts').onclick=()=>openSub('Серверные контакты',buildServerContacts);
+/* 5.2.20: «Серверные контакты» убраны — контакты хранятся только на устройстве (проверка ИБ) */
 if($('#rowBusiness'))$('#rowBusiness').onclick=()=>openSub('Бизнес-режим',buildBusiness);
 $('#rowCallsFrom').onclick=()=>openSub('Кто может звонить',buildCallsFrom);
 $('#rowBlocked').onclick=()=>openSub('Заблокированные',buildBlocked);
