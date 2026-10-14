@@ -2223,7 +2223,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.22', BUILD_ID='2026-10-14-192';
+const APP_VERSION='5.2.23', BUILD_ID='2026-10-14-194';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -4026,14 +4026,14 @@ function lastSeenText(u){
 function hiddenChats(){try{return JSON.parse(localStorage.getItem('om_hidden_chats')||'{}')||{};}catch(e){return {};}}
 function saveHiddenChats(h){try{localStorage.setItem('om_hidden_chats',JSON.stringify(h));}catch(e){}}
 function isChatHidden(chat){const ts=hiddenChats()[chat.id];if(!ts)return false;const last=(chat.messages&&chat.messages.at(-1)&&chat.messages.at(-1).t)||0;return last<=ts;}
-async function deleteChatForMe(chat,label){
+async function deleteChatForMe(chat,label,безВопроса){
   if(!chat)return;
-  const _ok=await appConfirm('Собеседник свою копию сохранит. Чат вернётся, если придёт новое сообщение.',{title:'Удалить чат'+(label?' «'+label+'»':'')+'?',okText:'Удалить',danger:true});
+  const _ok=безВопроса?true:await appConfirm('Собеседник свою копию сохранит. Чат вернётся, если придёт новое сообщение.',{title:'Удалить чат'+(label?' «'+label+'»':'')+'?',okText:'Удалить',danger:true});
   if(!_ok)return;
   const d=db();const c=d.chats[chat.id];if(c){c.messages=[];}                     // локальную историю чистим (на сервере остаётся)
   const h=hiddenChats();h[chat.id]=Date.now();saveHiddenChats(h);save(d);
   try{renderChats();}catch(e){}try{if(typeof renderHome==='function')renderHome();}catch(e){}
-  toast('Чат удалён у вас');
+  if(!безВопроса)toast('Чат удалён у вас');
 }
 /* Долгое нажатие (или правый клик на ПК) по строке чата → удалить. Обычный тап открывает чат. */
 /* --- Закрепление чатов и «отметить прочитанным» --- */
@@ -4187,6 +4187,8 @@ window.olesyaChat=function(действие,id){
       renderChats(); return;
     }
     if(действие==='удалить'){ try{deleteChatForMe(c,c.name||'');}catch(e){} return; }
+    /* выбор нескольких чатов в оболочке: она уже спросила один раз (14.10.2026) */
+    if(действие==='удалить-тихо'){ try{deleteChatForMe(c,c.name||'',true);}catch(e){} return; }
   }catch(e){}
 };
 function renderChats(){
@@ -9638,7 +9640,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=192, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-192.apk';
+const APK_NEW_BUILD=194, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-194.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
