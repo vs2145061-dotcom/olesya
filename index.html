@@ -2223,7 +2223,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.23', BUILD_ID='2026-10-14-194';
+const APP_VERSION='5.2.24', BUILD_ID='2026-10-14-195';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -4189,6 +4189,9 @@ window.olesyaChat=function(действие,id){
     if(действие==='удалить'){ try{deleteChatForMe(c,c.name||'');}catch(e){} return; }
     /* выбор нескольких чатов в оболочке: она уже спросила один раз (14.10.2026) */
     if(действие==='удалить-тихо'){ try{deleteChatForMe(c,c.name||'',true);}catch(e){} return; }
+    /* «Ещё» в выборе чатов оболочки (14.10.2026): очистить историю, заблокировать */
+    if(действие==='очистить'){ try{ c.messages=[]; save(d); renderChats(); if(typeof renderHome==='function')renderHome(); }catch(e){} return; }
+    if(действие==='заблокировать'){ if(c.group||c.channel)return; const peer=(c.members||[]).find(x=>x!==me.id); if(peer){ try{toggleBlock(peer);}catch(e){} renderChats(); } return; }
   }catch(e){}
 };
 function renderChats(){
@@ -4228,6 +4231,7 @@ function renderChats(){
         id:c.id, имя, значок, цвет, текст,
         время:last?fmtTime(last.t):'', непрочитано,
         закреплён:isPinned(c.id)?1:0, онлайн, своё, бот,
+        заблок:(!c.group&&!c.channel&&(()=>{try{return isBlocked((c.members||[]).find(x=>x!==me.id))?1:0;}catch(e){return 0;}})())||0,
       });
     }catch(e){}
   });
@@ -9640,7 +9644,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=194, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-194.apk';
+const APK_NEW_BUILD=195, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-195.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
