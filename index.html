@@ -1516,7 +1516,7 @@ body.call-open #toast{bottom:190px}
       <div class="grow"><div class="title">📢 Каналы</div><div class="sub">публичные ленты и подписки</div></div>
       <button class="iconbtn fx-add" id="btnNewChannel" title="Создать канал" data-знак="add" data-цвет="#22C55E"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg></button>
     </div>
-    <div class="searchbar"><input id="channelsSearch" placeholder="Найти канал по @адресу или названию…" /></div>
+    <div class="searchbar"><input id="channelsSearch" placeholder="Найти канал по z/адресу или названию…" /></div>
     <div class="list" id="channelsList"></div>
   </section>
 
@@ -1584,7 +1584,7 @@ body.call-open #toast{bottom:190px}
       <div class="grow"><div class="title">Телефонная книга</div><div class="sub" id="contactsCount">контакты</div></div>
       <button class="iconbtn fx-add" id="btnImportContacts" title="Импорт из телефона" data-знак="phone-portrait-outline" data-цвет="#22C55E"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg></button>
     </div>
-    <div class="searchbar"><input id="contactsSearch" placeholder="Имя, @ник или номер телефона…" /></div>
+    <div class="searchbar"><input id="contactsSearch" placeholder="Имя, z/ник или номер телефона…" /></div>
     <div class="cn-hint" id="cnHint"></div>
     <div class="list" id="contactsList"></div>
   </section>
@@ -1865,7 +1865,7 @@ body.call-open #toast{bottom:190px}
       <div style="font-family:var(--disp);font-size:20px" id="lockTitle">Введите PIN-код</div>
       <div class="pin-dots" id="pinDots"></div>
       <div class="keypad" id="keypad"></div>
-      <button id="lockBio" style="display:none;margin-top:16px;background:var(--raised-2);border:1px solid var(--line);color:var(--text);padding:11px 20px;border-radius:13px;font-size:14.5px;cursor:pointer">👆 Face ID / отпечаток</button>
+      <button id="lockBio" style="display:none;margin-top:16px;background:var(--raised-2);border:1px solid var(--line);color:var(--text);padding:11px 20px;border-radius:13px;font-size:14.5px;cursor:pointer;align-items:center;gap:9px"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="var(--primary)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:8px"><path d="M18.9 7a8 8 0 0 1 1.1 5v1a6 6 0 0 0 .8 3"/><path d="M8 11a4 4 0 0 1 8 0v1a10 10 0 0 0 2 6"/><path d="M12 11v2a14 14 0 0 0 2.5 8"/><path d="M8 15a18 18 0 0 0 1.8 6"/><path d="M4.9 19a22 22 0 0 1-.9-7v-1a8 8 0 0 1 12-6.95"/></svg>Отпечаток / Face ID</button>
     </div>
   </section>
 
@@ -1874,7 +1874,7 @@ body.call-open #toast{bottom:190px}
     <div class="modal">
       <div class="grip"></div>
       <h3>Новый чат</h3>
-      <div class="searchbar"><input id="contactSearch" placeholder="Имя, @ник или номер…" /></div>
+      <div class="searchbar"><input id="contactSearch" placeholder="Имя, z/ник или номер…" /></div>
       <div class="list" id="contactList" style="padding-bottom:10px"></div>
     </div>
   </div>
@@ -1933,7 +1933,7 @@ body.call-open #toast{bottom:190px}
     <div class="modal">
       <div class="grip"></div>
       <h3>📢 Новый канал</h3>
-      <div class="lang-hint">Публичная лента: посты пишет только владелец и админы, подписчиков — сколько угодно. Делитесь @адресом — так растёт аудитория.</div>
+      <div class="lang-hint">Публичная лента: посты пишет только владелец и админы, подписчиков — сколько угодно. Делитесь z/адресом — так растёт аудитория.</div>
       <div class="searchbar"><input id="chName" placeholder="Название канала" maxlength="80" /></div>
       <div class="searchbar ch-handle"><span>@</span><input id="chHandle" placeholder="адрес (латиница, цифры, _)" maxlength="32" /></div>
       <textarea id="chDescr" class="paste-area" style="min-height:70px" placeholder="Описание (необязательно)"></textarea>
@@ -2223,7 +2223,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.28', BUILD_ID='2026-10-19-199';
+const APP_VERSION='5.2.29', BUILD_ID='2026-10-19-199';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -3910,6 +3910,8 @@ function av(el,u){if(!el)return;u=u||{};
   el.querySelectorAll('.dot').forEach(x=>x.remove());
   el.style.backgroundImage='';
   const a=u.avatar;
+  /* Олеся — фирменный знак, как в Android (19.10.2026) */
+  if(u.bot||u.id==='bot_olesya'){el.style.fontFamily='';el.style.backgroundImage='';el.style.background='linear-gradient(135deg,#7B8CFF,#A56CFF 55%,#E15BC8)';el.style.color='#fff';el.innerHTML='<svg viewBox="0 0 24 24" style="width:56%;height:56%"><path fill="#fff" d="M14 3.8Q14 12 21.5 12Q14 12 14 20.2Q14 12 6.5 12Q14 12 14 3.8Z"/><path fill="#fff" d="M6 2.5Q6 6.2 9.5 6.2Q6 6.2 6 9.9Q6 6.2 2.5 6.2Q6 6.2 6 2.5Z"/><path fill="#fff" d="M6.6 15.4Q6.6 18 9.1 18Q6.6 18 6.6 20.6Q6.6 18 4 18Q6.6 18 6.6 15.4Z"/></svg>';return;}
   /* фото-аватар (data/http/blob) */
   if(a&&/^(https?:|data:|blob:|img\/)/i.test(a)){el.innerHTML='';el.style.fontFamily='';el.style.background='var(--raised)';el.style.backgroundImage='url("'+медиаАдрес(a)+'")';el.style.backgroundSize='cover';el.style.backgroundPosition='center';return;}
   el.style.background=gradCss(u.color);el.style.color='#fff';
@@ -4752,6 +4754,13 @@ document.addEventListener('click',closeReactMenu);
   .sb-btn{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:57px;padding:8px 4px;border-radius:13px;color:var(--text);font-size:12px;background:none;flex:none;line-height:1.15;cursor:pointer}
   .sb-btn svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   .sb-btn:active{background:var(--raised)}
+/* 19.10.2026: как в Android — у каждого действия свой цвет, объёмный кружок (градиент, блик, тень), значок белый */
+.sb-ic{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;position:relative;overflow:hidden;background:linear-gradient(160deg,var(--sa,#8B97FF),var(--sb,#5C6AE8));box-shadow:inset 0 -3px 6px rgba(0,0,0,.18),0 3px 8px -3px rgba(0,0,0,.35)}
+.sb-ic::before{content:'';position:absolute;left:16%;right:16%;top:5%;height:42%;border-radius:40%;background:linear-gradient(rgba(255,255,255,.5),rgba(255,255,255,0))}
+.sb-btn .sb-ic svg{width:20px;height:20px;stroke:#fff;position:relative}
+.sb-btn span.sb-l{font-size:11px;color:var(--muted)}.sb-btn.danger span.sb-l{color:var(--red)}
+.sb-c-pin,.sb-c-unpin,.sb-c-fwd{--sa:#8B97FF;--sb:#5C6AE8}.sb-c-read{--sa:#5EE0A1;--sb:#10A974}.sb-c-clear,.sb-c-copy{--sa:#67D3FF;--sb:#0B92D6}
+.sb-c-block{--sa:#B3ABCB;--sb:#776E93}.sb-c-fave{--sa:#FFC861;--sb:#F08C0A}.sb-c-del{--sa:#FF8A8A;--sb:#E5383B}
   .sb-btn.danger{color:var(--red)}
   .sb-btn.ai{color:#fff}
   .sb-btn.ai svg{stroke:none}
@@ -4816,26 +4825,30 @@ const _SBIC={
   del:'<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>',
   pin:'<path d="M9 4h6l-1 7 4 3H6l4-3z"/><path d="M12 14v6"/>',
   unpin:'<path d="M9 4h6l-1 7 4 3H6l4-3z"/><path d="M12 14v6"/><path d="M3 3l18 18"/>',
-  read:'<path d="M4 12l4 4L20 6"/>',
+  read:'<path d="M4 12l4 4L20 6"/>', clear:'<path d="M15 4l5 5M13 6l-8 8 3 3 8-8"/><path d="M5 14l-2 6 6-2"/>', block:'<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
   ai:'<defs><linearGradient id="olsg" x1="2" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#7B8CFF"/><stop offset="1" stop-color="#C46CFF"/></linearGradient></defs><path fill="url(#olsg)" d="M14 3.8Q14 12 21.5 12Q14 12 14 20.2Q14 12 6.5 12Q14 12 14 3.8Z"/><path fill="url(#olsg)" d="M6 2.5Q6 6.2 9.5 6.2Q6 6.2 6 9.9Q6 6.2 2.5 6.2Q6 6.2 6 2.5Z"/><path fill="url(#olsg)" d="M6.6 15.4Q6.6 18 9.1 18Q6.6 18 6.6 20.6Q6.6 18 4 18Q6.6 18 6.6 15.4Z"/>'
 };
-function _sbBtn(cls,icon,label,fn){ const b=document.createElement('button'); b.className='sb-btn'+(cls?' '+cls:''); b.innerHTML='<svg viewBox="0 0 24 24">'+_SBIC[icon]+'</svg><span>'+label+'</span>'; b.onclick=(e)=>{e.stopPropagation();_selVibe(10);fn();}; return b; }
+function _sbBtn(cls,icon,label,fn){ const b=document.createElement('button'); b.className='sb-btn'+(cls?' '+cls:''); b.innerHTML=(icon==='ai'?'<svg viewBox="0 0 24 24">'+_SBIC[icon]+'</svg>':'<span class="sb-ic sb-c-'+icon+'"><svg viewBox="0 0 24 24">'+_SBIC[icon]+'</svg></span>')+'<span class="sb-l">'+label+'</span>'; b.onclick=(e)=>{e.stopPropagation();_selVibe(10);fn();}; return b; }
 function updateSelBar(){ const bar=ensureSelBar(); bar.innerHTML='';
   const x=document.createElement('div'); x.className='sb-x'; x.textContent='✕'; x.onclick=(e)=>{e.stopPropagation();_selVibe(10);exitSel();}; bar.appendChild(x);
   const cnt=document.createElement('div'); cnt.className='sb-count'; cnt.textContent=selSet.size; bar.appendChild(cnt);
   const acts=document.createElement('div'); acts.className='sb-acts'; bar.appendChild(acts);
   if(selMode==='msg'){
     acts.appendChild(_sbBtn('ai','ai','Олеся',selAiMenu));
-    acts.appendChild(_sbBtn('','copy','Копир.',selCopy));
+    acts.appendChild(_sbBtn('','copy','Копия',selCopy));
     acts.appendChild(_sbBtn('','fwd','Переслать',selForward));
-    acts.appendChild(_sbBtn('','fave','В избр.',selFave));
+    acts.appendChild(_sbBtn('','fave','Избранное',selFave));
     acts.appendChild(_sbBtn('danger','del','Удалить',selDelete));
   }else{
     // если ВСЕ выбранные закреплены → «Открепить», иначе → «Закрепить»
     const _allPinned = selSet.size>0 && [...selSet].every(id=>isPinned(id));
     acts.appendChild(_sbBtn('', _allPinned?'unpin':'pin', _allPinned?'Открепить':'Закрепить', selTogglePin));
     acts.appendChild(_sbBtn('','read','Прочитано',selReadChats));
-    acts.appendChild(_sbBtn('danger','del','Удалить',selDeleteChats));
+    acts.appendChild(_sbBtn('','clear','Очистить',selClearChats));
+    /* чат Олеси-помощника не удалить и не заблокировать (как в Android, 19.10.2026) */
+    const _безОлеси=[...selSet].filter(id=>!_этоОлеся(id));
+    if(_безОлеси.length&&_безОлеси.every(id=>{const c=db().chats[id];return c&&!c.group&&!c.channel;})) acts.appendChild(_sbBtn('','block','Блок',selBlockChats));
+    if(_безОлеси.length) acts.appendChild(_sbBtn('danger','del','Удалить',selDeleteChats));
   }
   bar.classList.add('show');
 }
@@ -4859,7 +4872,10 @@ function selTogglePin(){ const ids=[...selSet]; if(!ids.length)return; const all
   ids.forEach(id=>{ const p=isPinned(id); if(allPinned){ if(p)togglePin(id); } else { if(!p)togglePin(id); } });
   const n=ids.length; exitSel(); renderChats(); toast(allPinned?('Откреплено: '+n):('📌 Закреплено: '+n)); }
 function selReadChats(){ const ids=[...selSet]; const d=db(); ids.forEach(id=>{ const c=d.chats[id]; if(!c)return; if(c.group){try{markReadGroup(id);}catch(e){}} else { const pid=(c.members||[]).find(x=>x!==me.id); if(pid)markRead(pid); } }); const n=ids.length; exitSel(); renderChats(); toast('Прочитано: '+n); }
-async function selDeleteChats(){ const ids=[...selSet]; if(!ids.length)return;
+function _этоОлеся(id){ const c=db().chats[id]; return !!(c&&(c.members||[]).includes('bot_olesya')) || /bot_olesya/.test(String(id)); }
+async function selClearChats(){ const ids=[...selSet]; if(!ids.length)return; const ok=await appConfirm('Сообщения удалятся с этого устройства, у собеседников останутся.',{title:'Очистить историю: '+ids.length+'?',okText:'Очистить',danger:true}); if(!ok)return; const d=db(); ids.forEach(id=>{ const c=d.chats[id]; if(c)c.messages=[]; }); save(d); exitSel(); try{renderChats();}catch(e){} try{if(typeof renderHome==='function')renderHome();}catch(e){} toast('История очищена'); }
+async function selBlockChats(){ const ids=[...selSet].filter(id=>!_этоОлеся(id)); if(!ids.length)return; const d=db(); const peers=ids.map(id=>{const c=d.chats[id];return c&&(c.members||[]).find(x=>x!==me.id);}).filter(Boolean); const всеЗаблок=peers.length&&peers.every(p=>isBlocked(p)); const ok=await appConfirm(всеЗаблок?'Сообщения и звонки снова будут доходить.':'Сообщения и звонки от них перестанут доходить.',{title:(всеЗаблок?'Разблокировать: ':'Заблокировать: ')+peers.length+'?',okText:всеЗаблок?'Разблокировать':'Заблокировать',danger:!всеЗаблок}); if(!ok)return; peers.forEach(p=>{ if(!!isBlocked(p)===всеЗаблок){try{toggleBlock(p);}catch(e){}} }); exitSel(); try{renderChats();}catch(e){} toast(всеЗаблок?'Разблокировано':'Заблокировано'); }
+async function selDeleteChats(){ const ids=[...selSet].filter(id=>!_этоОлеся(id)); if(!ids.length)return;
   const ok=await appConfirm('Собеседники свои копии сохранят. Чаты вернутся при новом сообщении.',{title:'Удалить '+ids.length+' чат(ов)?',okText:'Удалить',danger:true}); if(!ok)return;
   const d=db(); const h=hiddenChats(); ids.forEach(id=>{ const c=d.chats[id]; if(c)c.messages=[]; h[id]=Date.now(); }); saveHiddenChats(h); save(d);
   const n=ids.length; exitSel(); try{renderChats();}catch(e){} try{if(typeof renderHome==='function')renderHome();}catch(e){} toast('Удалено чатов: '+n);
@@ -5659,7 +5675,7 @@ async function renderChannelsScreen(){
   try{mine=(await cloudChannel('/channels/mine','GET')).channels||[];}
   catch(e){mine=Object.values(db().chats).filter(c=>c&&c.channel);}
   wrap.appendChild(el('<div class="cn-sec">Мои каналы</div>'));
-  if(!mine.length)wrap.appendChild(el('<div class="empty" style="padding:20px 18px">Пока нет каналов. Создайте свой или найдите по @адресу через поиск выше.</div>'));
+  if(!mine.length)wrap.appendChild(el('<div class="empty" style="padding:20px 18px">Пока нет каналов. Создайте свой или найдите по z/адресу через поиск выше.</div>'));
   mine.forEach(ch=>wrap.appendChild(channelRow(ch)));
 }
 function channelRow(ch){
@@ -7651,7 +7667,7 @@ function openNewChat(){
 
   if(others.length<=1 && matched.length===0 && !isPhone && !isUsername){
     const note=document.createElement('div');note.className='empty';note.style.padding='30px 24px';
-    note.innerHTML='Найдите собеседника по <b>номеру телефона</b> (+7 900 123 45 67) или по <b>@нику</b>, чтобы начать переписку.';
+    note.innerHTML='Найдите собеседника по <b>номеру телефона</b> (+7 900 123 45 67) или по <b>z/нику</b>, чтобы начать переписку.';
     wrap.appendChild(note);
   }
 
@@ -10261,7 +10277,36 @@ function setRemember(on){try{localStorage.setItem('om_remember',on?'1':'0');}cat
 
 /* ================== SETTINGS / PROFILE ================== */
 $('#btnSettings').onclick=()=>{paintMe();refreshSettings();$('#settingsSheet').classList.add('show');};
-$('#myAvatarTop').onclick=()=>{paintMe();refreshSettings();$('#settingsSheet').classList.add('show');};
+/* 19.10.2026 (владелец): своя аватарка → «Моя страница», а не настройки — как в Android */
+$('#myAvatarTop').onclick=()=>openMyPage();
+function _открытьНастройки(строка){ paintMe();refreshSettings();$('#settingsSheet').classList.add('show'); if(строка)setTimeout(()=>{const r=$('#'+строка);if(r)r.click();},120); }
+function openMyPage(){
+  if(!me)return; const старый=$('#myPage'); if(старый)старый.remove();
+  const w=document.createElement('div'); w.id='myPage';
+  w.style.cssText='position:fixed;inset:0;z-index:300;background:var(--bg);overflow-y:auto;animation:fadeIn .18s ease';
+  const кн=(иконка,подпись,дело)=>{const b=document.createElement('button');b.style.cssText='flex:1;height:74px;border-radius:16px;border:none;background:var(--surface);color:var(--text);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font:600 13px var(--body);cursor:pointer';b.innerHTML='<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+иконка+'</svg><span>'+подпись+'</span>';b.onclick=()=>{w.remove();дело();};return b;};
+  const стр=(верх,низ,дело)=>{const r=document.createElement('div');r.style.cssText='padding:12px 18px;cursor:pointer';r.innerHTML='<div style="font-size:16.5px;color:var(--text)"></div><div style="font-size:13px;color:var(--muted);margin-top:2px"></div>';r.children[0].textContent=верх;r.children[1].textContent=низ;r.onclick=дело;return r;};
+  const карт=()=>{const c=document.createElement('div');c.style.cssText='margin:0 16px 14px;border-radius:16px;background:var(--surface);padding:4px 0';return c;};
+  const шапка=document.createElement('div');шапка.style.cssText='height:56px;padding:0 16px;display:flex;align-items:center';
+  const назад=document.createElement('button');назад.setAttribute('aria-label','Назад');назад.style.cssText='border:none;background:none;color:var(--text);font-size:26px;cursor:pointer;padding:0';назад.textContent='←';назад.onclick=()=>w.remove();шапка.appendChild(назад);
+  w.appendChild(шапка);
+  const верх=document.createElement('div');верх.style.cssText='display:flex;flex-direction:column;align-items:center;padding:4px 0 18px';
+  const ав=document.createElement('div');ав.className='avatar xl';ав.style.cssText='width:112px;height:112px;font-size:44px;cursor:pointer';av(ав,me);ав.onclick=()=>{w.remove();_открытьНастройки('rowAvatar');};верх.appendChild(ав);
+  const им=document.createElement('div');им.style.cssText='font:600 24px var(--body);color:var(--text);margin-top:14px';им.textContent=me.name||'Я';верх.appendChild(им);
+  const ст=document.createElement('div');ст.style.cssText='font-size:14px;color:var(--muted);margin-top:3px';ст.textContent='в сети';верх.appendChild(ст);
+  w.appendChild(верх);
+  const ряд=document.createElement('div');ряд.style.cssText='display:flex;gap:10px;padding:0 16px;margin-bottom:14px';
+  ряд.appendChild(кн('<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>','Фото',()=>_открытьНастройки('rowAvatar')));
+  ряд.appendChild(кн('<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"/>','Ник и QR',()=>_открытьНастройки('rowIdentity')));
+  ряд.appendChild(кн('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>','Настройки',()=>_открытьНастройки(null)));
+  w.appendChild(ряд);
+  const к1=карт();
+  if(me.phone)к1.appendChild(стр(me.phone,'Телефон · нажмите, чтобы скопировать',()=>{try{copyText(me.phone);}catch(e){}}));
+  к1.appendChild(стр(me.username?('z/'+me.username):'Ник не задан','Имя пользователя',()=>{w.remove();_открытьНастройки('rowIdentity');}));
+  w.appendChild(к1);
+  const к2=карт();к2.appendChild(стр('🔖  Избранное','Сохранённые сообщения',()=>{w.remove();openConv(me.id);}));w.appendChild(к2);
+  document.body.appendChild(w);
+}
 $('#btnCloseSettings').onclick=()=>$('#settingsSheet').classList.remove('show');
 $('#btnLogout').onclick=()=>{setOnline(false);sessionStorage.removeItem(SS);localStorage.removeItem('om_me');
   /* Кэш визиток — это список компаний, с которыми человек переписывался.
