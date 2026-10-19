@@ -1818,14 +1818,14 @@ body.call-open #toast{bottom:190px}
       <div class="sec-head">Безопасность аккаунта</div>
       <div class="setting" id="rowTwoFA" style="cursor:pointer"><div class="ic">🔑</div><div class="lbl"><div class="t">Облачный пароль</div><div class="d">Второй фактор · <span id="st2fa">Отключён</span></div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowSessions" style="cursor:pointer"><div class="ic">📱</div><div class="lbl"><div class="t">Активные сеансы</div><div class="d" id="stSess">—</div></div><div style="color:var(--faint)">›</div></div>
-      <div class="setting" id="rowIdentity" style="cursor:pointer"><div class="ic">🪪</div><div class="lbl"><div class="t">Никнейм, QR и приглашения</div><div class="d" id="stIdentity">@username · ссылка для приглашения</div></div><div style="color:var(--faint)">›</div></div>
+      <div class="setting" id="rowIdentity" style="cursor:pointer"><div class="ic">🪪</div><div class="lbl"><div class="t">Никнейм, QR и приглашения</div><div class="d" id="stIdentity">z/ник · ссылка для приглашения</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowBusiness" style="cursor:pointer"><div class="ic">💼</div><div class="lbl"><div class="t">Бизнес-режим</div><div class="d">заявки, карточка клиента, статусы, чек-листы</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowLog" style="cursor:pointer"><div class="ic">📜</div><div class="lbl"><div class="t">Журнал безопасности</div><div class="d">Входы, блокировки, анти-спам</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowLegal" style="cursor:pointer"><div class="ic">📄</div><div class="lbl"><div class="t">Документы и приватность</div><div class="d">Политика, соглашение, удаление аккаунта</div></div><div style="color:var(--faint)">›</div></div>
       <div class="sec-head">Звонки</div>
       <div class="setting" id="rowCallsFrom" style="cursor:pointer"><div class="ic">📵</div><div class="lbl"><div class="t">Кто может звонить</div><div class="d" id="stCalls">Все</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowBlocked" style="cursor:pointer"><div class="ic">🚫</div><div class="lbl"><div class="t">Заблокированные</div><div class="d" id="stBlocked">0</div></div><div style="color:var(--faint)">›</div></div>
-      <div class="setting" id="rowHidePhone"><div class="ic">🙈</div><div class="lbl"><div class="t">Скрыть мой номер</div><div class="d">другие видят имя/@username, но не телефон</div></div><div class="switch" id="swHidePhone"></div></div>
+      <div class="setting" id="rowHidePhone"><div class="ic">🙈</div><div class="lbl"><div class="t">Скрыть мой номер</div><div class="d">другие видят имя и z/ник, но не телефон</div></div><div class="switch" id="swHidePhone"></div></div>
       <div class="sec-head">Доступ к устройствам</div>
       <div class="setting" id="rowMic"><div class="ic">🎤</div><div class="lbl"><div class="t">Микрофон</div><div class="d">для звонков и голосовых сообщений</div></div><div class="switch" id="swMic"></div></div>
       <div class="setting" id="rowCam"><div class="ic">📷</div><div class="lbl"><div class="t">Камера</div><div class="d">для видеозвонков и видео-кружков</div></div><div class="switch" id="swCam"></div></div>
@@ -2223,7 +2223,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.27', BUILD_ID='2026-10-18-198';
+const APP_VERSION='5.2.28', BUILD_ID='2026-10-19-199';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -2516,7 +2516,7 @@ async function cloudLookup(phone){
   const c=sbClient();if(c){const {data}=await c.from('om_users').select('id,phone,name,avatar,color,pass_hint').eq('phone',phone).maybeSingle();return data||null;}
   return null;}
 /* Поиск нового человека по @username на сервере (приватный способ, точное совпадение ника). */
-function cleanUsername(s){return String(s||'').replace(/^@+/,'').trim();}
+function cleanUsername(s){return String(s||'').trim().replace(/^(z\/|@+)/i,'').trim();}
 function looksLikeUsername(s){return /^[a-zA-Z0-9_.]{3,24}$/.test(cleanUsername(s));}
 async function cloudResolveUsername(name){
   if(!(cloudOn&&isCloudReady()&&CFG.provider==='worker'))return null;
@@ -4208,7 +4208,7 @@ function renderChats(){
       if(isChatHidden(c))return;
       const last=(c.messages||[]).at(-1);
       let имя='', значок='', цвет='', текст='', непрочитано=0, онлайн=0, своё=0, бот=0, ищем='';
-      if(c.channel){ имя='📢 '+c.name; значок=c.avatar||'channel'; цвет=c.color||''; текст=last?previewText(last):('@'+c.handle); ищем=c.name+' '+(c.handle||''); }
+      if(c.channel){ имя='📢 '+c.name; значок=c.avatar||'channel'; цвет=c.color||''; текст=last?previewText(last):('z/'+c.handle); ищем=c.name+' '+(c.handle||''); }
       else if(c.group){
         имя='👥 '+c.name; значок=c.avatar||'group'; цвет=c.color||'';
         непрочитано=(c.messages||[]).filter(m=>m.from!==me.id&&!(m.readBy||[]).includes(me.id)).length;
@@ -4248,7 +4248,7 @@ function renderChats(){
         row.innerHTML=`<div class="avatar lg"></div><div class="cr-main"><div class="cr-top"><span class="cr-name"></span><span class="cr-time">${last?fmtTime(last.t):''}</span></div><div class="cr-bottom"><span class="cr-msg"></span></div></div>`;
         av(row.querySelector('.avatar'),{avatar:(typeof c.avatar==='string'&&/^(https?:|data:|blob:)/i.test(c.avatar))?c.avatar:'channel',color:c.color,name:c.name});
         row.querySelector('.cr-name').textContent='📢 '+c.name;
-        row.querySelector('.cr-msg').textContent=last?previewText(last):('@'+c.handle);
+        row.querySelector('.cr-msg').textContent=last?previewText(last):('z/'+c.handle);
         row.onclick=()=>openChannel(c.id);
         attachChatMenu(row,c,c.name);
         return row;
@@ -4514,7 +4514,7 @@ function openConv(peerId){
   pinMsgsBottom(true);   // прилипаем к последнему сообщению (медиа догрузятся — останемся внизу)
 }
 function updateConvStatus(){
-  if(current&&current.channel){const s=$('#convStatus');s.classList.remove('typing');s.textContent='@'+current.handle+' · '+(current.subs||0)+' '+plural(current.subs||0,'подписчик','подписчика','подписчиков');return;}
+  if(current&&current.channel){const s=$('#convStatus');s.classList.remove('typing');s.textContent='z/'+current.handle+' · '+(current.subs||0)+' '+plural(current.subs||0,'подписчик','подписчика','подписчиков');return;}
   if(current&&current.group){const s=$('#convStatus');s.classList.remove('typing');const n=(current.members||[]).length;s.textContent=n+' '+plural(n,'участник','участника','участников');return;}
   if(current&&current.id===me.id){$('#convStatus').textContent='ваши сохранённые сообщения';return;}const s=$('#convStatus');s.classList.remove('typing');s.textContent=lastSeenText(current);}
 function fpr(seed){let h=0;for(const ch of seed)h=(h*31+ch.charCodeAt(0))>>>0;const hex=h.toString(16).padStart(8,'0').toUpperCase();return hex.match(/.{2}/g).join(' ');}
@@ -5437,24 +5437,26 @@ function demoteAdmin(gid,uid){
 
 /* ===== УПОМИНАНИЯ @имя ===== */
 function appendTextWithMentions(parent,text,group){
-  if(!group||!text||text.indexOf('@')<0){parent.appendChild(document.createTextNode(text||''));return;}
+  if(!group||!text||(text.indexOf('@')<0&&!/z\//i.test(text))){parent.appendChild(document.createTextNode(text||''));return;}
   const d=db();
   const names=(group.members||[]).map(id=>({id,name:((id===me.id?me:(d.users[id]||{})).name)||''})).filter(x=>x.name).sort((a,b)=>b.name.length-a.name.length);
   let i=0,buf='';
   const flush=()=>{ if(buf){parent.appendChild(document.createTextNode(buf));buf='';} };
   while(i<text.length){
-    if(text[i]==='@'){
+    /* 19.10.2026: знак ZORVELD — z/Имя; прежние @Имя тоже узнаём */
+    const зн=(text[i]==='@')?1:((text.substr(i,2).toLowerCase()==='z/')?2:0);
+    if(зн){
       let mt=null;
-      for(const n of names){ if(text.substr(i+1,n.name.length).toLowerCase()===n.name.toLowerCase()){mt=n;break;} }
-      if(mt){ flush(); const sp=document.createElement('span');sp.className='mention'+(mt.id===me.id?' me':'');sp.textContent='@'+mt.name;parent.appendChild(sp); i+=1+mt.name.length; continue; }
+      for(const n of names){ if(text.substr(i+зн,n.name.length).toLowerCase()===n.name.toLowerCase()){mt=n;break;} }
+      if(mt){ flush(); const sp=document.createElement('span');sp.className='mention'+(mt.id===me.id?' me':'');sp.textContent='z/'+mt.name;parent.appendChild(sp); i+=зн+mt.name.length; continue; }
     }
     buf+=text[i];i++;
   }
   flush();
 }
 function parseMentions(text,g){
-  const ids=[];if(!text||!g||text.indexOf('@')<0)return ids;const d=db();
-  (g.members||[]).forEach(id=>{ const u=id===me.id?me:(d.users[id]||{}); if(u.name&&text.toLowerCase().includes('@'+u.name.toLowerCase()))ids.push(id); });
+  const ids=[];if(!text||!g||(text.indexOf('@')<0&&!/z\//i.test(text)))return ids;const d=db();
+  (g.members||[]).forEach(id=>{ const u=id===me.id?me:(d.users[id]||{}); if(u.name&&(text.toLowerCase().includes('@'+u.name.toLowerCase())||text.toLowerCase().includes('z/'+u.name.toLowerCase())))ids.push(id); });
   return ids;
 }
 /* автоподсказка участников при вводе @ */
@@ -5463,7 +5465,7 @@ function updateMentionPop(){
   const ta=$('#msgInput');
   if(!(current&&current.group)){pop.classList.remove('show');return;}
   const val=ta.value||'';const caret=ta.selectionStart!=null?ta.selectionStart:val.length;
-  const before=val.slice(0,caret);const mch=before.match(/@([^\s@]*)$/);
+  const before=val.slice(0,caret);const mch=before.match(/(?:@|z\/)([^\s@\/]*)$/i);
   if(!mch){pop.classList.remove('show');return;}
   const q=mch[1].toLowerCase();const d=db();
   const list=(db().chats[current.id].members||[]).filter(id=>id!==me.id).map(id=>(d.users[id]||{id,name:'Участник'}))
@@ -5481,9 +5483,9 @@ function updateMentionPop(){
 }
 function insertMention(name,atIndex,caret){
   const ta=$('#msgInput');const val=ta.value||'';
-  const next=val.slice(0,atIndex)+'@'+name+' '+val.slice(caret);
+  const next=val.slice(0,atIndex)+'z/'+name+' '+val.slice(caret);
   ta.value=next;$('#mentionPop').classList.remove('show');
-  ta.focus();const pos=atIndex+name.length+2;try{ta.setSelectionRange(pos,pos);}catch(e){}
+  ta.focus();const pos=atIndex+name.length+3;try{ta.setSelectionRange(pos,pos);}catch(e){}
   autoSize();toggleSendBtn();
 }
 
@@ -5543,11 +5545,11 @@ function postToMsg(p){return {id:p.id,from:'__ch',t:p.t,type:p.type||'text',text
 function mergePosts(existing,incoming){const ids=new Set((existing||[]).map(m=>m.id));const out=(existing||[]).slice();(incoming||[]).forEach(m=>{if(!ids.has(m.id)){out.push(m);ids.add(m.id);}});out.sort((a,b)=>(a.t||0)-(b.t||0));return out;}
 
 async function createChannel(handle,name,descr){
-  handle=String(handle||'').replace(/^@/,'').toLowerCase();
-  if(!/^[a-z0-9_]{3,32}$/.test(handle)){toast('@адрес: 3–32 символа, латиница, цифры, _');return null;}
+  handle=String(handle||'').trim().replace(/^(z\/|@)/i,'').toLowerCase();
+  if(!/^[a-z0-9_]{3,32}$/.test(handle)){toast('z/адрес: 3–32 символа, латиница, цифры, _');return null;}
   let r=null;
-  try{r=await cloudChannel('/channel/create','POST',{handle,name:(name||'').trim()||('@'+handle),descr:descr||'',color:senderColor('ch_'+handle)});}
-  catch(e){toast(e.message==='no_cloud'?'Каналы работают при подключённом сервере':(e.message==='handle_taken'?'Этот @адрес уже занят':'Не удалось создать канал'));return null;}
+  try{r=await cloudChannel('/channel/create','POST',{handle,name:(name||'').trim()||('z/'+handle),descr:descr||'',color:senderColor('ch_'+handle)});}
+  catch(e){toast(e.message==='no_cloud'?'Каналы работают при подключённом сервере':(e.message==='handle_taken'?'Этот z/адрес уже занят':'Не удалось создать канал'));return null;}
   const ch=r.channel;const d=db();
   d.chats[ch.id]={id:ch.id,kind:'channel',channel:true,handle:ch.handle,name:ch.name,descr:ch.descr,avatar:ch.avatar,color:ch.color,owner:ch.owner,admins:ch.admins,subs:ch.subs,subscribed:true,messages:[]};
   save(d);renderChats();closeChannelModal();openChannel(ch.id);
@@ -5572,9 +5574,9 @@ async function openChannel(idOrHandle){
 function renderChannelView(c){
   const ca=$('#convAvatar');ca.innerHTML='';ca.style.background='';ca.style.color='';av(ca,{avatar:(typeof c.avatar==='string'&&/^(https?:|data:|blob:)/i.test(c.avatar))?c.avatar:'channel',color:c.color,name:c.name});
   $('#convName').textContent='📢 '+c.name;
-  $('#convStatus').textContent='@'+c.handle+' · '+(c.subs||0)+' '+plural(c.subs||0,'подписчик','подписчика','подписчиков');
+  $('#convStatus').textContent='z/'+c.handle+' · '+(c.subs||0)+' '+plural(c.subs||0,'подписчик','подписчика','подписчиков');
   $('#btnAudioCall').style.display='none';$('#btnVideoCall').style.display='none';
-  $('#fingerprint').textContent='@'+c.handle;updateE2eeBanner(null);
+  $('#fingerprint').textContent='z/'+c.handle;updateE2eeBanner(null);
   searchTerm='';const _csbC=$('#convSearchBar');if(_csbC)_csbC.classList.remove('show');
   renderMessages();renderPinnedBar();applyChatBg();
   updateChannelBars();
@@ -5624,13 +5626,13 @@ async function postChannelMessage(obj){
 }
 function onChannelPost(p){
   if(!p||!p.chId||!p.post)return;const d=db();let c=d.chats[p.chId];
-  if(!c||!c.channel){c=d.chats[p.chId]={id:p.chId,kind:'channel',channel:true,handle:p.handle,name:p.cname||('@'+p.handle),color:senderColor(p.chId),subscribed:true,subs:0,owner:null,admins:[],messages:[]};}
+  if(!c||!c.channel){c=d.chats[p.chId]={id:p.chId,kind:'channel',channel:true,handle:p.handle,name:p.cname||('z/'+p.handle),color:senderColor(p.chId),subscribed:true,subs:0,owner:null,admins:[],messages:[]};}
   if(!c.messages)c.messages=[];
   if(c.messages.some(m=>m.id===p.post.id)){save(d);return;}
   c.messages.push(postToMsg(p.post));save(d);
-  if(appHidden())showNotif('📢 '+(c.name||('@'+p.handle)),previewText(p.post),p.chId);
+  if(appHidden())showNotif('📢 '+(c.name||('z/'+p.handle)),previewText(p.post),p.chId);
   if(current&&current.channel&&current.id===p.chId){renderMessages();}
-  else{renderChats();toast('📢 '+(c.name||('@'+p.handle))+': '+previewText(p.post));}
+  else{renderChats();toast('📢 '+(c.name||('z/'+p.handle))+': '+previewText(p.post));}
   try{if(typeof renderHome==='function')renderHome();}catch(e){}
 }
 function shareChannel(c){
@@ -5664,7 +5666,7 @@ function channelRow(ch){
   const row=el('<div class="chat-row" style="cursor:pointer"><div class="avatar lg"></div><div class="cr-main"><div class="cr-name"></div><div class="cr-msg"></div></div></div>');
   av(row.querySelector('.avatar'),{avatar:(typeof ch.avatar==='string'&&/^(https?:|data:|blob:)/i.test(ch.avatar))?ch.avatar:'channel',color:ch.color,name:ch.name});
   row.querySelector('.cr-name').textContent='📢 '+ch.name;
-  row.querySelector('.cr-msg').textContent='@'+ch.handle+' · '+(ch.subs||0)+' подп.';
+  row.querySelector('.cr-msg').textContent='z/'+ch.handle+' · '+(ch.subs||0)+' подп.';
   row.onclick=()=>openChannel(ch.id);
   return row;
 }
@@ -7639,7 +7641,7 @@ function openNewChat(){
       ub.querySelector('.cr-msg').textContent='Ищем…';
       try{
         const u=await cloudResolveUsername(uname);
-        if(u&&u.id&&u.id!==me.id){cacheUser(u);ensureChat(u.id);closeModal();openConv(u.id);toast('Найден: '+(u.name||('@'+uname)));}
+        if(u&&u.id&&u.id!==me.id){cacheUser(u);ensureChat(u.id);closeModal();openConv(u.id);toast('Найден: '+(u.name||('z/'+uname)));}
         else if(u&&u.id===me.id){ub.querySelector('.cr-msg').textContent='Это ваш ник';}
         else{ub.querySelector('.cr-msg').textContent='Пользователь @'+uname+' не найден';}
       }catch(e){ub.querySelector('.cr-msg').textContent='Ошибка поиска. Проверьте связь.';}
@@ -9644,7 +9646,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=198, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-198.apk';
+const APK_NEW_BUILD=199, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-199.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
@@ -9895,7 +9897,7 @@ function renderContacts(){
       const sub=addu.querySelector('[data-sub]');sub.textContent='Ищем…';
       try{
         const u=await cloudResolveUsername(cuname);
-        if(u&&u.id&&u.id!==me.id){cacheUser(u);bookSet(u.id,{});const s=$('#contactsSearch');if(s)s.value='';renderContacts();toast('✅ Добавлен: '+(u.name||('@'+cuname)));}
+        if(u&&u.id&&u.id!==me.id){cacheUser(u);bookSet(u.id,{});const s=$('#contactsSearch');if(s)s.value='';renderContacts();toast('✅ Добавлен: '+(u.name||('z/'+cuname)));}
         else if(u&&u.id===me.id){sub.textContent='Это ваш ник';}
         else{sub.textContent='Пользователь @'+cuname+' не найден';}
       }catch(e){sub.textContent='Ошибка поиска. Проверьте связь.';}
@@ -10315,7 +10317,7 @@ function refreshSettings(){if(!me)return;
   const cfg=cloudCfg();const se=$('#stServer');if(se)se.textContent=cfg.provider==='worker'?'Cloudflare Worker':(cfg.provider==='supabase'?'Supabase':'Локальный режим');
   const t2=$('#st2fa');if(t2)t2.textContent=me.cloud?'Облачный пароль':((me.twoFA&&me.twoFA.hash)?'Включён':'Отключён');
   const ss=$('#stSess');if(ss)ss.textContent=Object.keys(sessionsMap()).length+' активн.';
-  const si=$('#stIdentity');if(si)si.textContent=(me&&me.username)?('@'+me.username):'настроить никнейм и QR';
+  const si=$('#stIdentity');if(si)si.textContent=(me&&me.username)?('z/'+me.username):'настроить никнейм и QR';
   const s=getSec();const sc=$('#stCalls');if(sc)sc.textContent=s.callsFrom==='contacts'?'Только контакты':'Все';
   const sb2=$('#stBlocked');if(sb2)sb2.textContent=String(s.blocked.length);
   const swhp=$('#swHidePhone');if(swhp)swhp.classList.toggle('on',!!s.hidePhone);
@@ -10400,9 +10402,9 @@ async function buildIdentityQR(body){
   const status=el('<div class="note"></div>');body.appendChild(status);
   const saveBtn=el('<button class="btn sub-btn">Сохранить никнейм</button>');body.appendChild(saveBtn);
   const box=el('<div style="text-align:center;padding:14px"></div>');body.appendChild(box);
-  function link(){const u=(inp.value||cur||'').trim().replace(/^@/,'').toLowerCase();return u?'https://app.zorveld.pro/?u='+encodeURIComponent(u):'https://app.zorveld.pro/';}
+  function link(){const u=(inp.value||cur||'').trim().replace(/^(z\/|@)/i,'').toLowerCase();return u?'https://app.zorveld.pro/?u='+encodeURIComponent(u):'https://app.zorveld.pro/';}
   function renderLink(){const l=link();box.innerHTML=qrSvg(l)+'<div class="note" style="word-break:break-all">'+esc(l)+'</div>';const cp=el('<button class="btn sub-btn">Скопировать ссылку</button>');cp.onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(l);toast('Ссылка скопирована');};box.appendChild(cp);}
-  saveBtn.onclick=async()=>{const username=inp.value.trim().replace(/^@/,'').toLowerCase();if(!username){toast('Введите никнейм');return;}try{const r=await jpost(wapi('/username/set'),{username});if(r.user){const d=db();d.users[me.id]=Object.assign(d.users[me.id]||{},r.user);me=d.users[me.id];save(d);localStorage.setItem('om_username',username);}status.textContent='✅ Никнейм сохранён: @'+username;renderLink();refreshSettings();}catch(e){status.textContent='❌ '+String(e.message||e);}};
+  saveBtn.onclick=async()=>{const username=inp.value.trim().replace(/^(z\/|@)/i,'').toLowerCase();if(!username){toast('Введите никнейм');return;}try{const r=await jpost(wapi('/username/set'),{username});if(r.user){const d=db();d.users[me.id]=Object.assign(d.users[me.id]||{},r.user);me=d.users[me.id];save(d);localStorage.setItem('om_username',username);}status.textContent='✅ Никнейм сохранён: z/'+username;renderLink();refreshSettings();}catch(e){status.textContent='❌ '+String(e.message||e);}};
   const inv=el('<button class="btn sub-btn">Создать одноразовую ссылку-приглашение</button>');inv.onclick=async()=>{try{const r=await jpost(wapi('/invite/create'),{});inp.value=(me.username||inp.value||'');box.innerHTML=qrSvg(r.link)+'<div class="note" style="word-break:break-all">'+esc(r.link)+'</div>';navigator.clipboard&&navigator.clipboard.writeText(r.link);toast('Приглашение создано и скопировано');}catch(e){toast('Не удалось создать приглашение');}};body.appendChild(inv);
   renderLink();
 }
@@ -10410,7 +10412,7 @@ async function buildServerContacts(body){
   body.appendChild(el('<div class="note">Серверные контакты синхронизируются между телефонами и браузером. Локальная телефонная книга остаётся на устройстве, но найденных пользователей можно сохранить в облако.</div>'));
   const add=el('<div></div>');add.innerHTML='<input class="input sub-input" id="scPhone" placeholder="Телефон +7... или ID пользователя"/><input class="input sub-input" id="scName" placeholder="Имя в вашей книге (необязательно)"/><button class="btn sub-btn" id="scAdd">Добавить в серверные контакты</button>';body.appendChild(add);
   const list=el('<div class="note">Загружаю...</div>');body.appendChild(list);
-  async function load(){try{const r=await jget(wapi('/contacts'));list.innerHTML='';if(!r.contacts||!r.contacts.length){list.appendChild(el('<div class="note">Пока нет серверных контактов.</div>'));return;}r.contacts.forEach(c=>{const u=c.user||{};const name=c.local_name||u.name||c.phone||'Контакт';const row=el('<div class="log-row" style="display:flex;align-items:center;gap:10px"><div style="flex:1"><div>'+esc(name)+'</div><div class="lt">'+esc(u.username?('@'+u.username):(c.phone||''))+'</div></div></div>');const b=el('<button class="kill">Удалить</button>');b.onclick=async()=>{await jpost(wapi('/contacts/remove'),{uid:c.contact_id,phone:c.phone});buildSubRefresh();};row.appendChild(b);list.appendChild(row);});}catch(e){list.innerHTML='<div class="note">Серверные контакты доступны после выкладки API v4.8.0.</div>';}}
+  async function load(){try{const r=await jget(wapi('/contacts'));list.innerHTML='';if(!r.contacts||!r.contacts.length){list.appendChild(el('<div class="note">Пока нет серверных контактов.</div>'));return;}r.contacts.forEach(c=>{const u=c.user||{};const name=c.local_name||u.name||c.phone||'Контакт';const row=el('<div class="log-row" style="display:flex;align-items:center;gap:10px"><div style="flex:1"><div>'+esc(name)+'</div><div class="lt">'+esc(u.username?('z/'+u.username):(c.phone||''))+'</div></div></div>');const b=el('<button class="kill">Удалить</button>');b.onclick=async()=>{await jpost(wapi('/contacts/remove'),{uid:c.contact_id,phone:c.phone});buildSubRefresh();};row.appendChild(b);list.appendChild(row);});}catch(e){list.innerHTML='<div class="note">Серверные контакты доступны после выкладки API v4.8.0.</div>';}}
   add.querySelector('#scAdd').onclick=async()=>{const raw=add.querySelector('#scPhone').value.trim();const nm=add.querySelector('#scName').value.trim();if(!raw){toast('Введите телефон или ID');return;}try{const bodyReq=/^\+?\d{7,15}$/.test(raw)?{phone:raw,name:nm}:{uid:raw,name:nm};await jpost(wapi('/contacts/add'),bodyReq);toast('Контакт добавлен');load();}catch(e){toast('Не удалось добавить контакт: '+String(e.message||e));}};
   load();
 }
