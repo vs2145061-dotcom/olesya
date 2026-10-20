@@ -290,6 +290,23 @@ html.шапки-поверх .screen.шапка-нативная>.topbar{display
 .cr-msg .ya{color:var(--faint)}
 .badge{min-width:20px;height:20px;padding:0 6px;border-radius:11px;background:var(--primary);color:#fff;font-size:11.5px;font-weight:700;display:grid;place-items:center}
 .badge.mute{background:var(--faint)}
+/* 20.10.2026: как в Android — серый колокол сразу после имени, точка «помечен непрочитанным» */
+.cr-mute{flex:none;align-self:center;width:15px;height:15px;color:var(--faint);margin:0 auto 0 -3px;display:grid;place-items:center}.cr-mute svg{width:15px;height:15px}
+.badge.udot{min-width:14px;width:14px;height:14px;padding:0}
+html #chatList.selmode .chat-row{padding-left:16px}
+html #chatList.selmode .chat-row::before{display:none}
+html #chatList.selmode .chat-row.selrow::before{display:block;left:50px;top:calc(50% + 7px);transform:none;border:2px solid var(--surface);background:var(--primary);box-shadow:none}
+html #chatList.selmode .chat-row.selrow::after{left:58.5px;top:calc(50% + 11px)}
+html #chatList.selmode .chat-row.selrow{background:rgba(108,123,255,.13)}
+/* полоса выбора — размеры как ПолосаВыбора в Android: все кнопки на виду, без прокрутки */
+html .sel-bar{padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+html .sel-bar .sb-x{width:44px;height:44px}
+html .sel-bar .sb-count{font-size:17px;min-width:22px;margin:0 2px 0 0}
+html .sel-bar .sb-acts{flex:1;min-width:0;justify-content:space-around;overflow:visible;gap:0;margin-left:0}
+html .sel-bar .sb-btn{flex:1;min-width:0;max-width:72px;padding:4px 1px;gap:3px}
+html .sel-bar .sb-ic{width:36px;height:36px}
+html .sel-bar .sb-btn .sb-ic svg{width:19px;height:19px}
+html .sel-bar .sb-btn span.sb-l{font-size:10.5px;line-height:13px;white-space:nowrap;letter-spacing:-.15px}@media (max-width:400px){html .sel-bar .sb-btn span.sb-l{font-size:9.5px}}
 .empty{padding:60px 30px;text-align:center;color:var(--faint)}
 .empty svg{width:54px;height:54px;opacity:.5;margin-bottom:14px}
 
@@ -2223,7 +2240,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.29', BUILD_ID='2026-10-19-199';
+const APP_VERSION='5.2.30', BUILD_ID='2026-10-20-200';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -4042,6 +4059,52 @@ async function deleteChatForMe(chat,label,безВопроса){
 function pinnedChats(){try{return JSON.parse(localStorage.getItem('om_pinned')||'[]')||[];}catch(e){return[];}}
 function isPinned(id){return pinnedChats().includes(id);}
 function togglePin(id){let p=pinnedChats();p=p.includes(id)?p.filter(x=>x!==id):[id,...p];try{localStorage.setItem('om_pinned',JSON.stringify(p));}catch(e){}}
+/* 20.10.2026: «Без звука» и «Пометить непрочитанным» — как в Android (App.js: zv-mutes, zv-unread-marks) */
+function _zvMutes(){ try{ const m=JSON.parse(localStorage.getItem('zv-mutes')||'{}'); return (m&&typeof m==='object')?m:{}; }catch(e){ return {}; } }
+function isMutedChat(id){ const до=_zvMutes()[id]; return до===-1||(typeof до==='number'&&до>Date.now()); }
+/* Ключ для уведомлений: в личном чате служба уведомлений знает собеседника, а не id чата */
+function _zvMuteKey(id){ try{ const c=db().chats[id]; if(c&&!c.group&&!c.channel)return (c.members||[]).find(x=>x!==me.id)||id; }catch(e){} return id; }
+function _zvMutesToSW(){ try{ const m=_zvMutes(), sw={}; Object.keys(m).forEach(id=>{ sw[_zvMuteKey(id)]=m[id]; sw[id]=m[id]; });
+  if(window.caches)caches.open('zv-settings').then(c=>c.put('/zv-mutes',new Response(JSON.stringify(sw),{headers:{'content-type':'application/json'}}))).catch(()=>{}); }catch(e){} }
+function setChatMute(ids,до){ const m=_zvMutes(); ids.forEach(id=>{ if(до===0)delete m[id]; else m[id]=до; }); try{localStorage.setItem('zv-mutes',JSON.stringify(m));}catch(e){} _zvMutesToSW(); try{renderChats();}catch(e){} }
+/* Уведомление о сообщении молчит, если чат без звука (звонки и напоминания — всегда со звуком) */
+function _zvPeerMuted(peer){ if(!peer||!me)return false; try{ return isMutedChat(peer)||isMutedChat(chatKey(me.id,peer)); }catch(e){ return isMutedChat(peer); } }
+function _zvMarks(){ try{ const a=JSON.parse(localStorage.getItem('zv-unread-marks')||'[]'); return new Set(Array.isArray(a)?a:[]); }catch(e){ return new Set(); } }
+function _zvSaveMarks(н){ try{localStorage.setItem('zv-unread-marks',JSON.stringify(Array.from(н)));}catch(e){} }
+function isMarkedUnread(id){ return _zvMarks().has(id); }
+function _zvMark(ids){ const н=_zvMarks(); ids.forEach(id=>н.add(id)); _zvSaveMarks(н); try{renderChats();}catch(e){} }
+function _zvUnmark(ids){ const н=_zvMarks(); let был=false; ids.forEach(id=>{ if(н.delete(id))был=true; }); if(был){ _zvSaveMarks(н); try{renderChats();}catch(e){} } }
+function _zvUnreadCount(id){ try{ const c=db().chats[id]; if(!c||c.channel)return 0; return (c.messages||[]).filter(m=>m.from!==me.id&&!(m.readBy||[]).includes(me.id)).length; }catch(e){ return 0; } }
+/* Подпись строки (для сверки списка) и отметки на ней */
+function _zvRowSig(id){ return '|m'+(isMutedChat(id)?1:0)+'|x'+(isMarkedUnread(id)?1:0); }
+function _zvRowMarks(row,id){
+  const тихо=isMutedChat(id);
+  if(тихо){ const n=row.querySelector('.cr-name'); if(n){ const i=document.createElement('span'); i.className='cr-mute'; i.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 9.4-4.9M18 8c0 7 3 9 3 9H9"/><path d="M6.3 11C5.9 15 3 17 3 17h3"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="M3 3l18 18"/></svg>'; n.after(i); } }
+  const b=row.querySelector('.cr-bottom .badge');
+  if(b){ if(тихо)b.classList.add('mute'); }
+  else if(isMarkedUnread(id)){ const cb=row.querySelector('.cr-bottom'); if(cb){ const d=document.createElement('span'); d.className='badge udot'+(тихо?' mute':''); cb.appendChild(d); } }
+}
+/* Лист «Выключить уведомления» — сроки как в Android */
+function _zvMuteSheet(ids,готово){
+  const n=ids.length;
+  const back=document.createElement('div');back.className='sheet-back';
+  const sheet=document.createElement('div');sheet.className='act-sheet';
+  const ttl=document.createElement('div');ttl.className='act-title';ttl.textContent='Выключить уведомления'+(n>1?' · чатов: '+n:'');sheet.appendChild(ttl);
+  const ч=3600e3;
+  const items=[
+    {ic:'🕐',t:'Выключить на 1 час',до:()=>Date.now()+ч,ок:'Уведомления выключены на 1 час'},
+    {ic:'🕙',t:'Выключить на 10 часов',до:()=>Date.now()+10*ч,ок:'Уведомления выключены на 10 часов'},
+    {ic:'📅',t:'Выключить на 2 дня',до:()=>Date.now()+48*ч,ок:'Уведомления выключены на 2 дня'},
+    {ic:'🗓',t:'Выключить на неделю',до:()=>Date.now()+7*24*ч,ок:'Уведомления выключены на неделю'},
+    {ic:'🔕',t:'Выключить насовсем',до:()=>-1,ок:'Уведомления выключены',danger:true},
+  ];
+  let closed=false;const close=()=>{if(closed)return;closed=true;back.classList.remove('show');setTimeout(()=>{try{back.remove();}catch(e){}},220);};
+  items.forEach(a=>{const b=document.createElement('button');b.className='act-item'+(a.danger?' act-danger':'');const ic=document.createElement('span');ic.className='act-ic';ic.textContent=a.ic;const tx=document.createElement('span');tx.textContent=a.t;b.appendChild(ic);b.appendChild(tx);b.onclick=()=>{close();setChatMute(ids,a.до());toast(a.ок);if(готово)готово();};sheet.appendChild(b);});
+  const cancel=document.createElement('button');cancel.className='act-item act-cancel';cancel.textContent='Отмена';cancel.onclick=close;sheet.appendChild(cancel);
+  back.appendChild(sheet);document.body.appendChild(back);
+  requestAnimationFrame(()=>back.classList.add('show'));
+  back.onclick=e=>{if(e.target===back)close();};
+}
 function markChatRead(chat){const d=db();const c=d.chats[chat.id];if(!c)return;(c.messages||[]).forEach(m=>{if(m.from!==me.id){m.readBy=m.readBy||[];if(!m.readBy.includes(me.id))m.readBy.push(me.id);}});save(d);}
 /* --- Контекст-меню чата (долгое нажатие / правый клик): выделение строки + лист действий --- */
 function openChatActions(row,chat,label){
@@ -4052,7 +4115,8 @@ function openChatActions(row,chat,label){
   const ttl=document.createElement('div');ttl.className='act-title';ttl.textContent=label||'Чат';sheet.appendChild(ttl);
   const items=[
     {ic:pinned?'📍':'📌',t:pinned?'Открепить':'Закрепить сверху',fn:()=>{togglePin(chat.id);renderChats();}},
-    {ic:'✓',t:'Отметить прочитанным',fn:()=>{markChatRead(chat);renderChats();}},
+    isMutedChat(chat.id)?{ic:'🔔',t:'Включить уведомления',fn:()=>{setChatMute([chat.id],0);toast('Уведомления включены');}}:{ic:'🔕',t:'Выключить уведомления',fn:()=>_zvMuteSheet([chat.id])},
+    (_zvUnreadCount(chat.id)>0||isMarkedUnread(chat.id))?{ic:'✓',t:'Отметить прочитанным',fn:()=>{markChatRead(chat);_zvUnmark([chat.id]);renderChats();}}:{ic:'💬',t:'Пометить непрочитанным',fn:()=>{_zvMark([chat.id]);toast('Помечен непрочитанным');}},
     {ic:'🗑️',t:'Удалить чат',danger:true,fn:()=>deleteChatForMe(chat,label)},
   ];
   let closed=false;const close=()=>{if(closed)return;closed=true;back.classList.remove('show');if(row)row.classList.remove('sel');setTimeout(()=>{try{back.remove();}catch(e){}},220);};
@@ -4238,13 +4302,14 @@ function renderChats(){
     }catch(e){}
   });
   отдатьСписокЧатов(дляОболочки);
+  if(!window._zvMutesSent){window._zvMutesSent=1;_zvMutesToSW();}
   myChats.forEach(c=>{
     if(isChatHidden(c))return;
     const pin=isPinned(c.id)?1:0;
     if(c.channel){
       const last=(c.messages||[]).at(-1);
       if(term){const hay=(c.name+' @'+c.handle+' '+(last?previewText(last):'')).toLowerCase();if(!hay.includes(term))return;}
-      const sig='ch|'+(c.name||'')+'|'+(c.handle||'')+'|'+(c.avatar||'')+'|'+(c.color||'')+'|'+(last?previewText(last)+'@'+last.t:'@'+c.handle)+'|p'+pin;
+      const sig='ch|'+(c.name||'')+'|'+(c.handle||'')+'|'+(c.avatar||'')+'|'+(c.color||'')+'|'+(last?previewText(last)+'@'+last.t:'@'+c.handle)+'|p'+pin+_zvRowSig(c.id);
       desired.push({key:'chat:'+c.id, sig, make:()=>{
         const row=document.createElement('div');row.className='chat-row';
         row.innerHTML=`<div class="avatar lg"></div><div class="cr-main"><div class="cr-top"><span class="cr-name"></span><span class="cr-time">${last?fmtTime(last.t):''}</span></div><div class="cr-bottom"><span class="cr-msg"></span></div></div>`;
@@ -4252,7 +4317,7 @@ function renderChats(){
         row.querySelector('.cr-name').textContent='📢 '+c.name;
         row.querySelector('.cr-msg').textContent=last?previewText(last):('z/'+c.handle);
         row.onclick=()=>openChannel(c.id);
-        attachChatMenu(row,c,c.name);
+        _zvRowMarks(row,c.id);attachChatMenu(row,c,c.name);
         return row;
       }});
       return;
@@ -4262,7 +4327,7 @@ function renderChats(){
       if(term){const hay=(c.name+' '+(last?previewText(last):'')).toLowerCase();if(!hay.includes(term))return;}
       const unread=c.messages.filter(m=>m.from!==me.id&&!m.readBy?.includes(me.id)).length;
       const who=last?(last.from===me.id?'Вы':((d.users[last.from]&&d.users[last.from].name)||'Участник')):'';
-      const sig='gr|'+(c.name||'')+'|'+(c.avatar||'')+'|'+(c.color||'')+'|'+(last?who+':'+previewText(last)+'@'+last.t:(c.members||[]).length+'уч')+'|u'+unread+'|p'+pin;
+      const sig='gr|'+(c.name||'')+'|'+(c.avatar||'')+'|'+(c.color||'')+'|'+(last?who+':'+previewText(last)+'@'+last.t:(c.members||[]).length+'уч')+'|u'+unread+'|p'+pin+_zvRowSig(c.id);
       desired.push({key:'chat:'+c.id, sig, make:()=>{
         const row=document.createElement('div');row.className='chat-row';
         row.innerHTML=`<div class="avatar lg"></div>
@@ -4279,7 +4344,7 @@ function renderChats(){
         }else{msgEl.textContent=(c.members||[]).length+' '+plural((c.members||[]).length,'участник','участника','участников');}
         if(unread>0){const bg=document.createElement('span');bg.className='badge';bg.textContent=unread;row.querySelector('.cr-bottom').appendChild(bg);}
         row.onclick=()=>openGroup(c.id);
-        attachChatMenu(row,c,c.name);
+        _zvRowMarks(row,c.id);attachChatMenu(row,c,c.name);
         return row;
       }});
       return;
@@ -4289,7 +4354,7 @@ function renderChats(){
     const last=c.messages.at(-1);
     if(term){const hay=(u.name+' '+u.phone+' '+(last?last.text:'')).toLowerCase();if(!hay.includes(term))return;}
     const unread=c.messages.filter(m=>m.from!==me.id&&!m.readBy?.includes(me.id)).length;
-    const sig='dm|'+peerId+'|'+(u.name||'')+'|'+(u.avatar||'')+'|'+(u.color||'')+'|'+(last?(last.from===me.id?'Вы:':'')+previewText(last)+'@'+last.t:'нет')+'|u'+unread+'|sv'+(isSaved?1:0)+'|p'+pin;
+    const sig='dm|'+peerId+'|'+(u.name||'')+'|'+(u.avatar||'')+'|'+(u.color||'')+'|'+(last?(last.from===me.id?'Вы:':'')+previewText(last)+'@'+last.t:'нет')+'|u'+unread+'|sv'+(isSaved?1:0)+'|p'+pin+_zvRowSig(c.id);
     desired.push({key:'chat:'+c.id, sig, make:()=>{
       const row=document.createElement('div');row.className='chat-row';
       row.innerHTML=`<div class="avatar lg"></div>
@@ -4308,7 +4373,7 @@ function renderChats(){
       }else{msgEl.textContent='Нет сообщений';}
       if(unread>0){const b=document.createElement('span');b.className='badge';b.textContent=unread;row.querySelector('.cr-bottom').appendChild(b);}
       row.onclick=()=>openConv(peerId);
-      attachChatMenu(row,c,isSaved?'Избранное':u.name);
+      _zvRowMarks(row,c.id);attachChatMenu(row,c,isSaved?'Избранное':u.name);
       return row;
     }});
   });
@@ -4760,7 +4825,7 @@ document.addEventListener('click',closeReactMenu);
 .sb-btn .sb-ic svg{width:20px;height:20px;stroke:#fff;position:relative}
 .sb-btn span.sb-l{font-size:11px;color:var(--muted)}.sb-btn.danger span.sb-l{color:var(--red)}
 .sb-c-pin,.sb-c-unpin,.sb-c-fwd{--sa:#8B97FF;--sb:#5C6AE8}.sb-c-read{--sa:#5EE0A1;--sb:#10A974}.sb-c-clear,.sb-c-copy{--sa:#67D3FF;--sb:#0B92D6}
-.sb-c-block{--sa:#B3ABCB;--sb:#776E93}.sb-c-fave{--sa:#FFC861;--sb:#F08C0A}.sb-c-del{--sa:#FF8A8A;--sb:#E5383B}
+.sb-c-block{--sa:#B3ABCB;--sb:#776E93}.sb-c-mute,.sb-c-sound{--sa:#FFC861;--sb:#F08C0A}.sb-c-unread{--sa:#5EE0A1;--sb:#10A974}.sb-c-fave{--sa:#FFC861;--sb:#F08C0A}.sb-c-del{--sa:#FF8A8A;--sb:#E5383B}
   .sb-btn.danger{color:var(--red)}
   .sb-btn.ai{color:#fff}
   .sb-btn.ai svg{stroke:none}
@@ -4825,7 +4890,7 @@ const _SBIC={
   del:'<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>',
   pin:'<path d="M9 4h6l-1 7 4 3H6l4-3z"/><path d="M12 14v6"/>',
   unpin:'<path d="M9 4h6l-1 7 4 3H6l4-3z"/><path d="M12 14v6"/><path d="M3 3l18 18"/>',
-  read:'<path d="M4 12l4 4L20 6"/>', clear:'<path d="M15 4l5 5M13 6l-8 8 3 3 8-8"/><path d="M5 14l-2 6 6-2"/>', block:'<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
+  read:'<path d="M2 13l4 4L16 7"/><path d="M10 15l2 2L22 7"/>', mute:'<path d="M6 8a6 6 0 0 1 9.4-4.9M18 8c0 7 3 9 3 9H9"/><path d="M6.3 11C5.9 15 3 17 3 17h3"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="M3 3l18 18"/>', sound:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>', unread:'<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/><path d="M12 12h.01"/>', clear:'<path d="M15 4l5 5M13 6l-8 8 3 3 8-8"/><path d="M5 14l-2 6 6-2"/>', block:'<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
   ai:'<defs><linearGradient id="olsg" x1="2" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#7B8CFF"/><stop offset="1" stop-color="#C46CFF"/></linearGradient></defs><path fill="url(#olsg)" d="M14 3.8Q14 12 21.5 12Q14 12 14 20.2Q14 12 6.5 12Q14 12 14 3.8Z"/><path fill="url(#olsg)" d="M6 2.5Q6 6.2 9.5 6.2Q6 6.2 6 9.9Q6 6.2 2.5 6.2Q6 6.2 6 2.5Z"/><path fill="url(#olsg)" d="M6.6 15.4Q6.6 18 9.1 18Q6.6 18 6.6 20.6Q6.6 18 4 18Q6.6 18 6.6 15.4Z"/>'
 };
 function _sbBtn(cls,icon,label,fn){ const b=document.createElement('button'); b.className='sb-btn'+(cls?' '+cls:''); b.innerHTML=(icon==='ai'?'<svg viewBox="0 0 24 24">'+_SBIC[icon]+'</svg>':'<span class="sb-ic sb-c-'+icon+'"><svg viewBox="0 0 24 24">'+_SBIC[icon]+'</svg></span>')+'<span class="sb-l">'+label+'</span>'; b.onclick=(e)=>{e.stopPropagation();_selVibe(10);fn();}; return b; }
@@ -4843,7 +4908,10 @@ function updateSelBar(){ const bar=ensureSelBar(); bar.innerHTML='';
     // если ВСЕ выбранные закреплены → «Открепить», иначе → «Закрепить»
     const _allPinned = selSet.size>0 && [...selSet].every(id=>isPinned(id));
     acts.appendChild(_sbBtn('', _allPinned?'unpin':'pin', _allPinned?'Открепить':'Закрепить', selTogglePin));
-    acts.appendChild(_sbBtn('','read','Прочитано',selReadChats));
+    const _всеТихие=selSet.size>0&&[...selSet].every(id=>isMutedChat(id));
+    acts.appendChild(_всеТихие?_sbBtn('','sound','Со звуком',selUnmuteChats):_sbBtn('','mute','Без звука',selMuteChats));
+    const _естьНепроч=[...selSet].some(id=>_zvUnreadCount(id)>0||isMarkedUnread(id));
+    acts.appendChild(_естьНепроч?_sbBtn('','read','Прочитано',selReadChats):_sbBtn('','unread','Непрочит.',selMarkUnread));
     acts.appendChild(_sbBtn('','clear','Очистить',selClearChats));
     /* чат Олеси-помощника не удалить и не заблокировать (как в Android, 19.10.2026) */
     const _безОлеси=[...selSet].filter(id=>!_этоОлеся(id));
@@ -4871,7 +4939,10 @@ async function selDelete(){ const ms=_selMsgs(); const mine=ms.filter(m=>m.from=
 function selTogglePin(){ const ids=[...selSet]; if(!ids.length)return; const allPinned=ids.every(id=>isPinned(id));
   ids.forEach(id=>{ const p=isPinned(id); if(allPinned){ if(p)togglePin(id); } else { if(!p)togglePin(id); } });
   const n=ids.length; exitSel(); renderChats(); toast(allPinned?('Откреплено: '+n):('📌 Закреплено: '+n)); }
-function selReadChats(){ const ids=[...selSet]; const d=db(); ids.forEach(id=>{ const c=d.chats[id]; if(!c)return; if(c.group){try{markReadGroup(id);}catch(e){}} else { const pid=(c.members||[]).find(x=>x!==me.id); if(pid)markRead(pid); } }); const n=ids.length; exitSel(); renderChats(); toast('Прочитано: '+n); }
+function selMuteChats(){ const ids=[...selSet]; if(!ids.length)return; _zvMuteSheet(ids,()=>{exitSel();}); }
+function selUnmuteChats(){ const ids=[...selSet]; setChatMute(ids,0); exitSel(); toast('Уведомления включены'); }
+function selMarkUnread(){ const ids=[...selSet]; _zvMark(ids); exitSel(); toast(ids.length>1?'Помечены непрочитанными':'Помечен непрочитанным'); }
+function selReadChats(){ const ids=[...selSet]; _zvUnmark(ids); const d=db(); ids.forEach(id=>{ const c=d.chats[id]; if(!c)return; if(c.group){try{markReadGroup(id);}catch(e){}} else { const pid=(c.members||[]).find(x=>x!==me.id); if(pid)markRead(pid); } }); const n=ids.length; exitSel(); renderChats(); toast('Прочитано: '+n); }
 function _этоОлеся(id){ const c=db().chats[id]; return !!(c&&(c.members||[]).includes('bot_olesya')) || /bot_olesya/.test(String(id)); }
 async function selClearChats(){ const ids=[...selSet]; if(!ids.length)return; const ok=await appConfirm('Сообщения удалятся с этого устройства, у собеседников останутся.',{title:'Очистить историю: '+ids.length+'?',okText:'Очистить',danger:true}); if(!ok)return; const d=db(); ids.forEach(id=>{ const c=d.chats[id]; if(c)c.messages=[]; }); save(d); exitSel(); try{renderChats();}catch(e){} try{if(typeof renderHome==='function')renderHome();}catch(e){} toast('История очищена'); }
 async function selBlockChats(){ const ids=[...selSet].filter(id=>!_этоОлеся(id)); if(!ids.length)return; const d=db(); const peers=ids.map(id=>{const c=d.chats[id];return c&&(c.members||[]).find(x=>x!==me.id);}).filter(Boolean); const всеЗаблок=peers.length&&peers.every(p=>isBlocked(p)); const ok=await appConfirm(всеЗаблок?'Сообщения и звонки снова будут доходить.':'Сообщения и звонки от них перестанут доходить.',{title:(всеЗаблок?'Разблокировать: ':'Заблокировать: ')+peers.length+'?',okText:всеЗаблок?'Разблокировать':'Заблокировать',danger:!всеЗаблок}); if(!ok)return; peers.forEach(p=>{ if(!!isBlocked(p)===всеЗаблок){try{toggleBlock(p);}catch(e){}} }); exitSel(); try{renderChats();}catch(e){} toast(всеЗаблок?'Разблокировано':'Заблокировано'); }
@@ -5101,6 +5172,7 @@ async function onIncomingMessage(p){
   try{if(typeof renderHome==='function')renderHome();}catch(e){}   // обновить счётчик «Чаты» на лицевой
 }
 function markRead(peerId){
+  try{_zvUnmark([chatKey(me.id,peerId)]);}catch(e){}
   const d=db();const c=d.chats[chatKey(me.id,peerId)];if(!c)return;let changed=false;
   c.messages.forEach(m=>{if(m.from!==me.id&&!(m.readBy||[]).includes(me.id)){m.readBy=[...(m.readBy||[]),me.id];changed=true;}});
   if(changed){save(d);emit('read',{to:peerId,from:me.id});renderChats();try{if(typeof renderHome==='function')renderHome();}catch(e){}}
@@ -5276,6 +5348,7 @@ function onIncomingGroupMessage(p){
   try{if(typeof renderHome==='function')renderHome();}catch(e){}
 }
 function markReadGroup(gid){
+  try{_zvUnmark([gid]);}catch(e){}
   const d=db();const g=d.chats[gid];if(!g)return;let changed=false;
   g.messages.forEach(m=>{if(m.from!==me.id&&!(m.readBy||[]).includes(me.id)){m.readBy=[...(m.readBy||[]),me.id];changed=true;}});
   if(changed){save(d);emitGroupRead(gid);renderChats();try{if(typeof renderHome==='function')renderHome();}catch(e){}}
@@ -5572,6 +5645,7 @@ async function createChannel(handle,name,descr){
   toast('📢 Канал @'+ch.handle+' создан');return ch;
 }
 async function openChannel(idOrHandle){
+  try{_zvUnmark([idOrHandle]);}catch(e){}
   idOrHandle=String(idOrHandle||'');
   const byHandle=!idOrHandle.startsWith('ch_');
   let info=null;
@@ -12144,6 +12218,7 @@ function showNotif(title,body,peer){
   if(typeof window!=='undefined'&&window.__OLESYA_NATIVE__)return;   // в нативной обёртке баннеры показывает система (Expo), веб-Notification не нужен
   if(!notifPref()||!notifGranted())return;
   const opts={body:body||'',tag:'om-'+(peer||'msg'),renotify:true,data:{peer:peer||null},icon:'apple-touch-icon.png',badge:'apple-touch-icon.png'};
+  if(!/^(📞|👥 Групповой звонок|⏰)/.test(String(title||''))&&_zvPeerMuted(peer)){ opts.silent=true; opts.renotify=false; }
   try{
     if(_swReg&&_swReg.showNotification){ _swReg.showNotification(title,opts); return; }
     if(navigator.serviceWorker&&navigator.serviceWorker.ready){ navigator.serviceWorker.ready.then(r=>{try{r.showNotification(title,opts);}catch(e){fallbackNotif(title,opts);}}).catch(()=>fallbackNotif(title,opts)); return; }

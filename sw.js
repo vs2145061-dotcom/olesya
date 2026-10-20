@@ -100,8 +100,18 @@ self.addEventListener('push', event => {
         body = кто ? ('Новое сообщение от ' + кто) : 'Новое сообщение';
       }
     }
+    /* 20.10.2026: чат «без звука» (страница кладёт сроки в caches → zv-settings/zv-mutes).
+       Показать уведомление всё равно обязаны — показываем тихо. Звонки и напоминания — всегда со звуком. */
+    let тихо = false;
+    if (!звонок && tag !== "om-due" && собеседник) {
+      try {
+        const к = await caches.open("zv-settings"); const о = await к.match("/zv-mutes");
+        const м = о ? await о.json() : {}; const до = м[собеседник];
+        тихо = до === -1 || (typeof до === "number" && до > Date.now());
+      } catch (e) {}
+    }
     await self.registration.showNotification(title, {
-      body: body, icon: d.icon, tag: tag,
+      body: body, icon: d.icon, tag: тихо ? "om-muted" : tag, silent: тихо,
       /* peer — кого открыть; звонок — какой экран. Без этого приложение
          открывалось на главном и человек искал, что же случилось. */
       data: { peer: собеседник, звонок: звонок }
