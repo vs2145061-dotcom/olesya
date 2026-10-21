@@ -412,6 +412,21 @@ html.нативный-список #scrChats>*{visibility:hidden}
 .zv-lp .t{font-weight:700;font-size:.92em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .zv-lp .d{font-size:.85em;opacity:.8;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .zv-lp img{display:block;width:100%;height:126px;object-fit:cover;border-radius:8px;margin-top:6px}
+/* 21.10.2026 — ответ на сообщение, как в Android */
+.zv-q{border-left:3px solid var(--primary);background:rgba(108,123,255,.10);border-radius:8px;padding:4px 8px;margin:0 0 5px;cursor:pointer;white-space:normal;max-width:260px}
+.row.me .zv-q{border-left-color:rgba(255,255,255,.75);background:rgba(255,255,255,.13)}
+.zv-q .n{font-weight:700;font-size:.85em;color:var(--primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row.me .zv-q .n{color:#fff}
+.zv-q .t{font-size:.85em;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zv-rb{display:flex;align-items:center;gap:10px;padding:6px 10px 8px 12px}
+.zv-rb svg.ic{flex:none;color:var(--primary)}
+.zv-rb .q{flex:1;min-width:0;border-left:3px solid var(--primary);padding-left:8px}
+.zv-rb .n{color:var(--primary);font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zv-rb .t{color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zv-rb .x{flex:none;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;color:var(--muted);font-size:18px;background:none;border:0;cursor:pointer}
+.row .bubble{transition:transform .18s ease}
+.row.zv-sw .bubble{transition:none}
+.zv-swi{position:absolute;left:6px;top:50%;width:30px;height:30px;margin-top:-15px;border-radius:50%;display:grid;place-items:center;background:var(--raised);color:var(--primary);opacity:0;pointer-events:none}
 
 .upd-banner{background:var(--raised);border:1px solid var(--line);border-radius:18px;padding:14px;margin:0 0 12px}
 .upd-row{display:flex;gap:11px;align-items:flex-start}
@@ -2260,7 +2275,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.31', BUILD_ID='2026-10-21-200';
+const APP_VERSION='5.2.32', BUILD_ID='2026-10-21-201';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -4655,7 +4670,7 @@ function renderMessages(){
   const box=$('#msgs');if(!box)return;const c=getChat();if(!c){box.innerHTML='';return;}
   // при смене чата — чистый лист (ключи сообщений уникальны, но так надёжнее и как раньше)
   const ck=c.id||'';
-  if(box.dataset.chat!==ck){ box.innerHTML=''; box.dataset.chat=ck; }
+  if(box.dataset.chat!==ck){ box.innerHTML=''; box.dataset.chat=ck; try{_zvEndReply();}catch(e){} }
   // 1) желаемая последовательность: разделители дней / системные / пузыри — с ключами и подписями
   const desired=[]; let lastDay='';
   c.messages.forEach(m0=>{
@@ -4731,12 +4746,46 @@ function _zvPreview(b,адрес){
 function _zvScale(){ try{ const н=parseFloat(localStorage.getItem('zv-text-scale')); return н>=0.8&&н<=1.6?н:1; }catch(e){ return 1; } }
 function _zvSetScale(н){ try{localStorage.setItem('zv-text-scale',String(н));}catch(e){} try{document.documentElement.style.setProperty('--zv-k',String(н));}catch(e){} }
 try{ document.documentElement.style.setProperty('--zv-k',String(_zvScale())); }catch(e){}
+/* ── 21.10.2026: ответ на сообщение (как Android: rep {id, f, n, t}) ── */
+let _zvReply=null;
+function _zvRepOf(m){ const кто=m.from===me.id?(me.name||'Вы'):(((db().users[m.from]||{}).name)||'Собеседник');
+  let т=''; try{ т=(m.text||previewText(m)||''); }catch(e){ т=m.text||''; }
+  return { id:String(m.id).slice(0,64), f:String(m.from||'').slice(0,64), n:String(кто).slice(0,80), t:String(т).replace(/\s+/g,' ').slice(0,200) }; }
+function _zvRepName(r){ return r&&r.f&&me&&r.f===me.id?'Вы':((r&&r.n)||'Сообщение'); }
+function _zvRepText(r){ if(r&&r.t)return r.t; try{ const c=getChat(); const м=c&&(c.messages||[]).find(x=>x.id===r.id); if(м)return м.text||previewText(м)||''; }catch(e){} return ''; }
+function _zvReplyBar(){
+  const comp=$('#composer'); if(!comp)return;
+  let бар=document.getElementById('zvReplyBar');
+  if(!_zvReply){ if(бар)бар.remove(); return; }
+  if(!бар){ бар=document.createElement('div'); бар.id='zvReplyBar'; бар.className='zv-rb'; comp.insertBefore(бар,comp.firstChild); }
+  const р=_zvRepOf(_zvReply);
+  бар.innerHTML='<svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/></svg><div class="q"><div class="n"></div><div class="t"></div></div><button class="x" aria-label="Не отвечать">✕</button>';
+  бар.querySelector('.n').textContent='Ответ: '+_zvRepName(р); бар.querySelector('.t').textContent=р.t||'Сообщение';
+  бар.querySelector('.x').onclick=(e)=>{ e.stopPropagation(); _zvEndReply(); };
+}
+function _zvStartReply(m){ if(!m||m.deleted||m.system)return; _zvReply=m; _zvReplyBar(); try{ $('#msgInput').focus(); }catch(e){} try{ if(navigator.vibrate&&tapVibeOn())navigator.vibrate(12); }catch(e){} }
+function _zvEndReply(){ _zvReply=null; _zvReplyBar(); }
+function _zvJump(id){ const r=document.querySelector('#msgs .row[data-mid="'+String(id).replace(/"/g,'')+'"]'); if(!r){ toast('Сообщение не найдено'); return; }
+  r.scrollIntoView({block:'center',behavior:'smooth'}); r.classList.remove('flash'); void r.offsetWidth; r.classList.add('flash'); setTimeout(()=>r.classList.remove('flash'),1200); }
+/* Свайп вправо по сообщению — ответить (как СвайпОтвет в Android: с 5 px, ответ с 34 px) */
+function _zvSwipe(row,b,m){
+  let x0=0,y0=0,идёт=false,сработал=false,знак=null;
+  row.addEventListener('touchstart',e=>{ if(selMode||m.deleted||m.system)return; const т=e.touches[0]; x0=т.clientX; y0=т.clientY; идёт=false; сработал=false; },{passive:true});
+  row.addEventListener('touchmove',e=>{ if(selMode||m.deleted||m.system)return; const т=e.touches[0]; const dx=т.clientX-x0, dy=т.clientY-y0;
+    if(!идёт){ if(dx>5&&dx>Math.abs(dy)*1.15){ идёт=true; row.classList.add('zv-sw'); if(!знак){ знак=document.createElement('div'); знак.className='zv-swi'; знак.innerHTML='<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/></svg>'; row.style.position='relative'; row.appendChild(знак); } } else return; }
+    const d=Math.max(0,Math.min(72,dx)); b.style.transform='translateX('+d+'px)'; if(знак)знак.style.opacity=String(Math.min(1,d/34));
+    if(d>34&&!сработал){ сработал=true; _zvStartReply(m); } },{passive:true});
+  const конец=()=>{ if(!идёт)return; идёт=false; row.classList.remove('zv-sw'); b.style.transform=''; if(знак)знак.style.opacity='0'; };
+  row.addEventListener('touchend',конец); row.addEventListener('touchcancel',конец);
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&_zvReply){ _zvEndReply(); } });
 function renderBubble(m){
   const mine=m.from===me.id;
   const row=document.createElement('div');row.className='row '+(mine?'me':'them');row.dataset.mid=m.id;
   const b=document.createElement('div');b.className='bubble';
   if(current&&current.group&&!mine){const su=db().users[m.from];const sn=document.createElement('div');sn.className='b-sender';sn.textContent=(su&&su.name)||'Участник';sn.style.color=senderColor(m.from);b.appendChild(sn);}
   if(m.fwd&&m.fwd.n){const _f=document.createElement('div');_f.className='fwd';_f.textContent='↗ Переслано от '+m.fwd.n;b.appendChild(_f);}
+  if(!m.deleted&&m.rep&&m.rep.id){ const q=document.createElement('div'); q.className='zv-q'; const qn=document.createElement('div'); qn.className='n'; qn.textContent=_zvRepName(m.rep); const qt=document.createElement('div'); qt.className='t'; qt.textContent=_zvRepText(m.rep)||'Сообщение'; q.append(qn,qt); q.addEventListener('click',ev=>{ if(selMode==='msg')return; ev.stopPropagation(); _zvJump(m.rep.id); }); b.appendChild(q); }
   if(m.deleted){const dd=document.createElement('div');dd.className='msg-deleted';dd.textContent='🚫 Сообщение удалено';b.appendChild(dd);}
   else if(m.type==='videonote'){b.classList.add('vnote-b');b.appendChild(videoNoteEl(m));}
   else if(m.type==='gif'){const img=document.createElement('img');img.className='att gif';img.src=m.src;img.loading='lazy';b.appendChild(img);const tg=document.createElement('span');tg.className='gif-tag';tg.textContent='GIF';b.appendChild(tg);}
@@ -4749,7 +4798,7 @@ function renderBubble(m){
     try{_zvRich(tx);}catch(e){}
     if(searchTerm&&m.text){highlightInNode(tx,searchTerm);}
     b.appendChild(tx);
-    const _эм=(!m.type||m.type==='text')&&!(m.fwd&&m.fwd.n)?_zvOnlyEm(m.text):0;
+    const _эм=(!m.type||m.type==='text')&&!(m.fwd&&m.fwd.n)&&!(m.rep&&m.rep.id)?_zvOnlyEm(m.text):0;
     if(_эм){b.classList.add('emoji-b');if(_эм>1)b.classList.add('e'+_эм);}}
   addTrBlock(b,m);
   if(m.actions&&m.actions.length){const ba=document.createElement('div');ba.className='bot-actions';
@@ -4795,6 +4844,7 @@ function renderBubble(m){
       rc.appendChild(el);});
     b.appendChild(rc);}
   row.appendChild(b);
+  try{ _zvSwipe(row,b,m); }catch(e){}
   // Мультивыбор: долгое нажатие входит в режим выбора; тап в режиме — переключает сообщение.
   let _lpT=null,_lp=false;
   row.addEventListener('touchstart',()=>{_lp=false;_lpT=setTimeout(()=>{_lp=true;_lpT=null;enterSel('msg',m.id);},450);},{passive:true});
@@ -4860,7 +4910,7 @@ function openReactMenu(anchor,m){
     trWant[m.id]=(trWant[m.id]===undefined||trWant[m.id]===null)?tgt:null;renderMessages();closeReactMenu();};
   menu.appendChild(_g);
   menu.appendChild(Object.assign(document.createElement('div'),{className:'rm-sep'}));
-  const _acts=[['☑️','Выбрать',()=>{closeReactMenu();enterSel('msg',m.id);}],['↗️','Переслать',()=>{closeReactMenu();openFwd(m);}],['🔖','В Избранное',()=>{closeReactMenu();saveToFaves(m);}]];
+  const _acts=[...(m.deleted||(current&&current.channel)?[]:[['↩️','Ответить',()=>{closeReactMenu();_zvStartReply(m);}]]),['☑️','Выбрать',()=>{closeReactMenu();enterSel('msg',m.id);}],['↗️','Переслать',()=>{closeReactMenu();openFwd(m);}],['🔖','В Избранное',()=>{closeReactMenu();saveToFaves(m);}]];
   // закрепить / открепить (в группе — только администратор)
   const _gc=getChat();const _canPin=(current&&current.channel)?!!current._isAdmin:(!(current&&current.group)||isGroupAdmin(_gc));
   if(_canPin&&_gc){const _isPinned=_gc.pinned&&_gc.pinned.id===m.id;_acts.push([_isPinned?'📌':'📍',_isPinned?'Открепить':'Закрепить',()=>{closeReactMenu();_isPinned?unpinMessage():pinMessage(m);}]);}
@@ -5128,7 +5178,7 @@ function startHeavyUpload(m,heavy,chatK,peerId,isBot){
    а не base64 — экономит трафик и не упирается в лимиты D1. При неудаче — резерв base64. */
 async function transmitMessage(m,peerId,isBot){
   if(!isBot&&peerId!==me.id&&isSecret(peerId)&&e2eAvailable()){
-    const enc=await e2eEncryptFor(peerId,{text:m.text,src:m.src,audio:m.audio,dur:m.dur,orig:m.orig,origLang:m.origLang,mtype:m.type});
+    const enc=await e2eEncryptFor(peerId,{text:m.text,src:m.src,audio:m.audio,dur:m.dur,orig:m.orig,origLang:m.origLang,mtype:m.type,rep:m.rep||undefined});
     if(enc){
       emit('msg',{id:m.id,from:me.id,to:peerId,t:m.t,type:m.type,e2e:1,enc});
       if(cloudOn&&isCloudReady()){
@@ -5186,6 +5236,7 @@ async function transmitMessage(m,peerId,isBot){
 function pushMessage(obj){
   try{ evSend('first_msg'); }catch(e){}
   if(current&&current.channel)return postChannelMessage(obj);
+  if(_zvReply&&obj&&!obj.rep&&!obj.system){ obj=Object.assign({},obj,{rep:_zvRepOf(_zvReply)}); _zvEndReply(); }
   if(current&&current.group)return pushGroupMessage(obj);
   const d=db();const k=chatKey(me.id,current.id);if(!d.chats[k])d.chats[k]={id:k,members:[me.id,current.id],messages:[]};
   const m=Object.assign({id:mid(),from:me.id,t:Date.now(),readBy:[me.id],st:0},obj);   // st:0 — пока не подтверждено сервером
@@ -5242,7 +5293,7 @@ async function onIncomingMessage(p){
   if(p&&p.from&&isBlocked(p.from))return;   // сообщения от заблокированных не показываем
   if(p&&p.e2e&&p.enc){
     const dec=await e2eDecryptFrom(p.from,p.enc);
-    if(dec)p=Object.assign({},p,{text:dec.text,src:dec.src,audio:dec.audio,dur:dec.dur,orig:dec.orig,origLang:dec.origLang,type:dec.mtype||p.type||'text'});
+    if(dec)p=Object.assign({},p,{text:dec.text,src:dec.src,audio:dec.audio,dur:dec.dur,orig:dec.orig,origLang:dec.origLang,type:dec.mtype||p.type||'text'},dec.rep&&dec.rep.id?{rep:dec.rep}:null);
     else p=Object.assign({},p,{text:'🔒 Зашифрованное сообщение (не удалось расшифровать)',type:'text',undecrypted:1});
     delete p.enc;
     if(!isSecret(p.from))setChatOpt(p.from,{secret:1});
