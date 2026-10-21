@@ -392,6 +392,26 @@ html.нативный-список #scrChats>*{visibility:hidden}
 .react{background:var(--raised-2);border:1px solid var(--line);border-radius:11px;padding:1px 7px;font-size:12px;display:flex;gap:3px;align-items:center}
 .row.me .reacts{justify-content:flex-end}
 .react .n{font-family:var(--mono);font-size:10px;color:var(--muted)}
+/* 21.10.2026 — как в Android: размер текста (--zv-k), эмодзи крупнее, одни эмодзи без пузыря, реакции крупнее, ссылки и превью */
+:root{--zv-k:1}
+.bubble{font-size:calc(14.7px * var(--zv-k))}
+.bubble .zv-em{font-size:1.25em;line-height:1}
+.bubble a.zv-a{color:inherit;text-decoration:underline;word-break:break-word}
+.row.them .bubble a.zv-a{color:var(--primary)}
+.bubble.emoji-b{background:none!important;box-shadow:none!important;border:0!important;padding:0 2px!important}
+.bubble.emoji-b .zv-txt{font-size:calc(50px * var(--zv-k));line-height:1.22}
+.bubble.emoji-b.e2 .zv-txt{font-size:calc(42px * var(--zv-k))}
+.bubble.emoji-b.e3 .zv-txt{font-size:calc(36px * var(--zv-k))}
+.bubble.emoji-b .meta,.bubble.emoji-b .tick{color:var(--muted)!important}
+.react{font-size:calc(17px * var(--zv-k));padding:1px 8px}
+.react .n{font-size:calc(12.5px * var(--zv-k))}
+.react-menu button{font-size:25px}
+.zv-lp{display:block;margin:6px 0 2px;border-left:3px solid var(--primary);background:rgba(108,123,255,.08);border-radius:8px;padding:4px 8px 6px 9px;cursor:pointer;max-width:260px;white-space:normal;text-decoration:none;color:inherit}
+.row.me .zv-lp{border-left-color:rgba(255,255,255,.85);background:rgba(255,255,255,.10)}
+.zv-lp .s{font-weight:700;font-size:.85em;color:var(--primary)}.row.me .zv-lp .s{color:#fff}
+.zv-lp .t{font-weight:700;font-size:.92em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.zv-lp .d{font-size:.85em;opacity:.8;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.zv-lp img{display:block;width:100%;height:126px;object-fit:cover;border-radius:8px;margin-top:6px}
 
 .upd-banner{background:var(--raised);border:1px solid var(--line);border-radius:18px;padding:14px;margin:0 0 12px}
 .upd-row{display:flex;gap:11px;align-items:flex-start}
@@ -2240,7 +2260,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.30', BUILD_ID='2026-10-20-200';
+const APP_VERSION='5.2.31', BUILD_ID='2026-10-21-200';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -2880,6 +2900,20 @@ function buildPeerActions(body){
   const peer=current?current.id:null;if(!peer){body.appendChild(el('<div class="note">Откройте личный чат.</div>'));return;}
   const u=userById(peer)||{};
   body.appendChild(el('<div class="note" style="text-align:center;margin-bottom:6px">'+esc(u.name||'Пользователь')+'</div>'));
+  if(peer==='zorveld-servers'){
+    const фб=el('<button class="sub-btn" style="text-align:center;display:none;margin-bottom:8px">🖼️ Сменить фото чата</button>'); body.appendChild(фб);
+    apiFetch(getApiUrl()+'/srv/profile',{headers:{'x-session-token':sessionToken||''},timeout:8000}).then(r=>r.ok?r.json():null).then(j=>{ if(j&&j.can)фб.style.display=''; }).catch(()=>{});
+    фб.onclick=()=>{ const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*';
+      inp.onchange=()=>{ const f=inp.files&&inp.files[0]; if(!f)return;
+        compressImageFile(f,256,0.72,async(url)=>{ if(!url){toast('Не удалось обработать фото');return;}
+          try{ const r=await apiFetch(getApiUrl()+'/srv/profile',{method:'POST',headers:{'x-session-token':sessionToken||'','content-type':'application/json'},body:JSON.stringify({avatar:url}),timeout:15000});
+            if(!r.ok){toast('Не удалось обновить фото');return;}
+            const d=db(); if(d.users[peer]){d.users[peer].avatar=url;save(d);}
+            try{const ca=$('#convAvatar');ca.innerHTML='';ca.style.background='';ca.style.color='';av(ca,d.users[peer]);}catch(e){}
+            try{renderChats();}catch(e){} toast('Фото чата обновлено у всех');
+          }catch(e){toast('Не удалось обновить фото');} }); };
+      inp.click(); };
+  }
   const bl=el('<button class="kill sub-btn" style="text-align:center">'+(isBlocked(peer)?'✅ Разблокировать':'🚫 Заблокировать')+'</button>');
   bl.onclick=()=>{const nowBlocked=toggleBlock(peer);toast(nowBlocked?'Пользователь заблокирован':'Разблокирован');buildSubRefresh();try{renderChats();}catch(e){}};
   body.appendChild(bl);
@@ -4653,6 +4687,50 @@ function renderMessages(){
   pinMsgsBottom();
   renderPinnedBar();
 }
+/* ── 21.10.2026: текст сообщения как в Android (screens/rich-text.js) ── */
+const _ZV_ЗН='(?:[©®‼⁉™ℹ↔-↙↩↪⌚⌛⌨⏏⏩-⏺Ⓜ▪-◾☀-➿⤴⤵⬅-⭕〰〽㊗㊙]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDC00-\uDFFF])';
+const _ZV_ДОБ='(?:️|\uD83C[\uDFFB-\uDFFF])?';
+const _ZV_ЭМ='(?:\uD83C[\uDDE6-\uDDFF]\uD83C[\uDDE6-\uDDFF]|[#*0-9]️?⃣|'+_ZV_ЗН+_ZV_ДОБ+'(?:‍'+_ZV_ЗН+_ZV_ДОБ+')*)';
+const _ZV_ЭМГ=new RegExp('('+_ZV_ЭМ+'(?:\\s*'+_ZV_ЭМ+')*)','g');
+function _zvOnlyEm(т){ const с=String(т||'').trim(); if(!с||с.length>40)return 0; let н=0; const о=с.replace(new RegExp(_ZV_ЭМ,'g'),()=>{н++;return '';}).replace(/[\s️‍]/g,''); return !о&&н>=1&&н<=3?н:0; }
+const _ZV_ЗОНЫ='ru|рф|com|pro|org|net|io|uz|kz|by|ua|info|biz|dev|app|me|tv|su|online|site|store|shop|ai|co|xyz|club|tech|space|edu|gov|рус|москва|de|uk|us|eu|tr';
+const _ZV_ССЫЛКА=new RegExp('((?:https?:\\/\\/|www\\.)[^\\s<>"\'«»]+|[A-Za-z0-9._%+-]+@[A-Za-z0-9А-Яа-яЁё.-]+\\.[A-Za-zА-Яа-яЁё]{2,}|(?:[A-Za-z0-9А-Яа-яЁё-]+\\.)+(?:'+_ZV_ЗОНЫ+')(?![A-Za-zА-Яа-яЁё0-9])(?:[\\/?#][^\\s<>"\'«»]*)?|\\+\\d[\\d\\s()-]{8,16}\\d|\\b8[\\s(-]*\\d{3}[\\s)-]*\\d{3}[\\s-]*\\d{2}[\\s-]*\\d{2}\\b)','gi');
+function _zvTrim(с){ let р=с; while(/[.,;:!?)\]»'"]$/.test(р)){ if(р[р.length-1]===')'&&р.split('(').length>р.split(')').length-1)break; р=р.slice(0,-1);} return р; }
+function _zvKind(с){ if(/^\+|^8[\s(-]*\d/.test(с)&&!/[a-zа-я@]/i.test(с))return {вид:'тел',адрес:'tel:'+с.replace(/[^\d+]/g,'')}; if(с.indexOf('@')>0&&!/^https?:/i.test(с))return {вид:'почта',адрес:'mailto:'+с}; return {вид:'сайт',адрес:/^https?:\/\//i.test(с)?с:'https://'+с}; }
+function _zvParse(т){ const с=String(т||''); const к=[]; let п=0;
+  с.replace(_ZV_ССЫЛКА,(н,_1,где)=>{ const ч=_zvTrim(н); if(!ч)return н; if(/^\+|^8/.test(ч)&&ч.replace(/\D/g,'').length<10)return н; if(где>п)к.push({т:с.slice(п,где)}); к.push(Object.assign({т:ч},_zvKind(ч))); п=где+ч.length; return н; });
+  if(п<с.length)к.push({т:с.slice(п)}); return к; }
+function _zvFirstUrl(т){ const х=_zvParse(т).find(x=>x.вид==='сайт'); return х?х.адрес:null; }
+function _zvEmInto(фр,т){ String(т).split(_ZV_ЭМГ).forEach((ч,и)=>{ if(!ч)return; if(и%2){const sp=document.createElement('span');sp.className='zv-em';sp.textContent=ч;фр.appendChild(sp);} else фр.appendChild(document.createTextNode(ч)); }); }
+/* Ссылки и эмодзи в уже собранном тексте (упоминания в группах не трогаем) */
+function _zvRich(tx){
+  const w=document.createTreeWalker(tx,NodeFilter.SHOW_TEXT); const узлы=[]; while(w.nextNode())узлы.push(w.currentNode);
+  узлы.forEach(n=>{ const к=_zvParse(n.nodeValue); const естьЭм=_ZV_ЭМГ.test(n.nodeValue); _ZV_ЭМГ.lastIndex=0;
+    if(к.length===1&&!к[0].вид&&!естьЭм)return;
+    const фр=document.createDocumentFragment();
+    к.forEach(х=>{ if(х.вид){ const a=document.createElement('a'); a.className='zv-a'; a.href=х.адрес; a.textContent=х.т; if(х.вид==='сайт'){a.target='_blank';a.rel='noopener noreferrer';} a.addEventListener('click',e=>{ if(selMode!=='msg')e.stopPropagation(); }); фр.appendChild(a); } else _zvEmInto(фр,х.т); });
+    n.parentNode.replaceChild(фр,n); });
+}
+/* Превью ссылки: страницу читает наш сервер (браузер чужую не прочтёт), ответ — в память на 3 дня */
+const _zvLP=new Map();
+function _zvPreview(b,адрес){
+  const box=document.createElement('a'); box.className='zv-lp'; box.href=адрес; box.target='_blank'; box.rel='noopener noreferrer'; box.style.display='none';
+  box.addEventListener('click',e=>{ if(selMode!=='msg')e.stopPropagation(); });
+  const мета=b.querySelector('.meta'); if(мета)b.insertBefore(box,мета); else b.appendChild(box);
+  const заполнить=(д)=>{ if(!д||!box.isConnected&&!box.parentNode)return; box.innerHTML='';
+    [['s',д.сайт],['t',д.заголовок],['d',д.описание]].forEach(([к,т])=>{ if(!т)return; const e=document.createElement('div'); e.className=к; e.textContent=т; box.appendChild(e); });
+    if(д.картинка){ const i=new Image(); i.loading='lazy'; i.alt=''; i.onerror=()=>i.remove(); i.src=д.картинка; box.appendChild(i); }
+    box.style.display=''; };
+  if(_zvLP.has(адрес)){ заполнить(_zvLP.get(адрес)); return; }
+  try{ const с=JSON.parse(localStorage.getItem('zv-lp:'+адрес)||'null'); if(с&&Date.now()-с.t<3*86400e3){ _zvLP.set(адрес,с.d); заполнить(с.d); return; } }catch(e){}
+  if(!sessionToken)return;
+  apiFetch(getApiUrl()+'/link/preview?url='+encodeURIComponent(адрес),{headers:{'x-session-token':sessionToken||''},timeout:12000})
+    .then(r=>r.ok?r.json():null).then(j=>{ const д=(j&&j.preview)||null; _zvLP.set(адрес,д); try{localStorage.setItem('zv-lp:'+адрес,JSON.stringify({t:Date.now(),d:д}));}catch(e){} заполнить(д); }).catch(()=>{});
+}
+/* Размер текста в чатах (как «Моя страница» в Android) */
+function _zvScale(){ try{ const н=parseFloat(localStorage.getItem('zv-text-scale')); return н>=0.8&&н<=1.6?н:1; }catch(e){ return 1; } }
+function _zvSetScale(н){ try{localStorage.setItem('zv-text-scale',String(н));}catch(e){} try{document.documentElement.style.setProperty('--zv-k',String(н));}catch(e){} }
+try{ document.documentElement.style.setProperty('--zv-k',String(_zvScale())); }catch(e){}
 function renderBubble(m){
   const mine=m.from===me.id;
   const row=document.createElement('div');row.className='row '+(mine?'me':'them');row.dataset.mid=m.id;
@@ -4666,10 +4744,13 @@ function renderBubble(m){
   else if(m.type==='voice'){b.appendChild(voiceEl(m,mine));}
   else if(m.type==='file'){b.appendChild(fileEl(m));}
   else if(m.type==='sticker'){b.classList.add('sticker-b');const sk=document.createElement('div');sk.innerHTML=stickerSVG(m.sticker||m.text);if(sk.firstChild)b.appendChild(sk.firstChild);}
-  if(!m.deleted&&m.text&&m.type!=='sticker'){const tx=document.createElement('div');tx.dir='auto';
+  if(!m.deleted&&m.text&&m.type!=='sticker'){const tx=document.createElement('div');tx.dir='auto';tx.className='zv-txt';
     if(current&&current.group)appendTextWithMentions(tx,m.text,db().chats[current.id]); else tx.textContent=m.text;
+    try{_zvRich(tx);}catch(e){}
     if(searchTerm&&m.text){highlightInNode(tx,searchTerm);}
-    b.appendChild(tx);}
+    b.appendChild(tx);
+    const _эм=(!m.type||m.type==='text')&&!(m.fwd&&m.fwd.n)?_zvOnlyEm(m.text):0;
+    if(_эм){b.classList.add('emoji-b');if(_эм>1)b.classList.add('e'+_эм);}}
   addTrBlock(b,m);
   if(m.actions&&m.actions.length){const ba=document.createElement('div');ba.className='bot-actions';
     m.actions.forEach(a=>{const ch=document.createElement('button');ch.className='bot-chip';ch.textContent=a.label;ch.onclick=ev=>{ev.stopPropagation();botAction(a.act);};ba.appendChild(ch);});
@@ -4703,6 +4784,8 @@ function renderBubble(m){
             :(st===1?'Отправлено':(st===2?'Доставлено':'Прочитано'));
     meta.appendChild(tk);}
   b.appendChild(meta);
+  /* превью ссылки — кроме секретных чатов */
+  if(!m.deleted&&m.text&&(!m.type||m.type==='text')){ try{ const _u=_zvFirstUrl(m.text); if(_u&&!(current&&!current.group&&typeof isSecret==='function'&&isSecret(current.id)))_zvPreview(b,_u); }catch(e){} }
   // reactions
   if(m.reactions&&m.reactions.length){const rc=document.createElement('div');rc.className='reacts';
     const grp={};m.reactions.forEach(r=>grp[r.emoji]=(grp[r.emoji]||0)+1);
@@ -4719,7 +4802,11 @@ function renderBubble(m){
   row.addEventListener('touchend',_lpC);row.addEventListener('touchmove',_lpC);
   row.addEventListener('click',ev=>{ if(selMode==='msg'){ev.stopPropagation();ev.preventDefault();if(_lp){_lp=false;return;}toggleSel('msg',m.id);} },true);
   // меню реакций — только вне режима выбора
-  b.addEventListener('click',ev=>{ if(selMode==='msg')return; if(m.type==='voice'||m.type==='videonote')return; ev.stopPropagation(); openReactMenu(b,m); });
+  let _тапТ=null,_тапВ=0;
+  b.addEventListener('click',ev=>{ if(selMode==='msg')return; if(m.type==='voice'||m.type==='videonote')return; ev.stopPropagation();
+    const t=Date.now();
+    if(t-_тапВ<300){ clearTimeout(_тапТ); _тапВ=0; if(!m.deleted){ const моя=(m.reactions||[]).find(r=>r.by===me.id); addReaction(m,моя?моя.emoji:'❤️'); } return; }
+    _тапВ=t; clearTimeout(_тапТ); _тапТ=setTimeout(()=>openReactMenu(b,m),260); });
   b.addEventListener('contextmenu',ev=>{ev.preventDefault();ev.stopPropagation(); if(_touchRecent())return; if(selMode==='msg'){toggleSel('msg',m.id);return;} openReactMenu(b,m);});
   return row;
 }
@@ -4985,7 +5072,8 @@ async function selAiRun(kind){ const ms=_selMsgs(); if(!ms.length)return; const 
   card.appendChild(acts);
 }
 function addReaction(m,emoji){
-  const d=db();const c=getChat();if(!c)return;const mm=c.messages.find(x=>x.id===m.id);if(!mm)return;
+  /* 21.10.2026: чат берём из той же копии базы, что и сохраняем (раньше getChat() читал свою — реакция терялась) */
+  const d=db();const c=d.chats[(current&&(current.group||current.channel))?current.id:chatKey(me.id,current.id)];if(!c)return;const mm=c.messages.find(x=>x.id===m.id);if(!mm)return;
   mm.reactions=mm.reactions||[];
   const ex=mm.reactions.findIndex(r=>r.by===me.id);
   if(ex>=0){if(mm.reactions[ex].emoji===emoji)mm.reactions.splice(ex,1);else mm.reactions[ex].emoji=emoji;}
@@ -9736,7 +9824,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=199, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-199.apk';
+const APK_NEW_BUILD=200, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-200.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
@@ -10379,6 +10467,20 @@ function openMyPage(){
   к1.appendChild(стр(me.username?('z/'+me.username):'Ник не задан','Имя пользователя',()=>{w.remove();_открытьНастройки('rowIdentity');}));
   w.appendChild(к1);
   const к2=карт();к2.appendChild(стр('🔖  Избранное','Сохранённые сообщения',()=>{w.remove();openConv(me.id);}));w.appendChild(к2);
+  /* 21.10.2026: размер текста в чатах — как в Android */
+  const к3=карт(); к3.style.padding='14px 18px';
+  const шаги=[[0.9,'Мелкий'],[1,'Обычный'],[1.15,'Крупный'],[1.3,'Очень крупный'],[1.5,'Огромный']];
+  const заг3=document.createElement('div'); заг3.style.cssText='font-size:16.5px;color:var(--text)'; заг3.textContent='Размер текста в чатах';
+  const под3=document.createElement('div'); под3.style.cssText='font-size:13px;color:var(--muted);margin-top:2px';
+  const ряд3=document.createElement('div'); ряд3.style.cssText='display:flex;gap:8px;margin-top:12px';
+  const пример3=document.createElement('div'); пример3.style.cssText='margin-top:12px;border-radius:16px;border-bottom-left-radius:6px;padding:9px 13px;background:var(--bubble-them);display:inline-block;max-width:90%;line-height:1.42;color:var(--text)';
+  const рис3=()=>{ const к=_zvScale(); под3.textContent=(шаги.find(x=>x[0]===к)||[0,'Обычный'])[1];
+    пример3.style.fontSize=(14.7*к)+'px'; пример3.innerHTML='Так будут выглядеть сообщения <span style="font-size:1.25em">👋</span>';
+    ряд3.innerHTML='';
+    шаги.forEach(([к2,т2])=>{ const кн=document.createElement('button'); кн.setAttribute('aria-label',т2); const выб=к2===к;
+      кн.style.cssText='flex:1;height:44px;border-radius:12px;border:1.5px solid '+(выб?'var(--primary)':'var(--line)')+';background:'+(выб?'rgba(108,123,255,.16)':'transparent')+';color:'+(выб?'var(--primary)':'var(--text)')+';font:700 '+(15*к2)+'px var(--body);cursor:pointer';
+      кн.textContent='А'; кн.onclick=()=>{ _zvSetScale(к2); рис3(); }; ряд3.appendChild(кн); }); };
+  рис3(); к3.append(заг3,под3,ряд3,пример3); w.appendChild(к3);
   document.body.appendChild(w);
 }
 $('#btnCloseSettings').onclick=()=>$('#settingsSheet').classList.remove('show');
