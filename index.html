@@ -2275,7 +2275,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.32', BUILD_ID='2026-10-21-201';
+const APP_VERSION='5.2.33', BUILD_ID='2026-10-22-201';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -4346,6 +4346,7 @@ function renderChats(){
         id:c.id, имя, значок, цвет, текст,
         время:last?fmtTime(last.t):'', непрочитано,
         закреплён:isPinned(c.id)?1:0, онлайн, своё, бот,
+        галки:(()=>{ try{ if(!last||last.from!==me.id||c.channel)return null; const чит=(last.readBy||[]).some(x=>x!==me.id); if(чит)return 3; return last.st===undefined?1:Number(last.st)||0; }catch(e){ return null; } })(),
         заблок:(!c.group&&!c.channel&&(()=>{try{return isBlocked((c.members||[]).find(x=>x!==me.id))?1:0;}catch(e){return 0;}})())||0,
       });
     }catch(e){}
@@ -4744,7 +4745,8 @@ function _zvPreview(b,адрес){
 }
 /* Размер текста в чатах (как «Моя страница» в Android) */
 function _zvScale(){ try{ const н=parseFloat(localStorage.getItem('zv-text-scale')); return н>=0.8&&н<=1.6?н:1; }catch(e){ return 1; } }
-function _zvSetScale(н){ try{localStorage.setItem('zv-text-scale',String(н));}catch(e){} try{document.documentElement.style.setProperty('--zv-k',String(н));}catch(e){} }
+function _zvSetScale(н){ try{localStorage.setItem('zv-text-scale',String(н));}catch(e){} try{document.documentElement.style.setProperty('--zv-k',String(н));}catch(e){}
+  try{ if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify({type:'text-scale',k:н})); }catch(e){} }
 try{ document.documentElement.style.setProperty('--zv-k',String(_zvScale())); }catch(e){}
 /* ── 21.10.2026: ответ на сообщение (как Android: rep {id, f, n, t}) ── */
 let _zvReply=null;
@@ -9875,7 +9877,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=200, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-200.apk';
+const APK_NEW_BUILD=201, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-201.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
@@ -11253,6 +11255,20 @@ $('#rowBlocked').onclick=()=>openSub('Заблокированные',buildBlock
 {const _rl=$('#rowLockOpts');if(_rl)_rl.onclick=()=>openSub('Блокировка приложения',buildLockOptions);}
 $('#rowLang').onclick=()=>openSub('Мой язык',buildLang);
 $('#rowTheme').onclick=()=>openSub('Внешний вид',buildTheme);
+/* 22.10.2026 (владелец: «не увидел настроек выбора шрифта»): размер текста — и здесь, не только в «Моей странице» */
+const _ZV_ШАГИ=[[0.9,'Мелкий'],[1,'Обычный'],[1.15,'Крупный'],[1.3,'Очень крупный'],[1.5,'Огромный']];
+function _zvScaleLabel(){ const к=_zvScale(); return (_ZV_ШАГИ.find(x=>x[0]===к)||[0,'Обычный'])[1]; }
+(function(){ const тема=$('#rowTheme'); if(!тема||document.getElementById('rowTextScale'))return;
+  const р=el('<div class="setting" id="rowTextScale" style="cursor:pointer"><div class="ic">🔠</div><div class="lbl"><div class="t">Размер текста в чатах</div><div class="d" id="stTextScale"></div></div><div style="color:var(--faint)">›</div></div>');
+  тема.after(р); const подпись=()=>{ const d=document.getElementById('stTextScale'); if(d)d.textContent=_zvScaleLabel(); }; подпись();
+  р.onclick=()=>openSub('Размер текста в чатах',function постр(body){ body.innerHTML='';
+    const к=_zvScale();
+    const пример=el('<div style="margin:4px 0 14px;border-radius:16px;border-bottom-left-radius:6px;padding:9px 13px;background:var(--bubble-them);display:inline-block;max-width:90%;line-height:1.42;color:var(--text)"></div>');
+    пример.style.fontSize=(14.7*к)+'px'; пример.innerHTML='Так будут выглядеть сообщения <span style="font-size:1.25em">👋</span>'; body.appendChild(пример);
+    const w=document.createElement('div'); w.className='opts';
+    _ZV_ШАГИ.forEach(([к2,т2])=>w.appendChild(optRow(т2,к2===к,()=>{ _zvSetScale(к2); подпись(); постр(body); })));
+    body.appendChild(w); });
+})();
 {const r=$('#rowTapSound'); if(r)r.onclick=()=>openSub('Звук нажатия',buildTapSound);}
 try{ setTimeout(zvTapToShell,0); }catch(e){}
 {const r=$('#rowMediaQ'); if(r)r.onclick=()=>openSub('Качество фото и видео',buildMediaQ); refreshMediaQLabel();}
