@@ -433,6 +433,39 @@ html.нативный-список #scrChats>*{visibility:hidden}
 .zv-att-ic b{position:relative;font:800 14px var(--mono);letter-spacing:.5px}
 /* список чатов: галочки и подсвеченный открытый чат (ПК — две колонки) */
 .cr-time .zv-tk{display:inline-block;vertical-align:-2px;margin-right:3px}
+/* 22.10.2026 — профиль собеседника как в Android */
+#zvProfile{position:fixed;inset:0;z-index:300;background:var(--surface);overflow-y:auto;animation:fadeIn .18s ease}
+.zvp-top{display:flex;flex-direction:column;align-items:center;padding:8px 16px 0;position:relative}
+.zvp-back{position:absolute;left:14px;top:10px;width:44px;height:44px;border-radius:50%;border:0;background:var(--raised);color:var(--primary);display:grid;place-items:center;cursor:pointer}
+.zvp-cam{position:absolute;right:14px;top:10px;width:44px;height:44px;border-radius:50%;border:0;background:var(--raised);color:var(--primary);display:grid;place-items:center;cursor:pointer}
+.zvp-name{font:700 22px var(--body);color:var(--text);margin-top:12px;max-width:86%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zvp-sub{font-size:14px;color:var(--muted);margin-top:2px}
+.zvp-btns{display:flex;gap:8px;margin:14px 16px 0;align-self:stretch}
+.zvp-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 0;border-radius:16px;border:0;background:var(--raised);color:var(--text);font:600 12.5px var(--body);cursor:pointer}
+.zvp-btn svg{width:22px;height:22px;stroke:var(--primary)}
+.zvp-info{margin:12px 16px 0;border-radius:16px;padding:12px 16px;background:var(--raised);cursor:pointer}
+.zvp-tabs{display:flex;gap:4px;margin:12px 16px 0;padding:4px;border-radius:16px;background:var(--raised);overflow-x:auto;scrollbar-width:none}
+.zvp-tab{flex:1 0 auto;padding:9px 12px;border-radius:12px;border:0;background:none;color:var(--muted);font:600 13px var(--body);cursor:pointer;white-space:nowrap}
+.zvp-tab.on{background:linear-gradient(135deg,var(--primary),#8a7bff);color:#fff}
+.zvp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;margin-top:10px}
+.zvp-grid img{width:100%;aspect-ratio:1;object-fit:cover;cursor:pointer;display:block}
+.zvp-row{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line-soft);cursor:pointer;text-decoration:none;color:inherit}
+.zvp-ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;color:#fff;font:700 16px var(--body);flex:none}
+.zvp-empty{text-align:center;color:var(--muted);padding:40px 20px;font-size:14px}
+.zvp-more{margin:18px 16px 30px}
+.zvp-more>.note:first-child{display:none}
+/* профиль группы — полный экран, как ПрофильГруппы в Android */
+#groupSheet{align-items:stretch!important;justify-content:stretch!important;padding:0!important}
+#groupSheet .modal{position:fixed!important;inset:0!important;width:100%!important;max-width:none!important;height:100%!important;max-height:none!important;border-radius:0!important;overflow-y:auto;padding:8px 0 24px!important;margin:0!important;transform:none!important}
+#groupSheet .grip{display:none}
+#groupSheet .gi-hero{flex-direction:column;align-items:center;gap:0;padding:8px 16px 0;position:relative}
+#groupSheet #giAvatar{width:112px;height:112px;font-size:44px}
+#groupSheet .gi-htext{text-align:center;margin-top:12px;flex:none}
+#groupSheet .gi-title{font-size:22px}
+#groupSheet #giRename{position:absolute;right:14px;top:10px;width:44px;height:44px;border-radius:50%;background:var(--raised);color:var(--primary)}
+#groupSheet #giAddBtn{display:none!important}
+#groupSheet .gi-mlist{max-height:none;margin:6px 16px 0}
+#groupSheet #giLeave{margin:16px;width:calc(100% - 32px)}
 @media (min-width:900px){.chat-row.zv-active{background:rgba(108,123,255,.13)}}
 /* 21.10.2026 — ответ на сообщение, как в Android */
 .zv-q{border-left:3px solid var(--primary);background:rgba(108,123,255,.10);border-radius:8px;padding:4px 8px;margin:0 0 5px;cursor:pointer;white-space:normal;max-width:260px}
@@ -2297,7 +2330,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.34', BUILD_ID='2026-10-22-201';
+const APP_VERSION='5.2.35', BUILD_ID='2026-10-22-201';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -2932,6 +2965,62 @@ async function setHidePhone(on){const s=getSec();s.hidePhone=!!on;saveSec(s);
 function openPeerActions(){
   if(!current||current.group||current.channel||current.id===me.id||current.bot)return;
   openSub(current.name||'Собеседник',buildPeerActions);
+}
+/* Вкладки профиля из переписки (как ПолосаВкладок/СодержимоеВкладки в Android); первая — своя (у группы «Участники») */
+function _zvTabs(messages,первая){
+  const мс=(messages||[]).filter(m=>!m.deleted);
+  const фото=мс.filter(m=>(m.type==='image'||m.type==='gif')&&m.src).reverse();
+  const файлы=мс.filter(m=>m.type==='file').reverse();
+  const голос=мс.filter(m=>m.type==='voice'||m.type==='videonote').reverse();
+  const ссылки=[]; мс.slice().reverse().forEach(m=>{ if(m.text)_zvParse(m.text).forEach(х=>{ if(х.вид==='сайт')ссылки.push({m,u:х.адрес}); }); });
+  const вкл=[...(первая?[[первая.к,первая.т,первая.н]]:[]),['медиа','Медиа',фото.length],['файлы','Файлы',файлы.length],['голос','Голосовые',голос.length],['ссылки','Ссылки',ссылки.length]];
+  const полоса=document.createElement('div'); полоса.className='zvp-tabs'; const тело=document.createElement('div');
+  const когда=(t)=>{ try{ return fmtDay(t)+', '+fmtTime(t); }catch(e){ return ''; } };
+  const пусто=(т)=>{ const e=document.createElement('div'); e.className='zvp-empty'; e.textContent=т; return e; };
+  const строка=(ц1,ц2,зн,верхТ,низТ,дело,href)=>{ const r=document.createElement(href?'a':'div'); r.className='zvp-row'; if(href){r.href=href;r.target='_blank';r.rel='noopener noreferrer';}
+    r.innerHTML='<div class="zvp-ic" style="background:linear-gradient(135deg,'+ц1+','+ц2+')"></div><div style="flex:1;min-width:0"><div style="font:700 15px var(--body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div><div style="font-size:12.5px;color:var(--muted)"></div></div>';
+    r.querySelector('.zvp-ic').innerHTML=зн; r.querySelectorAll('div div')[0].textContent=верхТ; r.querySelectorAll('div div')[1].textContent=низТ; if(дело)r.onclick=дело; return r; };
+  let выбрано=первая?первая.к:'медиа';
+  const рисовать=()=>{ полоса.innerHTML=''; вкл.forEach(([к,т,н])=>{ const b=document.createElement('button'); b.className='zvp-tab'+(к===выбрано?' on':''); b.textContent=т+(н?' '+н:''); b.onclick=()=>{выбрано=к;рисовать();}; полоса.appendChild(b); });
+    тело.innerHTML='';
+    if(первая&&первая.показ)первая.показ(выбрано===первая.к);
+    if(первая&&выбрано===первая.к){ if(первая.рис)первая.рис(тело); return; }
+    if(выбрано==='медиа'){ if(!фото.length){тело.appendChild(пусто('Здесь появятся фото из переписки'));return;}
+      const g=document.createElement('div'); g.className='zvp-grid'; фото.forEach(m=>{ const i=new Image(); i.src=m.src; i.loading='lazy'; i.onclick=()=>{ const v=document.createElement('div'); v.style.cssText='position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.92);display:grid;place-items:center;cursor:zoom-out'; const im=new Image(); im.src=m.src; im.style.cssText='max-width:100%;max-height:100%;object-fit:contain'; v.appendChild(im); v.onclick=()=>v.remove(); document.body.appendChild(v); }; g.appendChild(i); }); тело.appendChild(g); }
+    else if(выбрано==='файлы'){ if(!файлы.length){тело.appendChild(пусто('Здесь появятся файлы из переписки'));return;}
+      файлы.forEach(m=>тело.appendChild(строка('#5EE38A','#1FA85C','📄',m.name||'Документ',когда(m.t),null,m.src||null))); }
+    else if(выбрано==='голос'){ if(!голос.length){тело.appendChild(пусто('Здесь появятся голосовые и кружки'));return;}
+      let играет=null; голос.forEach(m=>{ const r=строка('#FF6B8B','#E0245E',m.type==='voice'?'🎤':'🎥',(m.type==='voice'?'Голосовое':'Кружок')+(m.dur?' · '+fmtDur(m.dur):''),(m.from===me.id?'Вы · ':'')+когда(m.t),()=>{ const src=m.audio||m.src; if(!src)return; if(играет){играет.pause();} if(m.type==='voice'){ играет=new Audio(src); играет.play().catch(()=>{}); } else { const v=document.createElement('div'); v.style.cssText='position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.92);display:grid;place-items:center'; const vid=document.createElement('video'); vid.src=src; vid.controls=true; vid.autoplay=true; vid.style.cssText='max-width:90%;max-height:90%;border-radius:50%'; v.appendChild(vid); v.onclick=(e)=>{ if(e.target===v)v.remove(); }; document.body.appendChild(v); } }); тело.appendChild(r); }); }
+    else { if(!ссылки.length){тело.appendChild(пусто('Здесь появятся ссылки из переписки'));return;}
+      ссылки.forEach(({m,u})=>{ const чисто=u.replace(/^https?:\/\/(www\.)?/,''); тело.appendChild(строка('#5BA8FF','#3B6FF6',esc((чисто[0]||'#').toUpperCase()),чисто,когда(m.t),null,u)); }); }
+  };
+  рисовать();
+  return {полоса,тело};
+}
+/* ── 22.10.2026: профиль собеседника как в Android ── */
+function openPeerProfile(){
+  if(!current||current.group||current.channel||current.id===me.id)return;
+  const peer=current.id; const u=userById(peer)||{}; const c=getChat()||{messages:[]};
+  const старый=document.getElementById('zvProfile'); if(старый)старый.remove();
+  const w=document.createElement('div'); w.id='zvProfile';
+  const SV=(p)=>'<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+p+'</svg>';
+  const верх=document.createElement('div'); верх.className='zvp-top';
+  верх.innerHTML='<button class="zvp-back" aria-label="Назад"><svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/></svg></button><div class="avatar xl" style="width:112px;height:112px;font-size:44px"></div><div class="zvp-name"></div><div class="zvp-sub"></div>';
+  av(верх.querySelector('.avatar'),u); верх.querySelector('.zvp-name').textContent=u.name||u.phone||'Пользователь'; верх.querySelector('.zvp-sub').textContent=u.phone||(u.online?'в сети':'');
+  верх.querySelector('.zvp-back').onclick=()=>w.remove();
+  const кн=document.createElement('div'); кн.className='zvp-btns';
+  [['Сообщение','<path d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 21l2.1-5.6A8.4 8.4 0 1 1 21 11.5z"/>',()=>w.remove()],
+   ['Звонок','<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>',()=>{w.remove();startCall('audio');}],
+   ['Видео','<path d="m23 7-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>',()=>{w.remove();startCall('video');}],
+   ['Поиск','<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',()=>{w.remove();try{openConvSearch();}catch(e){}}]]
+  .forEach(([т,п,д])=>{ const b=document.createElement('button'); b.className='zvp-btn'; b.innerHTML=SV(п)+'<span></span>'; b.lastChild.textContent=т; b.onclick=д; кн.appendChild(b); });
+  верх.appendChild(кн); w.appendChild(верх);
+  if(u.phone){ const и=document.createElement('div'); и.className='zvp-info'; и.innerHTML='<div style="font-size:16px;color:var(--text)"></div><div style="font-size:12.5px;color:var(--muted)">Телефон · нажмите, чтобы скопировать</div>'; и.firstChild.textContent=u.phone; и.onclick=()=>{ try{copyText(u.phone);}catch(e){} }; w.appendChild(и); }
+  const {полоса,тело}=_zvTabs(c.messages,null); w.appendChild(полоса); w.appendChild(тело);
+  // блокировка, жалоба, фото чата серверов — прежние кнопки ниже
+  const ещё=document.createElement('div'); ещё.className='zvp-more'; try{ buildPeerActions(ещё); }catch(e){} w.appendChild(ещё);
+  (document.getElementById('phone')||document.body).appendChild(w);
+  const esc0=(e)=>{ if(e.key==='Escape'&&document.getElementById('zvProfile')){ w.remove(); document.removeEventListener('keydown',esc0); } }; document.addEventListener('keydown',esc0);
 }
 function buildPeerActions(body){
   const peer=current?current.id:null;if(!peer){body.appendChild(el('<div class="note">Откройте личный чат.</div>'));return;}
@@ -5577,6 +5666,29 @@ function renderGroupInfo(g){
     if(admin&&id!==me.id&&id!==g.owner){const x=el('<button class="gi-x" title="Удалить из группы">✕</button>');x.onclick=()=>removeGroupMember(g.id,id);row.appendChild(x);}
     wrap.appendChild(row);
   });
+  try{ _zvGroupExtras(g); }catch(e){}
+}
+/* 22.10.2026: профиль группы как в Android — «Назад», «Звонок / Видео / Поиск / Добавить», вкладки «Участники / Медиа / Файлы / Голосовые / Ссылки» */
+function _zvGroupExtras(g){
+  const лист=document.querySelector('#groupSheet .modal'); if(!лист)return;
+  const hero=лист.querySelector('.gi-hero'); if(!hero)return;
+  if(!hero.querySelector('.zvp-back')){ const b=document.createElement('button'); b.className='zvp-back'; b.setAttribute('aria-label','Назад');
+    b.innerHTML='<svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/></svg>'; b.onclick=closeGroupInfo; hero.prepend(b); }
+  ['zvGiBtns','zvGiTabs','zvGiBody'].forEach(id=>{ const e=document.getElementById(id); if(e)e.remove(); });
+  const SV=(p)=>'<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+p+'</svg>';
+  const кн=document.createElement('div'); кн.id='zvGiBtns'; кн.className='zvp-btns';
+  const пункты=[['Звонок','<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>',()=>{closeGroupInfo();startCall('audio');}],
+    ['Видео','<path d="m23 7-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>',()=>{closeGroupInfo();startCall('video');}],
+    ['Поиск','<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',()=>{closeGroupInfo();try{openConvSearch();}catch(e){}}]];
+  if(isGroupAdmin(g))пункты.push(['Добавить','<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>',()=>{try{openAddMembers();}catch(e){}}]);
+  пункты.forEach(([т,п,д])=>{ const b=document.createElement('button'); b.className='zvp-btn'; b.innerHTML=SV(п)+'<span></span>'; b.lastChild.textContent=т; b.onclick=д; кн.appendChild(b); });
+  hero.after(кн);
+  const участники=document.getElementById('giMembers'), выход=document.getElementById('giLeave');
+  const {полоса,тело}=_zvTabs(g.messages||[],{к:'уч',т:'Участники',н:(g.members||[]).length,
+    показ:(вид)=>{ if(участники)участники.style.display=вид?'':'none'; if(выход)выход.style.display=вид?'':'none'; }});
+  полоса.id='zvGiTabs'; тело.id='zvGiBody';
+  кн.after(полоса); полоса.after(тело);
+  if(участники)тело.after(участники); if(участники&&выход)участники.after(выход);
 }
 function groupUpdateBroadcast(gid,patch){
   const g=db().chats[gid];if(!g)return;
@@ -11289,7 +11401,8 @@ $('#rowServer').onclick=()=>openSub('Облачный сервер',buildServer)
 if($('#rowNetDiag'))$('#rowNetDiag').onclick=()=>openSub('Диагностика сети',buildNetworkDiagnostics);
 $('#rowAi').onclick=()=>openSub('Олеся ИИ',buildAi);
 $('#btnChatSettings').onclick=()=>{ if(current&&current.group){openGroupInfo();return;} openSub('Перевод'+(current?' · '+current.name:''),buildChatSettings); };
-$('#convWho').onclick=()=>{ if(current&&current.group){openGroupInfo();return;} if(current&&!current.channel&&!current.bot&&current.id!==me.id)openPeerActions(); };
+$('#convWho').onclick=()=>{ if(current&&current.group){openGroupInfo();return;} if(current&&!current.channel&&!current.bot&&current.id!==me.id)openPeerProfile(); };
+try{ const _ca=$('#convAvatar'); if(_ca){ _ca.style.cursor='pointer'; _ca.addEventListener('click',()=>{ if(current&&!current.group&&!current.channel&&!current.bot&&current.id!==me.id)openPeerProfile(); }); } }catch(e){}
 /* поиск по сообщениям в чате */
 $('#btnConvSearch').onclick=()=>{const b=$('#convSearchBar');if(b&&b.classList.contains('show'))closeConvSearch();else openConvSearch();};
 $('#convSearchInput').addEventListener('input',()=>runConvSearch());
