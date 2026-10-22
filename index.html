@@ -412,6 +412,28 @@ html.нативный-список #scrChats>*{visibility:hidden}
 .zv-lp .t{font-weight:700;font-size:.92em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .zv-lp .d{font-size:.85em;opacity:.8;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .zv-lp img{display:block;width:100%;height:126px;object-fit:cover;border-radius:8px;margin-top:6px}
+/* 22.10.2026 — поле ввода как в Android: смайлик и скрепка внутри поля, справа микрофон/отправить */
+.zv-pill{flex:1;min-width:0;display:flex;align-items:flex-end;gap:4px;background:var(--raised);border:1.5px solid var(--line);border-radius:25px;padding:4px 5px;min-height:50px;transition:border-color .15s,box-shadow .15s}
+.zv-pill:focus-within{border-color:var(--primary);box-shadow:0 0 0 3px rgba(108,123,255,.14)}
+.composer .zv-pill .ta{background:none!important;border:0!important;box-shadow:none!important;padding:9px 4px;min-height:40px;border-radius:0}
+.composer .cbtn.zv-in{width:40px;height:40px;border-radius:50%;background:none;box-shadow:none}
+.composer #btnEmoji.zv-in{background:rgba(245,158,11,.14);color:#F59E0B}
+.composer .zv-clip{background:rgba(34,197,94,.14)!important;color:#22C55E}
+.composer .ta-row{align-items:flex-end}
+.composer .cbtn.mic,.composer .cbtn.send{width:50px;height:50px}
+.composer .tool-row{display:none!important}
+.zv-att{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:22px 22px 0 0;padding:10px 14px calc(18px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .22s cubic-bezier(.2,.8,.2,1)}
+.sheet-back.show .zv-att{transform:none}
+.zv-att .ручка{width:40px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 14px}
+.zv-att-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px 6px}
+.zv-att-i{display:flex;flex-direction:column;align-items:center;gap:6px;background:none;border:0;color:var(--text);font:12px var(--body);cursor:pointer}
+.zv-att-ic{width:56px;height:56px;border-radius:18px;display:grid;place-items:center;position:relative;overflow:hidden;color:#fff;box-shadow:inset 0 -3px 6px rgba(0,0,0,.18),0 4px 10px -4px rgba(0,0,0,.35)}
+.zv-att-ic::before{content:'';position:absolute;left:14%;right:14%;top:5%;height:42%;border-radius:40%;background:linear-gradient(rgba(255,255,255,.45),rgba(255,255,255,0))}
+.zv-att-ic svg{width:26px;height:26px;position:relative}
+.zv-att-ic b{position:relative;font:800 14px var(--mono);letter-spacing:.5px}
+/* список чатов: галочки и подсвеченный открытый чат (ПК — две колонки) */
+.cr-time .zv-tk{display:inline-block;vertical-align:-2px;margin-right:3px}
+@media (min-width:900px){.chat-row.zv-active{background:rgba(108,123,255,.13)}}
 /* 21.10.2026 — ответ на сообщение, как в Android */
 .zv-q{border-left:3px solid var(--primary);background:rgba(108,123,255,.10);border-radius:8px;padding:4px 8px;margin:0 0 5px;cursor:pointer;white-space:normal;max-width:260px}
 .row.me .zv-q{border-left-color:rgba(255,255,255,.75);background:rgba(255,255,255,.13)}
@@ -2275,7 +2297,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.33', BUILD_ID='2026-10-22-201';
+const APP_VERSION='5.2.34', BUILD_ID='2026-10-22-201';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -4125,9 +4147,17 @@ function _zvMark(ids){ const н=_zvMarks(); ids.forEach(id=>н.add(id)); _zvSave
 function _zvUnmark(ids){ const н=_zvMarks(); let был=false; ids.forEach(id=>{ if(н.delete(id))был=true; }); if(был){ _zvSaveMarks(н); try{renderChats();}catch(e){} } }
 function _zvUnreadCount(id){ try{ const c=db().chats[id]; if(!c||c.channel)return 0; return (c.messages||[]).filter(m=>m.from!==me.id&&!(m.readBy||[]).includes(me.id)).length; }catch(e){ return 0; } }
 /* Подпись строки (для сверки списка) и отметки на ней */
-function _zvRowSig(id){ return '|m'+(isMutedChat(id)?1:0)+'|x'+(isMarkedUnread(id)?1:0); }
+function _zvTickOf(id){ try{ const c=db().chats[id]; if(!c||c.channel)return null; const last=(c.messages||[]).at(-1); if(!last||last.from!==me.id)return null;
+  if((last.readBy||[]).some(x=>x!==me.id))return 3; return last.st===undefined?1:(Number(last.st)||0); }catch(e){ return null; } }
+function _zvTickSvg(р){ const ц=р===3?'#16B8A0':'var(--faint)';
+  return '<svg class="zv-tk" viewBox="0 0 24 24" width="'+(р===0?13:17)+'" height="13" fill="none" stroke="'+ц+'" stroke-width="'+(р===3?3:2.6)+'" stroke-linecap="round" stroke-linejoin="round">'
+    +(р===0?'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>':(р>=2?'<path d="m1 13 4 4L15 7"/><path d="m9 13 4 4L23 7"/>':'<path d="m4 12 5 5L20 6"/>'))+'</svg>'; }
+function _zvActiveRows(){ try{ const к=current?((current.group||current.channel)?current.id:chatKey(me.id,current.id)):null;
+  document.querySelectorAll('#chatList .chat-row').forEach(r=>r.classList.toggle('zv-active',!!к&&r.dataset.k==='chat:'+к)); }catch(e){} }
+function _zvRowSig(id){ return '|m'+(isMutedChat(id)?1:0)+'|x'+(isMarkedUnread(id)?1:0)+'|g'+_zvTickOf(id); }
 function _zvRowMarks(row,id){
   const тихо=isMutedChat(id);
+  try{ const р=_zvTickOf(id); const tm=row.querySelector('.cr-time'); if(р!=null&&tm)tm.insertAdjacentHTML('afterbegin',_zvTickSvg(р)); }catch(e){}
   if(тихо){ const n=row.querySelector('.cr-name'); if(n){ const i=document.createElement('span'); i.className='cr-mute'; i.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 9.4-4.9M18 8c0 7 3 9 3 9H9"/><path d="M6.3 11C5.9 15 3 17 3 17h3"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="M3 3l18 18"/></svg>'; n.after(i); } }
   const b=row.querySelector('.cr-bottom .badge');
   if(b){ if(тихо)b.classList.add('mute'); }
@@ -4401,6 +4431,7 @@ function renderChats(){
     }
     const peerId=(c.members.find(x=>x!==me.id))??me.id;const u=d.users[peerId];if(!u)return;
     const isSaved=peerId===me.id;
+    if(isSaved)return;   // 22.10.2026: «Избранное» — отдельной строкой сверху, как в Android
     const last=c.messages.at(-1);
     if(term){const hay=(u.name+' '+u.phone+' '+(last?last.text:'')).toLowerCase();if(!hay.includes(term))return;}
     const unread=c.messages.filter(m=>m.from!==me.id&&!m.readBy?.includes(me.id)).length;
@@ -4441,6 +4472,7 @@ function renderChats(){
     while(wrap.childNodes.length>finalNodes.length) wrap.removeChild(wrap.lastChild);
   }
   try{reapplySel();}catch(e){}   // сохранить подсветку выбранных чатов при инкрементальной перерисовке
+  try{_zvActiveRows();}catch(e){}
   $('#myStatusTop').textContent='в сети';
 }
 function videoNoteEl(m){
@@ -4671,7 +4703,7 @@ function renderMessages(){
   const box=$('#msgs');if(!box)return;const c=getChat();if(!c){box.innerHTML='';return;}
   // при смене чата — чистый лист (ключи сообщений уникальны, но так надёжнее и как раньше)
   const ck=c.id||'';
-  if(box.dataset.chat!==ck){ box.innerHTML=''; box.dataset.chat=ck; try{_zvEndReply();}catch(e){} }
+  if(box.dataset.chat!==ck){ box.innerHTML=''; box.dataset.chat=ck; try{_zvEndReply();}catch(e){} try{_zvActiveRows();}catch(e){} }
   // 1) желаемая последовательность: разделители дней / системные / пузыри — с ключами и подписями
   const desired=[]; let lastDay='';
   c.messages.forEach(m0=>{
@@ -5273,7 +5305,7 @@ function autoSize(){const t=$('#msgInput');t.style.height='auto';
   // сверху/снизу (box-sizing:border-box) — иначе одна строка давала бы «лишние» 3px прокрутки.
   // Потолок высоты задаёт CSS (max-height:40vh); за ним прокрутка идёт БЕЗ видимой полосы.
   t.style.height=(t.scrollHeight+3)+'px';}
-function toggleSendBtn(){const has=$('#msgInput').value.trim().length>0;$('#btnSend').style.display=has?'grid':'none';$('#btnMic').style.display=has?'none':'grid';}
+function toggleSendBtn(){const has=$('#msgInput').value.trim().length>0;$('#btnSend').style.display=has?'grid':'none';$('#btnMic').style.display=has?'none':'grid';const _cl=document.getElementById('btnClip');if(_cl)_cl.style.display=has?'none':'';}
 
 /* typing */
 let typingTO=null,typingSent=false;
@@ -6386,6 +6418,38 @@ function botReply(userMsg){
 
 /* ---------- attachments ---------- */
 $('#btnAttach').onclick=()=>$('#fileInput').click();
+/* 22.10.2026: поле ввода как в Android — 😊 слева в поле, 📎 справа в поле (пока нет текста), лист вложений */
+function _zvAttachSheet(){
+  const back=document.createElement('div'); back.className='sheet-back';
+  const лист=document.createElement('div'); лист.className='zv-att'; лист.innerHTML='<div class="ручка"></div><div class="zv-att-grid"></div>';
+  const сетка=лист.querySelector('.zv-att-grid');
+  const SV=(p)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+p+'</svg>';
+  const пункты=[
+    ['Галерея','#5BA8FF','#3B6FF6',SV('<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>'),'btnAttach'],
+    ['Камера','#3EE0C4','#14A89A',SV('<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>'),'btnCamera'],
+    ['Файл','#5EE38A','#1FA85C',SV('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>'),'btnDoc'],
+    ['Кружок','#FF6B8B','#E0245E',SV('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/>'),'btnVnote'],
+    ['GIF','#C98BFF','#7A3FE0','<b>GIF</b>','btnGif'],
+    ['Олеся','#7B8CFF','#C46CFF','<svg viewBox="0 0 24 24"><path fill="#fff" d="M14 3.8Q14 12 21.5 12Q14 12 14 20.2Q14 12 6.5 12Q14 12 14 3.8Z"/><path fill="#fff" d="M6 2.5Q6 6.2 9.5 6.2Q6 6.2 6 9.9Q6 6.2 2.5 6.2Q6 6.2 6 2.5Z"/></svg>','btnAiImg'],
+  ];
+  let closed=false; const close=()=>{ if(closed)return; closed=true; back.classList.remove('show'); setTimeout(()=>{ try{back.remove();}catch(e){} },230); };
+  пункты.forEach(([т,a,b,зн,id])=>{ const кн=document.getElementById(id); if(!кн)return;
+    const i=document.createElement('button'); i.className='zv-att-i';
+    i.innerHTML='<span class="zv-att-ic" style="background:linear-gradient(135deg,'+a+','+b+')">'+зн+'</span><span></span>'; i.lastChild.textContent=т;
+    i.onclick=(e)=>{ e.stopPropagation(); close(); setTimeout(()=>кн.click(),60); }; сетка.appendChild(i); });
+  back.appendChild(лист); (document.getElementById('phone')||document.body).appendChild(back);
+  requestAnimationFrame(()=>back.classList.add('show'));
+  back.onclick=(e)=>{ if(e.target===back)close(); };
+}
+(function _zvComposer(){
+  const ряд=document.querySelector('#composer .ta-row'), ta=document.getElementById('msgInput'), эм=document.getElementById('btnEmoji');
+  if(!ряд||!ta||!эм||document.getElementById('zvPill'))return;
+  const пилюля=document.createElement('div'); пилюля.id='zvPill'; пилюля.className='zv-pill';
+  ряд.insertBefore(пилюля,ta); эм.classList.remove('tool'); эм.classList.add('zv-in'); пилюля.appendChild(эм); пилюля.appendChild(ta);
+  const скрепка=document.createElement('button'); скрепка.id='btnClip'; скрепка.className='cbtn zv-in zv-clip'; скрепка.title='Вложение';
+  скрепка.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>';
+  скрепка.onclick=(e)=>{ e.stopPropagation(); _zvAttachSheet(); }; пилюля.appendChild(скрепка);
+})();
 /* Сжатие фото перед отправкой: иначе многомегабайтный base64 переполняет хранилище
    устройства (localStorage) и упирается в лимиты облака (D1/шина) — отсюда «нет места». */
 function compressImageFile(file,maxDim,quality,cb){
