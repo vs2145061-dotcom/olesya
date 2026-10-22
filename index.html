@@ -336,6 +336,9 @@ html.нативный-список #scrChats>*{visibility:hidden}
 .biz-card .bc-order{margin-top:9px;padding:7px 14px;border:0;border-radius:12px;background:var(--primary);color:#fff;font-size:13px;font-weight:600;cursor:pointer}
 .conv-head .who{flex:1;min-width:0;cursor:pointer}
 .conv-head .nm{font-weight:600;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 22.10.2026: длинное имя — в две строки помельче, кнопки шапки прежнего размера */
+.conv-head .nm.zv-long{white-space:normal;font-size:14.5px;line-height:17px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.conv-head{gap:9px}
 .conv-head .st{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px;width:auto;height:auto;border-radius:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:default;box-shadow:none;border:none;background:none;transform:none;padding:0}
 .conv-head .st::after{display:none}
 .conv-head .st:hover{transform:none}
@@ -2330,7 +2333,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.35', BUILD_ID='2026-10-22-201';
+const APP_VERSION='5.2.36', BUILD_ID='2026-10-22-202';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -4239,7 +4242,7 @@ function _zvUnreadCount(id){ try{ const c=db().chats[id]; if(!c||c.channel)retur
 function _zvTickOf(id){ try{ const c=db().chats[id]; if(!c||c.channel)return null; const last=(c.messages||[]).at(-1); if(!last||last.from!==me.id)return null;
   if((last.readBy||[]).some(x=>x!==me.id))return 3; return last.st===undefined?1:(Number(last.st)||0); }catch(e){ return null; } }
 function _zvTickSvg(р){ const ц=р===3?'#16B8A0':'var(--faint)';
-  return '<svg class="zv-tk" viewBox="0 0 24 24" width="'+(р===0?13:17)+'" height="13" fill="none" stroke="'+ц+'" stroke-width="'+(р===3?3:2.6)+'" stroke-linecap="round" stroke-linejoin="round">'
+  return '<svg class="zv-tk" viewBox="0 0 24 24" width="'+(р===0?14:19)+'" height="14" fill="none" stroke="'+ц+'" stroke-width="'+(р===3?3:2.7)+'" stroke-linecap="round" stroke-linejoin="round">'
     +(р===0?'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>':(р>=2?'<path d="m1 13 4 4L15 7"/><path d="m9 13 4 4L23 7"/>':'<path d="m4 12 5 5L20 6"/>'))+'</svg>'; }
 function _zvActiveRows(){ try{ const к=current?((current.group||current.channel)?current.id:chatKey(me.id,current.id)):null;
   document.querySelectorAll('#chatList .chat-row').forEach(r=>r.classList.toggle('zv-active',!!к&&r.dataset.k==='chat:'+к)); }catch(e){} }
@@ -4562,7 +4565,7 @@ function renderChats(){
   }
   try{reapplySel();}catch(e){}   // сохранить подсветку выбранных чатов при инкрементальной перерисовке
   try{_zvActiveRows();}catch(e){}
-  $('#myStatusTop').textContent='в сети';
+  try{_zvNetPaint();}catch(e){ $('#myStatusTop').textContent='в сети'; }
 }
 function videoNoteEl(m){
   const w=document.createElement('div');w.className='vnote-msg';
@@ -4752,6 +4755,7 @@ function openConv(peerId){
   pinMsgsBottom(true);   // прилипаем к последнему сообщению (медиа догрузятся — останемся внизу)
 }
 function updateConvStatus(){
+  try{ const _n=document.getElementById('convName'); if(_n)_n.classList.toggle('zv-long',(_n.textContent||'').length>13); }catch(e){}
   if(current&&current.channel){const s=$('#convStatus');s.classList.remove('typing');s.textContent='z/'+current.handle+' · '+(current.subs||0)+' '+plural(current.subs||0,'подписчик','подписчика','подписчиков');return;}
   if(current&&current.group){const s=$('#convStatus');s.classList.remove('typing');const n=(current.members||[]).length;s.textContent=n+' '+plural(n,'участник','участника','участников');return;}
   if(current&&current.id===me.id){$('#convStatus').textContent='ваши сохранённые сообщения';return;}const s=$('#convStatus');s.classList.remove('typing');s.textContent=lastSeenText(current);}
@@ -4865,6 +4869,28 @@ function _zvPreview(b,адрес){
     .then(r=>r.ok?r.json():null).then(j=>{ const д=(j&&j.preview)||null; _zvLP.set(адрес,д); try{localStorage.setItem('zv-lp:'+адрес,JSON.stringify({t:Date.now(),d:д}));}catch(e){} заполнить(д); }).catch(()=>{});
 }
 /* Размер текста в чатах (как «Моя страница» в Android) */
+/* ── 22.10.2026: «в сети» по-настоящему — сервер знает, когда человек последний раз был на связи ── */
+async function _zvPresence(){
+  try{
+    if(!me||!sessionToken||document.hidden)return;
+    const d=db(); const ids=new Set();
+    Object.values(d.chats||{}).forEach(c=>{ if(c.group||c.channel)return; const p=(c.members||[]).find(x=>x!==me.id); if(p&&p!=='bot_olesya'&&!/^zorveld-/.test(p))ids.add(p); });
+    const список=[...ids].slice(0,100); if(!список.length)return;
+    const r=await apiFetch(getApiUrl()+'/presence?ids='+encodeURIComponent(список.join(',')),{headers:{'x-session-token':sessionToken||''},timeout:8000});
+    if(!r.ok)return; const j=await r.json(); const d2=db(); let изм=false;
+    список.forEach(id=>{ const x=j&&j.users&&j.users[id]; const u=d2.users[id]; if(!x||!u)return;
+      const on=!!x.online; if(!!u.online!==on||(x.last_seen&&u.lastSeen!==x.last_seen)){ u.online=on; if(x.last_seen)u.lastSeen=x.last_seen; изм=true; } });
+    if(изм){ save(d2); try{ if(current&&!current.group&&!current.channel){ const u=d2.users[current.id]; if(u){ current.online=u.online; current.lastSeen=u.lastSeen; } } }catch(e){} try{renderChats();}catch(e){} try{refreshIfPresence();}catch(e){} }
+  }catch(e){}
+}
+setTimeout(_zvPresence,3000); setInterval(_zvPresence,20000);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden)_zvPresence(); });
+/* Своя связь — подпись под «Чаты»: «в сети» / «нет сети» (как шапка списка в Android) */
+function _zvNetLabel(){ try{ return navigator.onLine===false?'нет сети':'в сети'; }catch(e){ return 'в сети'; } }
+function _zvNetPaint(){ const e=document.getElementById('myStatusTop'); if(!e)return; const т=_zvNetLabel(); e.textContent=т; e.style.color=т==='в сети'?'':'#F59E0B'; }
+window.addEventListener('online',_zvNetPaint); window.addEventListener('offline',_zvNetPaint);
+/* Размер текста выбран в Android («Моя страница») — принимаем без ответа назад */
+window.olesyaМасштаб=function(к){ к=Number(к); if(!(к>=0.8&&к<=1.6))return; try{localStorage.setItem('zv-text-scale',String(к));}catch(e){} try{document.documentElement.style.setProperty('--zv-k',String(к));}catch(e){} try{ const d=document.getElementById('stTextScale'); if(d&&typeof _zvScaleLabel==='function')d.textContent=_zvScaleLabel(); }catch(e){} };
 function _zvScale(){ try{ const н=parseFloat(localStorage.getItem('zv-text-scale')); return н>=0.8&&н<=1.6?н:1; }catch(e){ return 1; } }
 function _zvSetScale(н){ try{localStorage.setItem('zv-text-scale',String(н));}catch(e){} try{document.documentElement.style.setProperty('--zv-k',String(н));}catch(e){}
   try{ if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify({type:'text-scale',k:н})); }catch(e){} }
@@ -10053,7 +10079,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=201, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-201.apk';
+const APK_NEW_BUILD=202, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-202.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
