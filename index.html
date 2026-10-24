@@ -2339,7 +2339,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.38', BUILD_ID='2026-10-24-204';
+const APP_VERSION='5.2.39', BUILD_ID='2026-10-24-205';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -4410,7 +4410,7 @@ window.olesyaГруппа=function(действие,gid,данные){
     if(действие==='создать'){
       const d0=db(); if(!gid||d0.chats[gid])return false;
       const members=Array.from(new Set([me.id,...(((данные&&данные.members)||[]).map(String))]));
-      if(members.length<2)return false;
+      /* 24.10.2026 (владелец): группу можно создать только с собой, участников — потом */
       const g0={id:gid,gid:gid,group:true,name:String((данные&&данные.name)||'Новая группа').slice(0,40),members,owner:me.id,admins:[me.id],color:senderColor(gid),created:Date.now(),messages:[]};
       d0.chats[gid]=g0;save(d0);
       const roster=rosterFor(members);
@@ -5616,7 +5616,7 @@ function rosterFor(members){const d=db();return members.map(id=>{const u=d.users
 function createGroup(name,memberIds){
   const d=db();
   const members=Array.from(new Set([me.id,...(memberIds||[]).filter(Boolean)]));
-  if(members.length<2){toast('Добавьте хотя бы одного участника');return null;}
+  /* 24.10.2026 (владелец): можно только с собой — участников добавите потом в профиле группы */
   const gid=genGid();
   const g={id:gid,gid:gid,group:true,name:(name&&name.trim())||'Новая группа',members,owner:me.id,admins:[me.id],color:senderColor(gid),created:Date.now(),messages:[]};
   d.chats[gid]=g;save(d);
@@ -8223,7 +8223,7 @@ function renderGroupContacts(){
 $('#groupSearch').addEventListener('input',renderGroupContacts);
 $('#newGroupModal').addEventListener('click',e=>{if(e.target.id==='newGroupModal')closeGroupModal();});
 $('#btnCreateGroup').onclick=()=>{
-  if(!groupPicked.length){toast('Выберите хотя бы одного участника');return;}
+  if(!groupPicked.length&&groupModalMode&&groupModalMode.add){toast('Выберите хотя бы одного участника');return;}
   if(groupModalMode&&groupModalMode.add){ addGroupMembers(groupModalMode.add,groupPicked.slice()); groupModalMode=null; closeGroupModal(); return; }
   const name=$('#groupName').value.trim();
   const g=createGroup(name||('Группа · '+(me.name||'я')),groupPicked.slice());
@@ -10153,7 +10153,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=204, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-204.apk';
+const APK_NEW_BUILD=205, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-205.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
