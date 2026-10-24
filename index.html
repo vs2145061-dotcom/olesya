@@ -379,6 +379,7 @@ html.нативный-список #scrChats>*{visibility:hidden}
 .row.them .bubble .meta{color:var(--faint)}
 .tick{display:inline-flex}
 .tick svg{width:15px;height:11px}
+.tick.two svg{width:18px}  /* 24.10.2026: две галочки разнесены */
 .tick.read{color:#bfe3ff}
 .tick.pending{opacity:.75}
 .tick.pending svg{width:12px;height:12px}
@@ -436,6 +437,9 @@ html.нативный-список #scrChats>*{visibility:hidden}
 .zv-att-ic b{position:relative;font:800 14px var(--mono);letter-spacing:.5px}
 /* список чатов: галочки и подсвеченный открытый чат (ПК — две колонки) */
 .cr-time .zv-tk{display:inline-block;vertical-align:-2px;margin-right:3px}
+/* 24.10.2026: перетаскивание закреплённых */
+.chat-row.pinned{transition:transform .15s ease}
+.chat-row.zv-drag{transition:none;position:relative;z-index:5;background:var(--surface);box-shadow:0 6px 18px rgba(0,0,0,.25);opacity:.97}
 /* 22.10.2026 — профиль собеседника как в Android */
 #zvProfile{position:fixed;inset:0;z-index:300;background:var(--surface);overflow-y:auto;animation:fadeIn .18s ease}
 .zvp-top{display:flex;flex-direction:column;align-items:center;padding:8px 16px 0;position:relative}
@@ -929,6 +933,8 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 .confirm-card .cf-btn{border:none;background:none;font-size:15px;font-weight:600;color:var(--primary);padding:9px 15px;border-radius:11px;cursor:pointer;font-family:inherit}
 .confirm-card .cf-btn:active{background:var(--raised)}
 .confirm-card .cf-btn.cf-danger{color:#ff5b5b}
+.confirm-card .cf-acts.cf-three{flex-wrap:wrap}
+.confirm-card .cf-acts.cf-three .cf-extra{flex-basis:100%;text-align:right}   /* 24.10.2026: «Удалить и заблокировать» — отдельной строкой сверху */
 
 /* контекст-меню чата (долгое нажатие) */
 .chat-row.sel{background:rgba(108,123,255,.16)}
@@ -2333,7 +2339,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.37', BUILD_ID='2026-10-22-203';
+const APP_VERSION='5.2.38', BUILD_ID='2026-10-24-204';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -4207,15 +4213,37 @@ function lastSeenText(u){
    прячем чат, пока не придёт СООБЩЕНИЕ новее момента удаления. Собеседник свою копию сохраняет. --- */
 function hiddenChats(){try{return JSON.parse(localStorage.getItem('om_hidden_chats')||'{}')||{};}catch(e){return {};}}
 function saveHiddenChats(h){try{localStorage.setItem('om_hidden_chats',JSON.stringify(h));}catch(e){}}
-function isChatHidden(chat){const ts=hiddenChats()[chat.id];if(!ts)return false;const last=(chat.messages&&chat.messages.at(-1)&&chat.messages.at(-1).t)||0;return last<=ts;}
+/* 24.10.2026 (владелец): «блокировка групп, чатов, каналов при их удалении». Заблокированный чат не возвращается
+   при новом сообщении, его сообщения и посты не принимаются; личный — ещё и блок собеседника (звонки тоже),
+   канал — отписка. Снять — Настройки → Заблокированные. Ключ om_blocked_chats синхронизируется между устройствами. */
+function blockedChats(){try{return JSON.parse(localStorage.getItem('om_blocked_chats')||'{}')||{};}catch(e){return {};}}
+function saveBlockedChats(b){try{localStorage.setItem('om_blocked_chats',JSON.stringify(b));}catch(e){}}
+function isChatBlocked(id){return !!blockedChats()[id];}
+function _zvPeerOf(id){return String(id).split('__').find(x=>x!==me.id)||'';}
+async function blockChatForMe(chat){
+  if(!chat||_этоОлеся(chat.id))return;
+  const kind=chat.channel?'channel':(chat.group?'group':'chat');
+  const b=blockedChats();b[chat.id]={t:Date.now(),name:chat.name||'',kind};saveBlockedChats(b);
+  if(kind==='chat'){const peer=_zvPeerOf(chat.id);if(peer&&!isBlocked(peer)){try{toggleBlock(peer);}catch(e){}}}
+  if(kind==='channel'&&chat.subscribed){try{await cloudChannel('/channel/unsubscribe','POST',{id:chat.id});}catch(e){}
+    const d=db();if(d.chats[chat.id]){d.chats[chat.id].subscribed=false;save(d);}}
+}
+function unblockChat(id){
+  const b=blockedChats();const x=b[id];delete b[id];saveBlockedChats(b);
+  if(x&&x.kind==='chat'){const peer=_zvPeerOf(id);if(peer&&isBlocked(peer)){try{toggleBlock(peer);}catch(e){}}}
+  try{if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify({type:'chat-unblocked',id:String(id)}));}catch(e){}
+}
+function isChatHidden(chat){if(isChatBlocked(chat.id))return true;const ts=hiddenChats()[chat.id];if(!ts)return false;const last=(chat.messages&&chat.messages.at(-1)&&chat.messages.at(-1).t)||0;return last<=ts;}
 async function deleteChatForMe(chat,label,безВопроса){
   if(!chat)return;
-  const _ok=безВопроса?true:await appConfirm('Собеседник свою копию сохранит. Чат вернётся, если придёт новое сообщение.',{title:'Удалить чат'+(label?' «'+label+'»':'')+'?',okText:'Удалить',danger:true});
+  const _можноБлок=!_этоОлеся(chat.id);
+  const _ok=безВопроса?true:await appConfirm('Собеседник свою копию сохранит. Чат вернётся, если придёт новое сообщение.'+(_можноБлок?' Чтобы не возвращался — «Удалить и заблокировать».':''),{extraText:_можноБлок?'Удалить и заблокировать':'',title:'Удалить чат'+(label?' «'+label+'»':'')+'?',okText:'Удалить',danger:true});
   if(!_ok)return;
   const d=db();const c=d.chats[chat.id];if(c){c.messages=[];}                     // локальную историю чистим (на сервере остаётся)
   const h=hiddenChats();h[chat.id]=Date.now();saveHiddenChats(h);save(d);
+  if(_ok==='extra')await blockChatForMe(chat);
   try{renderChats();}catch(e){}try{if(typeof renderHome==='function')renderHome();}catch(e){}
-  if(!безВопроса)toast('Чат удалён у вас');
+  if(!безВопроса)toast(_ok==='extra'?'Чат удалён и заблокирован':'Чат удалён у вас');
 }
 /* Долгое нажатие (или правый клик на ПК) по строке чата → удалить. Обычный тап открывает чат. */
 /* --- Закрепление чатов и «отметить прочитанным» --- */
@@ -4242,8 +4270,9 @@ function _zvUnreadCount(id){ try{ const c=db().chats[id]; if(!c||c.channel)retur
 function _zvTickOf(id){ try{ const c=db().chats[id]; if(!c||c.channel)return null; const last=(c.messages||[]).at(-1); if(!last||last.from!==me.id)return null;
   if((last.readBy||[]).some(x=>x!==me.id))return 3; return last.st===undefined?1:(Number(last.st)||0); }catch(e){ return null; } }
 function _zvTickSvg(р){ const ц=р===3?'#16B8A0':'var(--faint)';
-  return '<svg class="zv-tk" viewBox="0 0 24 24" width="'+(р===0?14:19)+'" height="14" fill="none" stroke="'+ц+'" stroke-width="'+(р===3?3:2.7)+'" stroke-linecap="round" stroke-linejoin="round">'
-    +(р===0?'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>':(р>=2?'<path d="m1 13 4 4L15 7"/><path d="m9 13 4 4L23 7"/>':'<path d="m4 12 5 5L20 6"/>'))+'</svg>'; }
+  /* 24.10.2026: две галочки разнесены (шаг 11, поле 28×24) — как в Android */
+  return '<svg class="zv-tk" viewBox="'+(р>=2?'0 0 28 24':'0 0 24 24')+'" width="'+(р===0?14:(р>=2?22:19))+'" height="14" fill="none" stroke="'+ц+'" stroke-width="'+(р===3?3:2.7)+'" stroke-linecap="round" stroke-linejoin="round">'
+    +(р===0?'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>':(р>=2?'<path d="m1 13 4 4L15 7"/><path d="m12 13 4 4L26 7"/>':'<path d="m4 12 5 5L20 6"/>'))+'</svg>'; }
 function _zvActiveRows(){ try{ const к=current?((current.group||current.channel)?current.id:chatKey(me.id,current.id)):null;
   document.querySelectorAll('#chatList .chat-row').forEach(r=>r.classList.toggle('zv-active',!!к&&r.dataset.k==='chat:'+к)); }catch(e){} }
 function _zvRowSig(id){ return '|m'+(isMutedChat(id)?1:0)+'|x'+(isMarkedUnread(id)?1:0)+'|g'+_zvTickOf(id); }
@@ -4297,14 +4326,42 @@ function openChatActions(row,chat,label){
   requestAnimationFrame(()=>back.classList.add('show'));
   back.onclick=e=>{if(e.target===back)close();};
 }
+/* 24.10.2026 (владелец): закреплённые перетаскиваются, как в Android. Палец — долгое нажатие (выбор, как было)
+   и, не отпуская, повести вверх-вниз; мышь (ПК) — просто тянуть строку. Порядок — om_pinned. */
+let _zvDragId=null;
+function _zvPinnedRows(){return [...document.querySelectorAll('#chatList .chat-row.pinned')];}
+function _zvSavePinOrder(ids){const p=pinnedChats();const итог=ids.filter(x=>p.includes(x)).concat(p.filter(x=>!ids.includes(x)));
+  try{localStorage.setItem('om_pinned',JSON.stringify(итог));}catch(e){} try{renderChats();}catch(e){}}
 function attachChatMenu(row,chat,label){
-  if(isPinned(chat.id))row.classList.add('pinned');
-  let tmr=null,long=false;
+  const pinned=isPinned(chat.id);
+  if(pinned)row.classList.add('pinned');
+  row.dataset.cid=chat.id;
+  let tmr=null,long=false,armed=false,dragging=false,y0=0,rows=[],from=-1,to=-1,H=0;
   // Долгое нажатие → режим мультивыбора чатов (тап в режиме переключает). Правый клик (ПК) —
   // одиночное меню чата, но в режиме выбора тоже переключает.
-  row.addEventListener('touchstart',()=>{long=false;tmr=setTimeout(()=>{long=true;tmr=null;enterSel('chat',chat.id);},500);},{passive:true});
+  row.addEventListener('touchstart',e=>{long=false;armed=false;y0=(e.touches[0]||{}).clientY||0;tmr=setTimeout(()=>{long=true;tmr=null;enterSel('chat',chat.id);if(pinned)armed=true;},500);},{passive:true});
   const cancel=()=>{if(tmr){clearTimeout(tmr);tmr=null;}};
-  row.addEventListener('touchend',cancel);row.addEventListener('touchmove',cancel);
+  const dragEnd=()=>{ if(dragging){ rows.forEach(r=>{r.style.transform='';}); row.classList.remove('zv-drag');
+      if(to>=0&&to!==from){ const ids=rows.map(r=>r.dataset.cid); const [x]=ids.splice(from,1); ids.splice(to,0,x); try{exitSel();}catch(e){} _zvSavePinOrder(ids); } }
+    dragging=false; armed=false; };
+  row.addEventListener('touchend',()=>{cancel();dragEnd();});row.addEventListener('touchcancel',()=>{cancel();dragEnd();});
+  row.addEventListener('touchmove',e=>{ cancel(); if(!armed)return; e.preventDefault();
+    const dy=((e.touches[0]||{}).clientY||y0)-y0;
+    if(!dragging){ dragging=true; rows=_zvPinnedRows(); from=rows.indexOf(row); to=from; H=row.offsetHeight||72; row.classList.add('zv-drag'); }
+    if(from<0)return;
+    const lim=Math.max(-from*H,Math.min((rows.length-1-from)*H,dy)); row.style.transform='translateY('+lim+'px)';
+    const t=Math.max(0,Math.min(rows.length-1,from+Math.round(lim/H)));
+    if(t!==to){ to=t; try{ if(typeof tapFx==='function')tapFx(); }catch(_){} }
+    rows.forEach((r,i)=>{ if(r===row)return; let sh=0; if(to>from&&i>from&&i<=to)sh=-H; else if(to<from&&i>=to&&i<from)sh=H; r.style.transform=sh?'translateY('+sh+'px)':''; });
+  },{passive:false});
+  if(pinned&&!('ontouchstart' in window)){
+    row.draggable=true;
+    row.addEventListener('dragstart',e=>{ _zvDragId=chat.id; try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',chat.id);}catch(_){} row.classList.add('zv-drag'); });
+    row.addEventListener('dragend',()=>{ row.classList.remove('zv-drag'); _zvDragId=null; });
+    row.addEventListener('dragover',e=>{ if(_zvDragId&&_zvDragId!==chat.id){ e.preventDefault(); try{e.dataTransfer.dropEffect='move';}catch(_){} } });
+    row.addEventListener('drop',e=>{ if(!_zvDragId)return; e.preventDefault(); const ids=_zvPinnedRows().map(r=>r.dataset.cid);
+      const a=ids.indexOf(_zvDragId),b=ids.indexOf(chat.id); if(a<0||b<0)return; ids.splice(a,1); ids.splice(b,0,_zvDragId); _zvDragId=null; _zvSavePinOrder(ids); });
+  }
   row.addEventListener('contextmenu',e=>{e.preventDefault(); if(_touchRecent())return; if(selMode==='chat'){toggleSel('chat',chat.id);return;} openChatActions(row,chat,label);});
   row.addEventListener('click',e=>{ if(selMode==='chat'){e.stopImmediatePropagation();e.preventDefault();if(long){long=false;return;}toggleSel('chat',chat.id);return;} if(long){e.stopImmediatePropagation();e.preventDefault();long=false;} },true);
 }
@@ -4406,6 +4463,10 @@ window.olesyaChat=function(действие,id){
     if(действие==='настройки'){ const b=$('#btnSettings'); if(b)b.click(); return; }
     if(действие==='новый'){ try{openNewChat();}catch(e){} return; }
     if(действие==='избранное'){ if(me)openConv(me.id); return; }
+    /* 24.10.2026: новый порядок закреплённых из оболочки (перетаскивание) — id через перевод строки */
+    if(действие==='порядок-закреплённых'){ const нов=String(id||'').split('\n').filter(Boolean); const p=pinnedChats();
+      const итог=нов.filter(x=>p.includes(x)).concat(p.filter(x=>!нов.includes(x)));
+      try{localStorage.setItem('om_pinned',JSON.stringify(итог));}catch(e){} try{renderChats();}catch(e){} return; }
     if(действие==='искать'){
       const п=$('#searchInput'); if(п){ п.value=id||''; }
       renderChats(); return;
@@ -4426,6 +4487,8 @@ window.olesyaChat=function(действие,id){
     if(действие==='удалить'){ try{deleteChatForMe(c,c.name||'');}catch(e){} return; }
     /* выбор нескольких чатов в оболочке: она уже спросила один раз (14.10.2026) */
     if(действие==='удалить-тихо'){ try{deleteChatForMe(c,c.name||'',true);}catch(e){} return; }
+    /* 24.10.2026: «Удалить и заблокировать» из выбора чатов оболочки (она уже спросила) */
+    if(действие==='удалить-блок'){ try{ deleteChatForMe(c,c.name||'',true).then(()=>blockChatForMe(c)).then(()=>{try{renderChats();}catch(e){}}).catch(()=>{}); }catch(e){} return; }
     /* «Ещё» в выборе чатов оболочки (14.10.2026): очистить историю, заблокировать */
     if(действие==='очистить'){ try{ c.messages=[]; save(d); renderChats(); if(typeof renderHome==='function')renderHome(); }catch(e){} return; }
     if(действие==='заблокировать'){ if(c.group||c.channel)return; const peer=(c.members||[]).find(x=>x!==me.id); if(peer){ try{toggleBlock(peer);}catch(e){} renderChats(); } return; }
@@ -4435,7 +4498,9 @@ function renderChats(){
   if(!me)return;const d=db();const wrap=$('#chatList');
   const term=($('#searchInput').value||'').toLowerCase();
   const myChats=Object.values(d.chats).filter(c=>(c.members&&c.members.includes(me.id))||(c.channel&&c.subscribed));
-  myChats.sort((a,b)=>{const pa=isPinned(a.id)?1:0,pb=isPinned(b.id)?1:0;if(pa!==pb)return pb-pa;const la=a.messages.at(-1)?.t||0,lb=b.messages.at(-1)?.t||0;return lb-la;});
+  /* 24.10.2026 (владелец): закреплённые — в своём порядке (перетаскиванием), не по времени */
+  const _пз=pinnedChats();
+  myChats.sort((a,b)=>{const pa=isPinned(a.id)?1:0,pb=isPinned(b.id)?1:0;if(pa!==pb)return pb-pa;if(pa&&pb)return _пз.indexOf(a.id)-_пз.indexOf(b.id);const la=a.messages.at(-1)?.t||0,lb=b.messages.at(-1)?.t||0;return lb-la;});
   const desired=[];
   const дляОболочки=[];
   myChats.forEach(c=>{
@@ -4967,7 +5032,7 @@ function renderBubble(m){
     const total=(current.members||[]).length-1;
     const readers=(m.readBy||[]).filter(x=>x!==me.id&&(current.members||[]).indexOf(x)>=0).length;
     const rc=document.createElement('span');rc.className='b-readcnt'+(total>0&&readers>=total?' done':'');
-    rc.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" width="13" height="13" style="vertical-align:-2px">'+((readers>0)?'<path d="m1 13 4 4L15 7"/><path d="m9 13 4 4L23 7"/>':'<path d="m4 12 5 5L20 6"/>')+'</svg> '+readers+'/'+Math.max(total,1);
+    rc.innerHTML='<svg viewBox="'+(readers>0?'0 0 28 24':'0 0 24 24')+'" fill="none" stroke="currentColor" stroke-width="2.6" width="'+(readers>0?15:13)+'" height="13" style="vertical-align:-2px">'+((readers>0)?'<path d="m1 13 4 4L15 7"/><path d="m12 13 4 4L26 7"/>':'<path d="m4 12 5 5L20 6"/>')+'</svg> '+readers+'/'+Math.max(total,1);
     meta.appendChild(rc);
   } else if(mine){
     // Четыре состояния: часики (не ушло) → одна галочка (сервер принял) →
@@ -4978,11 +5043,11 @@ function renderBubble(m){
     // висели бы на них вечно. Нет поля — значит старое, показываем как отправленное.
     const st=isRead?3:(m.st===undefined?1:m.st);
     const tk=document.createElement('span');
-    tk.className='tick'+(isRead?' read':(st===0?' pending':''));
+    tk.className='tick'+(isRead?' read':(st===0?' pending':''))+(st>=2?' two':'');
     const ONE='<path d="m4 12 5 5L20 6"/>';
-    const TWO='<path d="m1 13 4 4L15 7"/><path d="m9 13 4 4L23 7"/>';
+    const TWO='<path d="m1 13 4 4L15 7"/><path d="m12 13 4 4L26 7"/>';
     const CLOCK='<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>';
-    tk.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">'
+    tk.innerHTML='<svg viewBox="'+(st>=2?'0 0 28 24':'0 0 24 24')+'" fill="none" stroke="currentColor" stroke-width="2.5">'
       +(st===0?CLOCK:(st>=2?TWO:ONE))+'</svg>';
     tk.title=st===0?'Не отправлено — уйдёт, когда появится связь'
             :(st===1?'Отправлено':(st===2?'Доставлено':'Прочитано'));
@@ -5239,8 +5304,9 @@ function _этоОлеся(id){ const c=db().chats[id]; return !!(c&&(c.members|
 async function selClearChats(){ const ids=[...selSet]; if(!ids.length)return; const ok=await appConfirm('Сообщения удалятся с этого устройства, у собеседников останутся.',{title:'Очистить историю: '+ids.length+'?',okText:'Очистить',danger:true}); if(!ok)return; const d=db(); ids.forEach(id=>{ const c=d.chats[id]; if(c)c.messages=[]; }); save(d); exitSel(); try{renderChats();}catch(e){} try{if(typeof renderHome==='function')renderHome();}catch(e){} toast('История очищена'); }
 async function selBlockChats(){ const ids=[...selSet].filter(id=>!_этоОлеся(id)); if(!ids.length)return; const d=db(); const peers=ids.map(id=>{const c=d.chats[id];return c&&(c.members||[]).find(x=>x!==me.id);}).filter(Boolean); const всеЗаблок=peers.length&&peers.every(p=>isBlocked(p)); const ok=await appConfirm(всеЗаблок?'Сообщения и звонки снова будут доходить.':'Сообщения и звонки от них перестанут доходить.',{title:(всеЗаблок?'Разблокировать: ':'Заблокировать: ')+peers.length+'?',okText:всеЗаблок?'Разблокировать':'Заблокировать',danger:!всеЗаблок}); if(!ok)return; peers.forEach(p=>{ if(!!isBlocked(p)===всеЗаблок){try{toggleBlock(p);}catch(e){}} }); exitSel(); try{renderChats();}catch(e){} toast(всеЗаблок?'Разблокировано':'Заблокировано'); }
 async function selDeleteChats(){ const ids=[...selSet].filter(id=>!_этоОлеся(id)); if(!ids.length)return;
-  const ok=await appConfirm('Собеседники свои копии сохранят. Чаты вернутся при новом сообщении.',{title:'Удалить '+ids.length+' чат(ов)?',okText:'Удалить',danger:true}); if(!ok)return;
+  const ok=await appConfirm('Собеседники свои копии сохранят. Чаты вернутся при новом сообщении. Чтобы не возвращались — «Удалить и заблокировать».',{title:'Удалить '+ids.length+' чат(ов)?',okText:'Удалить',extraText:'Удалить и заблокировать',danger:true}); if(!ok)return;
   const d=db(); const h=hiddenChats(); ids.forEach(id=>{ const c=d.chats[id]; if(c)c.messages=[]; h[id]=Date.now(); }); saveHiddenChats(h); save(d);
+  if(ok==='extra'){ for(const id of ids){ const c=db().chats[id]; if(c)await blockChatForMe(c); } }
   const n=ids.length; exitSel(); try{renderChats();}catch(e){} try{if(typeof renderHome==='function')renderHome();}catch(e){} toast('Удалено чатов: '+n);
 }
 /* --- ✨ изюминка: действия с Олесей над выбранными сообщениями --- */
@@ -5625,6 +5691,7 @@ async function transmitGroupMessage(m,g){
   });
 }
 function onIncomingGroupMessage(p){
+  if(p&&p.gid&&isChatBlocked(p.gid))return;   // 24.10.2026: группа заблокирована при удалении
   const d=db();const gid=p.gid;
   let g=d.chats[gid];
   if(!g||!g.group){g=d.chats[gid]={id:gid,gid:gid,group:true,name:p.gname||'Группа',members:p.gmembers||[me.id,p.from],color:senderColor(gid),messages:[]};}
@@ -6032,7 +6099,8 @@ async function postChannelMessage(obj){
   return m;
 }
 function onChannelPost(p){
-  if(!p||!p.chId||!p.post)return;const d=db();let c=d.chats[p.chId];
+  if(!p||!p.chId||!p.post)return;
+  if(isChatBlocked(p.chId))return;   // 24.10.2026: канал заблокирован при удаленииconst d=db();let c=d.chats[p.chId];
   if(!c||!c.channel){c=d.chats[p.chId]={id:p.chId,kind:'channel',channel:true,handle:p.handle,name:p.cname||('z/'+p.handle),color:senderColor(p.chId),subscribed:true,subs:0,owner:null,admins:[],messages:[]};}
   if(!c.messages)c.messages=[];
   if(c.messages.some(m=>m.id===p.post.id)){save(d);return;}
@@ -10085,7 +10153,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=203, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-203.apk';
+const APK_NEW_BUILD=204, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-204.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
@@ -10802,7 +10870,7 @@ function refreshSettings(){if(!me)return;
   const ss=$('#stSess');if(ss)ss.textContent=Object.keys(sessionsMap()).length+' активн.';
   const si=$('#stIdentity');if(si)si.textContent=(me&&me.username)?('z/'+me.username):'настроить никнейм и QR';
   const s=getSec();const sc=$('#stCalls');if(sc)sc.textContent=s.callsFrom==='contacts'?'Только контакты':'Все';
-  const sb2=$('#stBlocked');if(sb2)sb2.textContent=String(s.blocked.length);
+  const sb2=$('#stBlocked');if(sb2)sb2.textContent=String(s.blocked.length+Object.values(blockedChats()).filter(x=>x.kind!=='chat').length);   // 24.10.2026: и группы с каналами
   const swhp=$('#swHidePhone');if(swhp)swhp.classList.toggle('on',!!s.hidePhone);
   refreshTapSoundLabel();
   const swm=$('#swMic');if(swm)swm.classList.toggle('on',micAllowed());
@@ -11331,9 +11399,14 @@ function buildCallsFrom(body){const s=getSec();
   body.appendChild(w);}
 
 function buildBlocked(body){const s=getSec();const now=Date.now();const tmpIds=Object.keys(s.tmp).filter(id=>s.tmp[id]>now);
-  if(!s.blocked.length&&!tmpIds.length){body.appendChild(el('<div class="note">Список пуст. Заблокировать номер можно прямо во время входящего спам-звонка (кнопка 🚫).</div>'));return;}
+  /* 24.10.2026: заблокированные при удалении группы и каналы (личные — и так в списке людей ниже) */
+  const bc=blockedChats();Object.keys(bc).filter(id=>bc[id].kind!=='chat').forEach(id=>{const x=bc[id];
+    const row=el('<div class="log-row" style="display:flex;align-items:center;gap:10px"><div style="flex:1"></div></div>');
+    row.firstChild.textContent=(x.kind==='channel'?'📢 ':'👥 ')+(x.name||id);
+    const k=el('<button class="kill">Разблокировать</button>');k.onclick=()=>{unblockChat(id);try{renderChats();}catch(e){}refreshSettings();buildSubRefresh();};row.appendChild(k);body.appendChild(row);});
+  if(!s.blocked.length&&!tmpIds.length&&!Object.keys(bc).some(id=>bc[id].kind!=='chat')){body.appendChild(el('<div class="note">Список пуст. Заблокировать номер можно прямо во время входящего спам-звонка (кнопка 🚫).</div>'));return;}
   s.blocked.forEach(id=>{const u=userById(id)||{name:id};const row=el('<div class="log-row" style="display:flex;align-items:center;gap:10px"><div style="flex:1">'+(u.name||id)+'</div></div>');
-    const k=el('<button class="kill">Разблокировать</button>');k.onclick=()=>{const ss=getSec();ss.blocked=ss.blocked.filter(x=>x!==id);saveSec(ss);refreshSettings();buildSubRefresh();};row.appendChild(k);body.appendChild(row);});
+    const k=el('<button class="kill">Разблокировать</button>');k.onclick=()=>{const ss=getSec();ss.blocked=ss.blocked.filter(x=>x!==id);saveSec(ss);const ck=chatKey(me.id,id);if(isChatBlocked(ck))unblockChat(ck);try{renderChats();}catch(e){}refreshSettings();buildSubRefresh();};row.appendChild(k);body.appendChild(row);});
   tmpIds.forEach(id=>{const u=userById(id)||{name:id};body.appendChild(el('<div class="log-row"><div>'+(u.name||id)+' · <span class="danger">временно (анти-спам)</span></div><div class="lt">до '+new Date(s.tmp[id]).toLocaleTimeString('ru-RU')+'</div></div>'));});}
 
 function buildLang(body){
@@ -11458,7 +11531,21 @@ if($('#rowIdentity'))$('#rowIdentity').onclick=()=>openSub('Никнейм, QR �
 /* 5.2.20: «Серверные контакты» убраны — контакты хранятся только на устройстве (проверка ИБ) */
 if($('#rowBusiness'))$('#rowBusiness').onclick=()=>openSub('Бизнес-режим',buildBusiness);
 $('#rowCallsFrom').onclick=()=>openSub('Кто может звонить',buildCallsFrom);
-$('#rowBlocked').onclick=()=>openSub('Заблокированные',buildBlocked);
+/* 24.10.2026 (владелец: «переводи всё в натив»): в Android «Заблокированные» — нативный экран (screens/blocked.js).
+   Страница отдаёт ему список и снимает блок по его команде (olesyaРазблок), после — шлёт список заново. */
+function _zvBlockedList(){ const s=getSec(),now=Date.now(),bc=blockedChats(),л=[];
+  s.blocked.forEach(id=>{const u=userById(id)||{};л.push({id,вид:'человек',имя:u.name||u.phone||id,подпись:u.phone&&u.name?u.phone:'сообщения и звонки не доходят'});});
+  Object.keys(bc).filter(id=>bc[id].kind!=='chat').forEach(id=>{const x=bc[id];л.push({id,вид:x.kind==='channel'?'канал':'группа',имя:x.name||id,подпись:(x.kind==='channel'?'канал':'группа')+' · заблокирован'+(x.kind==='channel'?'':'а')+' при удалении'});});
+  Object.keys(s.tmp).filter(id=>s.tmp[id]>now).forEach(id=>{const u=userById(id)||{};л.push({id,вид:'временно',имя:u.name||u.phone||id,подпись:'временно (анти-спам) до '+new Date(s.tmp[id]).toLocaleTimeString().slice(0,5)});});
+  return л; }
+function _zvSendBlocked(тип){ try{ window.ReactNativeWebView.postMessage(JSON.stringify({type:тип||'blocked-list',список:_zvBlockedList()})); }catch(e){} }
+window.olesyaРазблок=function(id,вид){ try{ id=String(id||'');
+    if(вид==='человек'){ const ss=getSec(); ss.blocked=ss.blocked.filter(x=>x!==id); saveSec(ss); const ck=chatKey(me.id,id); if(isChatBlocked(ck))unblockChat(ck); }
+    else if(вид==='временно'){ const ss=getSec(); delete ss.tmp[id]; saveSec(ss); }
+    else unblockChat(id);
+    try{renderChats();}catch(e){} try{refreshSettings();}catch(e){}
+  }catch(e){} _zvSendBlocked(); };
+$('#rowBlocked').onclick=()=>{ const _сб=Number(((window.__OLESYA_SHELL__||{}).b))||0; if(window.ReactNativeWebView&&window.__OLESYA_NATIVE__&&_сб>=204){ /* нативный экран — с оболочки 204 */ _zvSendBlocked('blocked-open'); return; } openSub('Заблокированные',buildBlocked); };
 {const _sw=$('#swHidePhone');if(_sw)_sw.onclick=function(){const on=!hidePhoneEnabled();setHidePhone(on);this.classList.toggle('on',on);toast(on?'🙈 Номер скрыт от других':'Номер снова виден');};}
 {const _sm=$('#swMic');if(_sm)_sm.onclick=function(){const p=mediaPerm();p.mic=!micAllowed();setMediaPerm(p);this.classList.toggle('on',p.mic);toast(p.mic?'🎤 Микрофон включён':'Микрофон выключен — звонки и голосовые недоступны');if(p.mic)requestMediaPermsOnce();};}
 {const _sc=$('#swCam');if(_sc)_sc.onclick=function(){const p=mediaPerm();p.cam=!camAllowed();setMediaPerm(p);this.classList.toggle('on',p.cam);toast(p.cam?'📷 Камера включена':'Камера выключена — видеозвонки только со звуком');};}
@@ -12333,7 +12420,7 @@ function appConfirm(message,opts){
   return new Promise(resolve=>{
     const back=document.createElement('div');back.className='confirm-back';
     const card=document.createElement('div');card.className='confirm-card';
-    card.innerHTML=(opts.title?'<div class="cf-title"></div>':'')+'<div class="cf-msg"></div><div class="cf-acts"><button class="cf-btn cf-cancel"></button><button class="cf-btn cf-ok"></button></div>';
+    card.innerHTML=(opts.title?'<div class="cf-title"></div>':'')+'<div class="cf-msg"></div><div class="cf-acts'+(opts.extraText?' cf-three':'')+'">'+(opts.extraText?'<button class="cf-btn cf-extra cf-danger"></button>':'')+'<button class="cf-btn cf-cancel"></button><button class="cf-btn cf-ok"></button></div>';
     if(opts.title)card.querySelector('.cf-title').textContent=opts.title;
     card.querySelector('.cf-msg').textContent=message||'';
     const okBtn=card.querySelector('.cf-ok');okBtn.textContent=opts.okText||'OK';if(opts.danger)okBtn.classList.add('cf-danger');
@@ -12343,6 +12430,7 @@ function appConfirm(message,opts){
     let done=false;const finish=v=>{if(done)return;done=true;try{back.remove();}catch(e){}resolve(v);};
     okBtn.onclick=()=>finish(true);
     card.querySelector('.cf-cancel').onclick=()=>finish(false);
+    if(opts.extraText){const ex=card.querySelector('.cf-extra');ex.textContent=opts.extraText;ex.onclick=()=>finish('extra');}
     back.onclick=e=>{if(e.target===back)finish(false);};
   });
 }
@@ -12740,7 +12828,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==
    и возвращаются при входе — на любом устройстве.
    НЕ синхронизируем: токен сессии, ключи шифрования, PIN-код и служебные метки
    (это привязано к конкретному устройству), а также фон Главной (тяжёлая картинка). */
-const SETTINGS_SYNC_KEYS=['om_theme','om_tapfx','om_tapsnd','om_tapsnd_name','om_tapsnd_vol','om_tapvib','om_proaccent','om_pinned','om_hidden_chats','om_cc_iso','om_username'];   // om_ai и om_gifkey убраны: в них ключи API пользователя
+const SETTINGS_SYNC_KEYS=['om_theme','om_tapfx','om_tapsnd','om_tapsnd_name','om_tapsnd_vol','om_tapvib','om_proaccent','om_pinned','om_hidden_chats','om_blocked_chats','om_cc_iso','om_username'];   // om_ai и om_gifkey убраны: в них ключи API пользователя
 const SETTINGS_SYNC_RE=[/^om_lang_/,/^om_tr_/];
 function _settingsSyncable(k){ return !!k && (SETTINGS_SYNC_KEYS.indexOf(k)>=0 || SETTINGS_SYNC_RE.some(re=>re.test(k))); }
 const _lsSetRaw=localStorage.setItem.bind(localStorage);   // запись без обратного вызова синхронизации
