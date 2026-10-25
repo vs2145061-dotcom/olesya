@@ -1940,6 +1940,7 @@ body.call-open #toast{bottom:190px}
       <div class="setting" id="rowLegal" style="cursor:pointer"><div class="ic">📄</div><div class="lbl"><div class="t">Документы и приватность</div><div class="d">Политика, соглашение, удаление аккаунта</div></div><div style="color:var(--faint)">›</div></div>
       <div class="sec-head">Звонки</div>
       <div class="setting" id="rowCallsFrom" style="cursor:pointer"><div class="ic">📵</div><div class="lbl"><div class="t">Кто может звонить</div><div class="d" id="stCalls">Все</div></div><div style="color:var(--faint)">›</div></div>
+      <div class="setting" id="rowLastSeen" style="cursor:pointer"><div class="ic">🕓</div><div class="lbl"><div class="t">Время захода</div><div class="d" id="stLastSeen">Все</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowBlocked" style="cursor:pointer"><div class="ic">🚫</div><div class="lbl"><div class="t">Заблокированные</div><div class="d" id="stBlocked">0</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowHidePhone"><div class="ic">🙈</div><div class="lbl"><div class="t">Скрыть мой номер</div><div class="d">другие видят имя и z/ник, но не телефон</div></div><div class="switch" id="swHidePhone"></div></div>
       <div class="sec-head">Доступ к устройствам</div>
@@ -2339,7 +2340,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.40', BUILD_ID='2026-10-25-206';
+const APP_VERSION='5.2.41', BUILD_ID='2026-10-25-207';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -4202,6 +4203,7 @@ function ensureChat(peerId,silent){
 function userById(id){return db().users[id]||null;}
 function lastSeenText(u){
   if(u.bot)return 'бот · всегда на связи';
+  if(u.seenApprox)return 'был(а) '+u.seenApprox;   // 25.10.2026: время захода скрыто (у него или у меня) — как в Telegram
   if(u.online)return 'в сети';
   const diff=Date.now()-(u.lastSeen||0);
   if(diff<60000)return 'был(а) только что';
@@ -4944,7 +4946,7 @@ async function _zvPresence(){
     const r=await apiFetch(getApiUrl()+'/presence?ids='+encodeURIComponent(список.join(',')),{headers:{'x-session-token':sessionToken||''},timeout:8000});
     if(!r.ok)return; const j=await r.json(); const d2=db(); let изм=false;
     список.forEach(id=>{ const x=j&&j.users&&j.users[id]; const u=d2.users[id]; if(!x||!u)return;
-      const on=!!x.online; if(!!u.online!==on||(x.last_seen&&u.lastSeen!==x.last_seen)){ u.online=on; if(x.last_seen)u.lastSeen=x.last_seen; изм=true; } });
+      const on=!!x.online, пр=String(x.примерно||''); if(!!u.online!==on||(x.last_seen&&u.lastSeen!==x.last_seen)||(u.seenApprox||'')!==пр){ u.online=on; if(x.last_seen)u.lastSeen=x.last_seen; u.seenApprox=пр; изм=true; } });
     if(изм){ save(d2); try{ if(current&&!current.group&&!current.channel){ const u=d2.users[current.id]; if(u){ current.online=u.online; current.lastSeen=u.lastSeen; } } }catch(e){} try{renderChats();}catch(e){} try{refreshIfPresence();}catch(e){} }
   }catch(e){}
 }
@@ -7374,7 +7376,7 @@ async function setupPeer(isCaller,kind){
   try{
     if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){
       _camFacing='user';   // новый звонок стартует с фронтальной камеры
-      const _vc=(kind==='video'&&camAllowed())?{width:{ideal:1280},height:{ideal:720},frameRate:{ideal:30},facingMode:'user'}:false;   // качественное видео; битрейт вручную НЕ ограничиваем — WebRTC сам адаптирует под сеть (стабильнее жёсткого потолка)
+      const _vc=(kind==='video'&&camAllowed())?{width:{ideal:1920},height:{ideal:1080},frameRate:{ideal:30},facingMode:'user'}:false;   // качественное видео; битрейт вручную НЕ ограничиваем — WebRTC сам адаптирует под сеть (стабильнее жёсткого потолка)
       localStream=await getMediaWithTimeout({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:_vc},15000);
       if(kind==='video'){const lv=$('#localVideo');if(lv){try{lv.srcObject=localStream;if(lv.play)lv.play().catch(()=>{});}catch(e){}}
         try{const cs=document.getElementById('callScreen');if(cs)cs.classList.add('video');}catch(e){}}   // видео пошло → верстка видеозвонка (аватар скрыт, имя в углу) гарантированно
@@ -7411,7 +7413,7 @@ async function setupPeer(isCaller,kind){
       const ra=$('#remoteAudio'); if(ra){ if(ra.srcObject!==st)ra.srcObject=st; ra.muted=false; ra.volume=1; const pr=ra.play(); if(pr&&pr.catch)pr.catch(()=>{ _pendingRemoteAudio=true; }); }
     };
     pc.onconnectionstatechange=()=>{ if(!pc)return; const st=pc.connectionState;
-      if(st==='connected'){ try{onCallConnected();}catch(e){} }
+      if(st==='connected'){ try{onCallConnected();}catch(e){} _zvКачествоВидео(pc); }
       // endCall(false), а не (true): завершаем МЫ, и собеседник должен об этом узнать,
       // иначе у него экран вызова висит, пока он сам не нажмёт отбой.
       if(st==='failed'){ const cs=$('#callStatus'); if(cs)cs.textContent='Не удалось соединиться (сеть/NAT)'; setTimeout(()=>{try{_причинаОтбоя='соединение не собралось (failed)';endCall(false);}catch(e){}},1800); }
@@ -7452,6 +7454,14 @@ async function applyOfferAndAnswer(sdp,от){
     if(pc&&callPeerId)emit('call:answer',{to:callPeerId,from:me.id,sdp:pc.localDescription});   // trickle: answer сразу
   }catch(e){console.error('RTC answer error',e);}
 }
+/* 25.10.2026 (владелец: «качество видео максимально лучше»): до 4 Мбит/с, 30 к/с, без уменьшения картинки;
+   при плохой связи браузер сам снизит и вернёт (balanced). */
+async function _zvКачествоВидео(p){ try{ if(!p||!p.getSenders)return;
+  for(const о of p.getSenders()){ if(!о.track||о.track.kind!=='video'||!о.getParameters||!о.setParameters)continue;
+    const пр=о.getParameters(); if(!пр.encodings||!пр.encodings.length)пр.encodings=[{}];
+    пр.encodings[0].maxBitrate=4000000; пр.encodings[0].maxFramerate=30; пр.encodings[0].scaleResolutionDownBy=1;
+    try{ пр.degradationPreference='balanced'; }catch(e){}
+    await о.setParameters(пр); } }catch(e){} }
 function closePeer(){ if(разговорНативный())оболочке({type:'rtc-stop'}); try{if(pc){pc.ontrack=null;pc.onconnectionstatechange=null;pc.onicecandidate=null;pc.close();}}catch(e){} pc=null; pendingOffer=null; _callIceBuf=[]; _callHasRemote=false; stopCallPoll(); try{clearInterval(_vidWatch);_vidWatch=null;}catch(e){} }
 /* ЗВУК ЗВОНКА.
    Его не было вовсе. У того, кому звонят, только тряслась аватарка; тот, кто
@@ -10183,7 +10193,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=206, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-206.apk';
+const APK_NEW_BUILD=207, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-207.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
@@ -11575,6 +11585,26 @@ window.olesyaРазблок=function(id,вид){ try{ id=String(id||'');
     else unblockChat(id);
     try{renderChats();}catch(e){} try{refreshSettings();}catch(e){}
   }catch(e){} _zvSendBlocked(); };
+/* 25.10.2026 (владелец): «Время захода» — скрыть, когда был в сети («был(а) недавно»), и тогда сам не видишь
+   время других. Решает сервер (/privacy). В Android 207+ — нативный экран (screens/last-seen.js). */
+let _zvСкрытЗаход=null;
+async function _zvЗаходПрочитать(){ try{ const j=await jget(wapi('/privacy'),8000); _zvСкрытЗаход=!!(j&&j.hide_seen); }catch(e){}
+  const d=$('#stLastSeen'); if(d&&_zvСкрытЗаход!==null)d.textContent=_zvСкрытЗаход?'Никто — «был(а) недавно»':'Все'; return _zvСкрытЗаход; }
+window.olesyaВремяЗахода=function(){ _zvЗаходПрочитать(); try{ if(typeof refreshPresenceNow==='function')refreshPresenceNow(); }catch(e){} };
+function buildLastSeen(body){
+  const w=el('<div></div>');
+  const выбрать=async(скрыть)=>{ try{ const j=await jpost(wapi('/privacy'),{hide_seen:!!скрыть}); _zvСкрытЗаход=!!(j&&j.hide_seen);
+      toast(_zvСкрытЗаход?'Время захода скрыто':'Время захода видно всем'); }catch(e){ toast('Не удалось сохранить — проверьте связь'); }
+    await _zvЗаходПрочитать(); buildSubRefresh(); };
+  w.appendChild(optRow('Все — видно «в сети» и точное время',_zvСкрытЗаход===false,()=>выбрать(false)));
+  w.appendChild(optRow('Никто — другим только «был(а) недавно»',_zvСкрытЗаход===true,()=>выбрать(true)));
+  body.appendChild(w);
+  body.appendChild(el('<div class="note">Как в Telegram: если скрыть своё время захода, вы тоже не будете видеть, когда были в сети другие, — только «недавно».</div>'));
+}
+$('#rowLastSeen').onclick=async()=>{ const _сб=Number(((window.__OLESYA_SHELL__||{}).b))||0;
+  if(window.ReactNativeWebView&&window.__OLESYA_NATIVE__&&_сб>=207){ /* нативный экран — с оболочки 207 */ try{window.ReactNativeWebView.postMessage(JSON.stringify({type:'last-seen-open'}));}catch(e){} return; }
+  await _zvЗаходПрочитать(); openSub('Время захода',buildLastSeen); };
+try{ setTimeout(()=>{ if(sessionToken)_zvЗаходПрочитать(); },4000); }catch(e){}
 $('#rowBlocked').onclick=()=>{ const _сб=Number(((window.__OLESYA_SHELL__||{}).b))||0; if(window.ReactNativeWebView&&window.__OLESYA_NATIVE__&&_сб>=204){ /* нативный экран — с оболочки 204 */ _zvSendBlocked('blocked-open'); return; } openSub('Заблокированные',buildBlocked); };
 {const _sw=$('#swHidePhone');if(_sw)_sw.onclick=function(){const on=!hidePhoneEnabled();setHidePhone(on);this.classList.toggle('on',on);toast(on?'🙈 Номер скрыт от других':'Номер снова виден');};}
 {const _sm=$('#swMic');if(_sm)_sm.onclick=function(){const p=mediaPerm();p.mic=!micAllowed();setMediaPerm(p);this.classList.toggle('on',p.mic);toast(p.mic?'🎤 Микрофон включён':'Микрофон выключен — звонки и голосовые недоступны');if(p.mic)requestMediaPermsOnce();};}
