@@ -2339,7 +2339,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.39', BUILD_ID='2026-10-24-205';
+const APP_VERSION='5.2.40', BUILD_ID='2026-10-25-206';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -7773,6 +7773,7 @@ window.olesyaCallAction=function(action,from,kind,name,cid){
 };
 let _причинаОтбоя='';
 function endCall(remote){
+  try{ if(_zvCallUiOn())оболочке({type:'call-ui',state:'конец'}); _zvCallUiOpt=null; }catch(e){}
   try{ крошка('страница: КОНЕЦ ЗВОНКА — '+(_причинаОтбоя||'причина не отмечена')
     +(remote?' (решение собеседника)':' (решение наше)')
     +', отвечен '+(callAnswered?'да':'нет')
@@ -7856,7 +7857,36 @@ async function switchCamera(fb){
     if(fb)fb.disabled=false;
   }catch(e){ if(fb)fb.disabled=false; }
 }
+/* 25.10.2026 (владелец: «делай полностью нативно»): в Android 206+ экран разговора рисует оболочка
+   (screens/call-screen.js). Страница — мозг звонка: шлёт ей состояние (call-ui) и принимает кнопки
+   (olesyaЗвонокКнопка). Старые сборки и браузер — как было, экраном #callScreen. */
+function _zvCallUiOn(){ try{ return разговорНативный() && (Number(((window.__OLESYA_SHELL__||{}).b))||0)>=206; }catch(e){ return false; } }
+let _zvCallUiOpt=null, _zvCallUiObs=null;
+function _zvCallUi(state,opt){
+  if(!_zvCallUiOn())return;
+  if(opt!==undefined)_zvCallUiOpt=opt||null;
+  try{
+    const u=(typeof userById==='function'&&callPeerId)?(userById(callPeerId)||{}):{};
+    const ав=(typeof u.avatar==='string')?u.avatar:'';
+    оболочке({type:'call-ui',state,peer:callPeerId||'',name:($('#callName')&&$('#callName').textContent)||u.name||u.phone||'',
+      avatar:ав,color:u.color||'',kind:(callKind==='video'?'video':'audio'),status:($('#callStatus')&&$('#callStatus').textContent)||'',
+      unknown:!!(_zvCallUiOpt&&_zvCallUiOpt.unknown)});
+  }catch(e){}
+  /* подпись «Вызов… / Соединение… / Занято» страница меняет во многих местах — слушаем сам элемент */
+  try{ if(!_zvCallUiObs){ const st=$('#callStatus'); if(st){ _zvCallUiObs=new MutationObserver(()=>{ if(_zvCallUiOn())оболочке({type:'call-ui-status',status:st.textContent||''}); });
+    _zvCallUiObs.observe(st,{childList:true,characterData:true,subtree:true}); } } }catch(e){}
+}
+window.olesyaЗвонокКнопка=function(что){
+  try{
+    if(что==='отбой'){ _причинаОтбоя='нажали «Отбой» на нативном экране'; endCall(false); }
+    else if(что==='отклонить'){ _причинаОтбоя='нажали «Отклонить» на нативном экране'; endCall(false); }
+    else if(что==='ответить'){ acceptCall(); }
+    else if(что==='блок'){ const от=(_zvCallUiOpt&&_zvCallUiOpt.from)||callPeerId; if(от){ const s=getSec(); if(!s.blocked.includes(от))s.blocked.push(от); saveSec(s);
+      logSec('🚫 Заблокирован номер из входящего звонка'); toast('Номер заблокирован'); emit('call:reject',{to:от,from:me.id,reason:'blocked'}); try{refreshSettings();}catch(e){} } endCall(true); }
+  }catch(e){}
+};
 function renderCallActions(incoming,active,opt){
+  _zvCallUi(incoming?'входящий':(active?'разговор':'вызов'),incoming?opt:undefined);
   try{const cs=document.getElementById('callScreen');if(cs)cs.classList.toggle('video',callKind==='video'&&!!active);}catch(e){}   // видео-раскладку — только когда звонок СОЕДИНЁН; при дозвоне показываем аватар + брендовый фон (не мрачный чёрный)
   const a=$('#callActions');a.innerHTML='';a.classList.remove('answer-row');
   const btn=(cls,svg,fn)=>{const b=document.createElement('button');b.className='callbtn '+cls;b.innerHTML=svg;b.onclick=fn;return b;};
@@ -10153,7 +10183,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=205, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-205.apk';
+const APK_NEW_BUILD=206, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-206.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
