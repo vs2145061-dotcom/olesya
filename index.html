@@ -2340,7 +2340,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.41', BUILD_ID='2026-10-25-207';
+const APP_VERSION='5.2.42', BUILD_ID='2026-10-25-208';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -7268,7 +7268,24 @@ function stopCallInvite(){ if(callInviteTimer){clearInterval(callInviteTimer);ca
 // RTCIceCandidate нельзя структурно клонировать (BroadcastChannel/localStorage) → шлём простой объект
 function _iceToPlain(c){ if(!c)return c; try{ if(typeof c.toJSON==='function')return c.toJSON(); }catch(e){} return {candidate:c.candidate,sdpMid:c.sdpMid,sdpMLineIndex:c.sdpMLineIndex,usernameFragment:c.usernameFragment}; }
 // Форс VP8: переставляем VP8 первым в m=video (обе стороны → VP8 договаривается). H.264 между iOS Safari и Android часто даёт чёрное видео.
-function _preferVp8(sdp){
+/* 25.10.2026 (владелец: «качество видео максимально»; журнал: передача стартовала с 300 кбит/с и роняла картинку
+   до 320×176): кодекам видео — старт 2 Мбит/с, не ниже 1, не выше 4 (x-google-*), разделу видео — b=AS:4000.
+   То же делает оболочка Android (sdpСкорость). */
+function _zvSdpСкорость(sdp){
+  try{
+    if(!sdp||sdp.indexOf('m=video')<0)return sdp;
+    const стр=String(sdp).split(/\r?\n/).filter((л,i,все)=>л||i<все.length-1); const pt=new Set(), естьF=new Set();
+    for(const л of стр){ const м=л.match(/^a=rtpmap:(\d+) (H264|VP8|VP9|AV1)\/90000/i); if(м)pt.add(м[1]); const ф=л.match(/^a=fmtp:(\d+) /); if(ф)естьF.add(ф[1]); }
+    const пар='x-google-start-bitrate=2000;x-google-min-bitrate=1000;x-google-max-bitrate=4000'; const out=[]; let видео=false;
+    for(const л of стр){ if(/^m=/.test(л))видео=/^m=video/.test(л); if(видео&&/^b=AS:/.test(л))continue;
+      const ф=л.match(/^a=fmtp:(\d+) (.*)$/); if(видео&&ф&&pt.has(ф[1])){ out.push(/x-google-/.test(ф[2])?л:л+';'+пар); continue; }
+      out.push(л); if(видео&&/^c=IN /.test(л))out.push('b=AS:4000');
+      const р=л.match(/^a=rtpmap:(\d+) /); if(видео&&р&&pt.has(р[1])&&!естьF.has(р[1]))out.push('a=fmtp:'+р[1]+' '+пар); }
+    return out.join('\r\n')+'\r\n';
+  }catch(e){ return sdp; }
+}
+function _preferVp8(sdp){ return _zvSdpСкорость(_preferVp8Порядок(sdp)); }
+function _preferVp8Порядок(sdp){
   try{
     if(!sdp||sdp.indexOf('m=video')<0)return sdp;
     const lines=sdp.split(/\r\n/);
@@ -10193,7 +10210,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=207, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-207.apk';
+const APK_NEW_BUILD=208, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-208.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
