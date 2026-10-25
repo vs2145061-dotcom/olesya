@@ -2340,7 +2340,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.42', BUILD_ID='2026-10-25-208';
+const APP_VERSION='5.2.43', BUILD_ID='2026-10-25-209';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -3239,8 +3239,17 @@ function handleBus(m){
   /* Сигнал от ЧУЖОГО звонка не наш. Сигналы без номера пропускаем: их шлёт
      необновлённая сторона, и глушить её нельзя. */
   if(m.type&&m.type.indexOf('call:')===0&&m.payload&&m.payload.cid&&callCid&&m.payload.cid!==callCid){
-    try{ крошка('страница: ОТБРОШЕН '+m.type+' — от другого звонка','звонок'); }catch(e){}
-    return;
+    /* 25.10.2026 (владелец: «при сбрасывании звонящего на другом телефоне звонок продолжается и задваивается»):
+       звонящий прислал два приглашения с разными номерами, мы показывали первое, а его отбой (со вторым номером)
+       отбрасывали — звонок висел. Отбой ТОГО ЖЕ собеседника, пока звонок не принят, — наш, завершаем. */
+    const тотЖе=!!(callPeerId&&(m.payload.from===callPeerId||m.from===callPeerId));
+    if(тотЖе&&!callAnswered&&(m.type==='call:end'||m.type==='call:reject')){
+      try{ крошка('страница: '+m.type+' того же собеседника с другим номером звонка — звонок не принят, завершаю','звонок'); }catch(e){}
+      callCid=m.payload.cid;
+    } else {
+      try{ крошка('страница: ОТБРОШЕН '+m.type+' — от другого звонка','звонок'); }catch(e){}
+      return;
+    }
   }
   switch(m.type){
     case 'msg': if(me&&m.payload.to===me.id){onIncomingMessage(m.payload);} break;
@@ -7582,7 +7591,13 @@ function _ringStop(){
   _гудокОтОболочки=false;
   if(_ringTO){ clearTimeout(_ringTO); _ringTO=null; }
 }
+let _zvЗвонокНачат=0;
 function startCall(kind){
+  /* 25.10.2026 (владелец: «звонок задваивается»): у собеседника приходили два приглашения с разными номерами —
+     звонок запускался дважды (двойное нажатие / повтор команды оболочки). Пока звонок идёт или прошло меньше 3 с — второй не начинаем. */
+  if(callPeerId&&!callIncoming&&(Date.now()-_zvЗвонокНачат<3000||(current&&current.id===callPeerId))){
+    try{ крошка('страница: повторный запуск звонка тому же — пропущен','звонок'); }catch(e){} return; }
+  _zvЗвонокНачат=Date.now();
   сбросВыводЗвука();
   запомнитьЭкранДоЗвонка();
   пометитьЗвонокНаЭкране(true);
@@ -10210,7 +10225,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=208, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-208.apk';
+const APK_NEW_BUILD=209, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-209.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
