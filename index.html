@@ -1938,11 +1938,12 @@ body.call-open #toast{bottom:190px}
       <div class="setting" id="rowBusiness" style="cursor:pointer"><div class="ic">💼</div><div class="lbl"><div class="t">Бизнес-режим</div><div class="d">заявки, карточка клиента, статусы, чек-листы</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowLog" style="cursor:pointer"><div class="ic">📜</div><div class="lbl"><div class="t">Журнал безопасности</div><div class="d">Входы, блокировки, анти-спам</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowLegal" style="cursor:pointer"><div class="ic">📄</div><div class="lbl"><div class="t">Документы и приватность</div><div class="d">Политика, соглашение, удаление аккаунта</div></div><div style="color:var(--faint)">›</div></div>
+      <div class="sec-head">Конфиденциальность</div>
+      <div class="setting" id="rowLastSeen" style="cursor:pointer"><div class="ic">🕓</div><div class="lbl"><div class="t">Время захода</div><div class="d" id="stLastSeen">Все</div></div><div style="color:var(--faint)">›</div></div>
+      <div class="setting" id="rowHidePhone"><div class="ic">🙈</div><div class="lbl"><div class="t">Скрыть мой номер</div><div class="d">другие видят имя и z/ник, но не телефон</div></div><div class="switch" id="swHidePhone"></div></div>
+      <div class="setting" id="rowBlocked" style="cursor:pointer"><div class="ic">🚫</div><div class="lbl"><div class="t">Заблокированные</div><div class="d" id="stBlocked">0</div></div><div style="color:var(--faint)">›</div></div>
       <div class="sec-head">Звонки</div>
       <div class="setting" id="rowCallsFrom" style="cursor:pointer"><div class="ic">📵</div><div class="lbl"><div class="t">Кто может звонить</div><div class="d" id="stCalls">Все</div></div><div style="color:var(--faint)">›</div></div>
-      <div class="setting" id="rowLastSeen" style="cursor:pointer"><div class="ic">🕓</div><div class="lbl"><div class="t">Время захода</div><div class="d" id="stLastSeen">Все</div></div><div style="color:var(--faint)">›</div></div>
-      <div class="setting" id="rowBlocked" style="cursor:pointer"><div class="ic">🚫</div><div class="lbl"><div class="t">Заблокированные</div><div class="d" id="stBlocked">0</div></div><div style="color:var(--faint)">›</div></div>
-      <div class="setting" id="rowHidePhone"><div class="ic">🙈</div><div class="lbl"><div class="t">Скрыть мой номер</div><div class="d">другие видят имя и z/ник, но не телефон</div></div><div class="switch" id="swHidePhone"></div></div>
       <div class="sec-head">Доступ к устройствам</div>
       <div class="setting" id="rowMic"><div class="ic">🎤</div><div class="lbl"><div class="t">Микрофон</div><div class="d">для звонков и голосовых сообщений</div></div><div class="switch" id="swMic"></div></div>
       <div class="setting" id="rowCam"><div class="ic">📷</div><div class="lbl"><div class="t">Камера</div><div class="d">для видеозвонков и видео-кружков</div></div><div class="switch" id="swCam"></div></div>
@@ -2340,7 +2341,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.43', BUILD_ID='2026-10-25-209';
+const APP_VERSION='5.2.44', BUILD_ID='2026-10-25-209';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
