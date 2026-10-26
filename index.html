@@ -1592,7 +1592,7 @@ body.call-open #toast{bottom:190px}
   <section class="screen hidden" id="scrTgChannels">
     <div class="topbar">
       <button class="iconbtn" data-back="scrSocial" title="Назад">←</button>
-      <div class="grow"><div class="title">Telegram-каналы</div><div class="sub">новости внутри ZORVELD</div></div>
+      <div class="grow"><div class="title">Новостные каналы</div><div class="sub">новости внутри ZORVELD</div></div>
     </div>
     <div class="social-wrap" id="tgList"></div>
   </section>
@@ -1601,7 +1601,7 @@ body.call-open #toast{bottom:190px}
   <section class="screen hidden" id="scrFeed">
     <div class="topbar">
       <button class="iconbtn" data-back="scrTgChannels" title="Назад">←</button>
-      <div class="grow"><div class="title" id="feedTitle">Канал</div><div class="sub" id="feedSub">Telegram · новости</div></div>
+      <div class="grow"><div class="title" id="feedTitle">Канал</div><div class="sub" id="feedSub">Новости</div></div>
       <button class="iconbtn fx-reload" id="btnFeedReload" title="Обновить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v5h-5"/></svg></button>
     </div>
     <div class="news-list" id="feedList"></div>
@@ -1669,7 +1669,7 @@ body.call-open #toast{bottom:190px}
         <div class="searchbar"><input id="proCode" placeholder="Промокод" style="text-transform:uppercase" /></div>
         <button class="btn" id="btnRedeemPro" style="background:var(--raised);color:var(--text);border:1px solid var(--line);box-shadow:none">Активировать</button>
       </div>
-      <div class="note" style="margin:14px 12px">Цена ниже Telegram Premium. Подписка поддерживает развитие мессенджера. Онлайн-оплата — через ЮKassa (подключается владельцем); промокоды работают уже сейчас.</div>
+      <div class="note" style="margin:14px 12px">Подписка поддерживает развитие мессенджера. Онлайн-оплата — через ЮKassa (подключается владельцем); промокоды работают уже сейчас.</div>
     </div>
   </section>
 
@@ -2341,7 +2341,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.44', BUILD_ID='2026-10-25-209';
+const APP_VERSION='5.2.45', BUILD_ID='2026-10-26-210';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -4213,7 +4213,7 @@ function ensureChat(peerId,silent){
 function userById(id){return db().users[id]||null;}
 function lastSeenText(u){
   if(u.bot)return 'бот · всегда на связи';
-  if(u.seenApprox)return 'был(а) '+u.seenApprox;   // 25.10.2026: время захода скрыто (у него или у меня) — как в Telegram
+  if(u.seenApprox)return 'был(а) '+u.seenApprox;   // 25.10.2026: время захода скрыто (у него или у меня)
   if(u.online)return 'в сети';
   const diff=Date.now()-(u.lastSeen||0);
   if(diff<60000)return 'был(а) только что';
@@ -10226,7 +10226,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=209, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-209.apk';
+const APK_NEW_BUILD=210, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-210.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
@@ -10752,7 +10752,7 @@ function renderTgChannels(){
     const del=el('<button class="sn-act" title="Удалить" style="padding:7px 11px">✕</button>');del.onclick=()=>removeTgChannel(ch);
     row.appendChild(ic);row.appendChild(main);row.appendChild(open);row.appendChild(del);box.appendChild(row);
   });
-  if(!(cfg.tgChannels||[]).length){box.appendChild(el('<div class="news-empty" style="padding:24px 16px"><div class="ne-ic">📣</div>Добавьте публичные Telegram-каналы — их посты будут показываться здесь, в стиле ZORVELD.</div>'));}
+  if(!(cfg.tgChannels||[]).length){box.appendChild(el('<div class="news-empty" style="padding:24px 16px"><div class="ne-ic">📣</div>Добавьте публичные новостные каналы — их посты будут показываться здесь, в стиле ZORVELD.</div>'));}
 }
 async function addTgChannel(){
   const cfg=loadSocialCfg();
@@ -10769,7 +10769,7 @@ let _tgChannel='';
 function openTgChannel(channel){
   _tgChannel=channel;
   $('#feedTitle').textContent='@'+channel;
-  $('#feedSub').textContent='Telegram · новостной канал';
+  $('#feedSub').textContent='Новостной канал';
   go('scrFeed');renderTgFeed(channel);
 }
 async function renderTgFeed(channel,force){
@@ -10780,7 +10780,7 @@ async function renderTgFeed(channel,force){
     const r=await jget(wapi('/tg?channel='+encodeURIComponent(channel)));items=(r&&r.items)||[];
   }catch(e){
     box.innerHTML='';box.appendChild(newsEmpty(e.message==='no_cloud'
-      ?'Лента Telegram-канала загружается через ваш сервер (Настройки → Облачный сервер). Подключите его — и посты канала появятся здесь, в стиле ZORVELD.'
+      ?'Лента канала загружается через ваш сервер (Настройки → Облачный сервер). Подключите его — и посты канала появятся здесь, в стиле ZORVELD.'
       :'Не удалось загрузить канал @'+channel+'. Проверьте имя канала и интернет.'));return;
   }
   if(channel!==_tgChannel)return;
@@ -11620,19 +11620,26 @@ window.olesyaРазблок=function(id,вид){ try{ id=String(id||'');
   }catch(e){} _zvSendBlocked(); };
 /* 25.10.2026 (владелец): «Время захода» — скрыть, когда был в сети («был(а) недавно»), и тогда сам не видишь
    время других. Решает сервер (/privacy). В Android 207+ — нативный экран (screens/last-seen.js). */
-let _zvСкрытЗаход=null;
-async function _zvЗаходПрочитать(){ try{ const j=await jget(wapi('/privacy'),8000); _zvСкрытЗаход=!!(j&&j.hide_seen); }catch(e){}
-  const d=$('#stLastSeen'); if(d&&_zvСкрытЗаход!==null)d.textContent=_zvСкрытЗаход?'Никто — «был(а) недавно»':'Все'; return _zvСкрытЗаход; }
+let _zvЗаход=null;   // all | contacts | nobody (26.10.2026: + «Мои контакты» — собеседники по личным чатам)
+const _zvЗаходПодпись={all:'Все',contacts:'Мои контакты',nobody:'Никто — «был(а) недавно»'};
+function _zvМоиКонтакты(){ try{ const d=db(); return Object.values(d.chats||{}).filter(c=>c&&!c.group&&!c.channel&&(c.members||[]).includes(me.id))
+  .map(c=>(c.members||[]).find(x=>x!==me.id)).filter(x=>x&&x!=='bot_olesya'&&!/^zorveld-/.test(x)); }catch(e){ return []; } }
+async function _zvЗаходПрочитать(){ try{ const j=await jget(wapi('/privacy'),8000); _zvЗаход=(j&&j.who)||((j&&j.hide_seen)?'nobody':'all'); }catch(e){}
+  const d=$('#stLastSeen'); if(d&&_zvЗаход)d.textContent=_zvЗаходПодпись[_zvЗаход]||'Все';
+  /* «Мои контакты»: список у сервера обновляем при каждом чтении — появился новый чат, и он уже видит время */
+  if(_zvЗаход==='contacts'){ try{ await jpost(wapi('/privacy'),{who:'contacts',allow:_zvМоиКонтакты()}); }catch(e){} }
+  return _zvЗаход; }
 window.olesyaВремяЗахода=function(){ _zvЗаходПрочитать(); try{ if(typeof refreshPresenceNow==='function')refreshPresenceNow(); }catch(e){} };
 function buildLastSeen(body){
   const w=el('<div></div>');
-  const выбрать=async(скрыть)=>{ try{ const j=await jpost(wapi('/privacy'),{hide_seen:!!скрыть}); _zvСкрытЗаход=!!(j&&j.hide_seen);
-      toast(_zvСкрытЗаход?'Время захода скрыто':'Время захода видно всем'); }catch(e){ toast('Не удалось сохранить — проверьте связь'); }
+  const выбрать=async(кто)=>{ try{ const j=await jpost(wapi('/privacy'),кто==='contacts'?{who:кто,allow:_zvМоиКонтакты()}:{who:кто}); _zvЗаход=(j&&j.who)||кто;
+      toast(_zvЗаход==='nobody'?'Время захода скрыто':(_zvЗаход==='contacts'?'Время захода видят только ваши контакты':'Время захода видно всем')); }catch(e){ toast('Не удалось сохранить — проверьте связь'); }
     await _zvЗаходПрочитать(); buildSubRefresh(); };
-  w.appendChild(optRow('Все — видно «в сети» и точное время',_zvСкрытЗаход===false,()=>выбрать(false)));
-  w.appendChild(optRow('Никто — другим только «был(а) недавно»',_zvСкрытЗаход===true,()=>выбрать(true)));
+  w.appendChild(optRow('Все — видно «в сети» и точное время',_zvЗаход==='all',()=>выбрать('all')));
+  w.appendChild(optRow('Мои контакты — те, с кем есть чат; остальным «был(а) недавно»',_zvЗаход==='contacts',()=>выбрать('contacts')));
+  w.appendChild(optRow('Никто — другим только «был(а) недавно»',_zvЗаход==='nobody',()=>выбрать('nobody')));
   body.appendChild(w);
-  body.appendChild(el('<div class="note">Как в Telegram: если скрыть своё время захода, вы тоже не будете видеть, когда были в сети другие, — только «недавно».</div>'));
+  body.appendChild(el('<div class="note">Если вы скрываете своё время захода от человека, вы тоже не видите, когда он был в сети, — только «недавно».</div>'));
 }
 $('#rowLastSeen').onclick=async()=>{ const _сб=Number(((window.__OLESYA_SHELL__||{}).b))||0;
   if(window.ReactNativeWebView&&window.__OLESYA_NATIVE__&&_сб>=207){ /* нативный экран — с оболочки 207 */ try{window.ReactNativeWebView.postMessage(JSON.stringify({type:'last-seen-open'}));}catch(e){} return; }
