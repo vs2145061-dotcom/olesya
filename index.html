@@ -934,6 +934,30 @@ mark.hl{background:#FFE066;color:#111;border-radius:3px;padding:0 1px}
 .confirm-card .cf-btn:active{background:var(--raised)}
 .confirm-card .cf-btn.cf-danger{color:#ff5b5b}
 .confirm-card .cf-acts.cf-three{flex-wrap:wrap}
+/* 26.10.2026: сканер документов — плитка на виду и выбор проекта */
+.zv-scan-tile{display:flex;align-items:center;gap:14px;margin:6px 12px 12px;padding:16px;border-radius:18px;cursor:pointer;color:#fff;background:linear-gradient(135deg,#6C7BFF,#9B5BE1 60%,#E15BC8);box-shadow:0 10px 24px -12px rgba(108,123,255,.8)}
+.zv-st-ic{font-size:30px;width:52px;height:52px;border-radius:16px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center}
+.zv-st-t{font-weight:700;font-size:16.5px}.zv-st-d{font-size:12.5px;opacity:.9;margin-top:2px}.zv-st-go{margin-left:auto;font-size:26px;opacity:.85}
+.zv-pick{max-height:52vh;overflow:auto;margin:6px 0 4px}.zv-pick-row{padding:12px 6px;border-bottom:1px solid var(--line);cursor:pointer}.zv-pick-row .t{font-weight:600}.zv-pick-row .d{font-size:12.5px;color:var(--muted)}
+/* 26.10.2026: сканер документов (iPhone/ПК) */
+.zv-scan{position:fixed;inset:0;z-index:300;background:#0B0A12;color:#fff;display:flex;flex-direction:column}
+.zv-scan-head{display:flex;align-items:center;gap:12px;padding:12px 16px}
+.zv-scan-x{border:none;background:rgba(255,255,255,.12);color:#fff;width:38px;height:38px;border-radius:19px;font-size:18px;cursor:pointer}
+.zv-scan-t div:first-child{font-weight:700;font-size:17px}.zv-scan-d{font-size:12.5px;opacity:.7}
+.zv-scan-body{flex:1;overflow:auto;padding:12px 16px 24px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.zv-scan-body>*{width:100%;max-width:560px}
+.zv-scan-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}.zv-scan-row .btn{flex:1;min-width:120px}
+.zv-scan-grid{display:flex;flex-wrap:wrap;gap:10px}
+.zv-scan-th{position:relative;width:30%;aspect-ratio:.72;border-radius:10px;overflow:hidden;background:rgba(255,255,255,.06)}
+.zv-scan-th img{width:100%;height:100%;object-fit:cover}
+.zv-scan-th span{position:absolute;left:6px;bottom:6px;background:rgba(0,0,0,.55);border-radius:8px;padding:0 6px;font-size:12px}
+.zv-scan-th button{position:absolute;right:6px;top:6px;width:26px;height:26px;border-radius:13px;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer}
+.zv-scan-edit{position:relative;width:auto!important;touch-action:none}
+.zv-scan-edit canvas{display:block;border-radius:6px}
+.zv-scan-edit svg{position:absolute;left:0;top:0;pointer-events:none}
+.zv-scan-edit polygon{fill:rgba(108,123,255,.18);stroke:var(--primary);stroke-width:2.5}
+.zv-scan-edit i{position:absolute;width:32px;height:32px;border-radius:16px;border:3px solid var(--primary);background:rgba(255,255,255,.85);cursor:grab;touch-action:none}
+.zv-scan-ocr{display:flex;gap:8px;align-items:center;margin-top:12px;font-size:14px}
 .confirm-card .cf-acts.cf-three .cf-extra{flex-basis:100%;text-align:right}   /* 24.10.2026: «Удалить и заблокировать» — отдельной строкой сверху */
 
 /* контекст-меню чата (долгое нажатие) */
@@ -2341,7 +2365,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.45', BUILD_ID='2026-10-26-210';
+const APP_VERSION='5.2.46', BUILD_ID='2026-10-26-211';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -8425,10 +8449,12 @@ async function renderWork(){
   const box=$('#workBody'); if(!box)return;
   box.innerHTML='<div class="note">Загружаю…</div>';
   try{
-    if(_workTab==='tickets')return await workTickets(box);
-    if(_workTab==='clients')return await workClients(box);
-    if(_workTab==='projects')return await workProjects(box);
-    return await workCard(box);
+    if(_workTab==='tickets')await workTickets(box);
+    else if(_workTab==='clients')await workClients(box);
+    else if(_workTab==='projects')await workProjects(box);
+    else await workCard(box);
+    _zvПлиткаСканера(box);   // 26.10.2026 (владелец: «сканер нужно сделать на виду в бизнес-режиме»)
+    return;
   }catch(e){
     /* 402 — подписка кончилась прямо во время работы. Не оставляем человека
        перед пустым экраном: объясняем и даём кнопку. */
@@ -9446,6 +9472,7 @@ function workPrjFileRow(x,after){
     (after==='all'&&задача)?('к задаче «'+задача.title+'»'):''].filter(Boolean).join(' · ');
   r.onclick=(e)=>{ if(e.target&&e.target.closest&&e.target.closest('button'))return;
     workFileView({src:x.url,name:x.name,mime:x.mime,size:x.size,who:workPrjName(x.uploader_uid)}); };
+  if(x.text_len>0){ const тк=el('<button class="wk-ai-btn">Текст</button>'); тк.onclick=()=>workPrjFileText(x); r.appendChild(тк); }   // 26.10.2026: распознанный текст скана
   if(_prj.role==='owner'||x.uploader_uid===(me&&me.id)){
     const del=el('<button class="wk-ai-btn">Убрать</button>');
     del.onclick=async()=>{
@@ -9486,12 +9513,239 @@ function workPrjAttach(taskId,after){
   };
   inp.click();
 }
+/* ── Сканер документов (26.10.2026, владелец: «сканер документов в Бизнес-режим»; свой сканер, текст — наш сервер,
+   документ — в файлы проекта или задачи). Android 211+ — нативный экран (screens/doc-scanner.js); здесь — то же
+   для iPhone и ПК: снимок → углы (находит сам, поправить) → Документ/Серый/Цвет → листы → PDF → /ocr → файл проекта. ── */
+let _zvСканПосле=null;
+function _zvСканМесто(taskId){ const t=taskId?((_prj.tasks||[]).find(x=>x.id===taskId)||null):null; return 'Проект «'+_prj.project.name+'»'+(t?' · задача «'+t.title+'»':''); }
+/* Плитка сканера — сверху на каждой вкладке Бизнес-режима */
+function _zvПлиткаСканера(box){
+  if(!box||box.querySelector('.zv-scan-tile'))return;
+  const п=el('<div class="zv-scan-tile"><div class="zv-st-ic">📷</div><div><div class="zv-st-t">Сканер документов</div><div class="zv-st-d">договор, счёт, акт — выровняет лист, соберёт PDF, распознает текст</div></div><div class="zv-st-go">›</div></div>');
+  п.onclick=()=>workScanStart(); box.insertBefore(п,box.firstChild);
+}
+/* Выбор из списка в своём окне: [{т,д}] → номер или null */
+function _zvВыбор(заголовок,пункты){
+  return new Promise(готово=>{
+    const back=el('<div class="confirm-back"><div class="confirm-card" style="max-width:480px;width:92%"><div class="cf-title"></div><div class="zv-pick"></div><div class="cf-acts"><button class="cf-btn cf-cancel">Отмена</button></div></div></div>');
+    back.querySelector('.cf-title').textContent=заголовок;
+    const сп=back.querySelector('.zv-pick'); let было=false; const конец=(v)=>{ if(было)return; было=true; back.remove(); готово(v); };
+    пункты.forEach((п,i)=>{ const r=el('<div class="zv-pick-row"><div class="t"></div><div class="d"></div></div>'); r.querySelector('.t').textContent=п.т; r.querySelector('.d').textContent=п.д||''; r.onclick=()=>конец(i); сп.appendChild(r); });
+    back.querySelector('.cf-cancel').onclick=()=>конец(null); back.onclick=e=>{ if(e.target===back)конец(null); };
+    document.body.appendChild(back); requestAnimationFrame(()=>back.classList.add('show'));
+  });
+}
+async function workScanStart(){
+  let список=[];
+  try{ const r=await jget(wapi('/business/projects')); список=(r&&r.projects)||[]; }catch(e){ toast('Нет связи с сервером'); return; }
+  if(!список.length){ toast('Сначала создайте проект — документ сохраняется в его файлы'); _workTab='projects'; renderWork(); return; }
+  let i=0;
+  if(список.length>1){ i=await _zvВыбор('Куда сохранить документ',список.map(p=>({т:p.name||'Проект',д:(p.open_tasks?('открытых задач: '+p.open_tasks):'')}))); if(i===null)return; }
+  let пр=null;
+  try{ const r=await jget(wapi('/business/projects/tasks?id='+encodeURIComponent(список[i].id))); пр={project:r.project,role:r.role,members:r.members||[],tasks:r.tasks||[],files:r.files||[]}; }
+  catch(e){ toast(workPrjErr(e)); return; }
+  _prj=пр;
+  const задачи=(пр.tasks||[]).filter(t=>t.status==='open');
+  let taskId=null;
+  if(задачи.length){ const j=await _zvВыбор('К чему приложить',[{т:'К проекту целиком',д:'в «Файлы» проекта'}].concat(задачи.slice(0,30).map(t=>({т:t.title,д:'задача'})))); if(j===null)return; if(j>0)taskId=задачи[j-1].id; }
+  workPrjScan(taskId,()=>{ _workTab='projects'; try{ $$('#workTabs .tabbtn').forEach(b=>b.classList.toggle('sel',b.dataset.wt==='projects')); }catch(e){}
+    if(taskId){ const t=(_prj.tasks||[]).find(x=>x.id===taskId); if(t){ workPrjTaskView(t); return; } } workPrjFiles(); });
+}
+function workPrjScan(taskId,after){
+  if(!_prj)return;
+  const сб=Number(((window.__OLESYA_SHELL__||{}).b))||0;
+  if(window.ReactNativeWebView&&window.__OLESYA_NATIVE__&&сб>=211){
+    _zvСканПосле={taskId:taskId||null,after,project_id:_prj.project.id};
+    оболочке({type:'scanner-open',project_id:_prj.project.id,task_id:taskId||'',place:_zvСканМесто(taskId)}); return; }
+  _zvВебСканер(taskId||null,after);
+}
+async function _zvСканСохранить(рез,taskId,after){
+  const pid=рез.project_id||(_prj&&_prj.project.id); if(!pid)return;
+  try{
+    const r=await jpost(wapi('/business/projects/files'),{project_id:pid,task_id:taskId||null,name:рез.name,mime:рез.mime||'application/pdf',size:рез.size||0,url:рез.url,text:рез.text||''});
+    if(_prj&&_prj.project.id===pid)_prj.files.unshift({id:r&&r.id,task_id:taskId||null,uploader_uid:(me&&me.id)||'',name:рез.name,mime:рез.mime||'application/pdf',
+      size:рез.size||0,url:рез.url,created_at:Date.now(),text_len:(рез.text||'').length});
+    toast('📄 Документ сохранён'+((рез.text||'')?' · текст распознан':''));
+    if(after)after();
+  }catch(e){ toast(/bad_file_url/.test(String(e&&e.message))?'Сервер не принял ссылку на файл':workPrjErr(e)); }
+}
+window.olesyaСканГотов=function(рез){ const п=_zvСканПосле||{}; _zvСканПосле=null; _zvСканСохранить(рез||{},(рез&&рез.task_id)||п.taskId||null,п.after); };
+/* Текст отсканированного документа: показать и скопировать */
+async function workPrjFileText(x){
+  let т='';
+  try{ const j=await jget(wapi('/business/projects/files/text?id='+encodeURIComponent(_prj.project.id)+'&file_id='+encodeURIComponent(x.id)),15000); т=String((j&&j.text)||''); }
+  catch(e){ toast('Не удалось получить текст — проверьте связь'); return; }
+  const back=el('<div class="confirm-back"><div class="confirm-card" style="max-width:560px;width:92%"><div class="cf-title"></div><textarea class="input" readonly style="width:100%;height:52vh;font-size:14px;line-height:1.45;resize:none"></textarea><div class="cf-acts"><button class="cf-btn cf-cancel">Закрыть</button><button class="cf-btn cf-ok">Скопировать</button></div></div></div>');
+  back.querySelector('.cf-title').textContent='Текст · '+(x.name||'документ');
+  back.querySelector('textarea').value=т||'Текст не распознан';
+  document.body.appendChild(back); requestAnimationFrame(()=>back.classList.add('show'));
+  back.querySelector('.cf-cancel').onclick=()=>back.remove();
+  back.querySelector('.cf-ok').onclick=async()=>{ try{ await navigator.clipboard.writeText(т); toast('Текст скопирован'); }catch(e){ toast('Не удалось скопировать'); } };
+  back.onclick=e=>{ if(e.target===back)back.remove(); };
+}
+/* углы листа: лист светлее стола — порог Оцу, самое большое светлое пятно, крайние точки (как в Android) */
+function _zvУглыJS(img){
+  const запас=[0.06,0.06,0.94,0.06,0.94,0.94,0.06,0.94];
+  try{
+    const k=360/Math.max(img.width,img.height); const w=Math.max(8,Math.round(img.width*k)), h=Math.max(8,Math.round(img.height*k)), n=w*h;
+    const c=document.createElement('canvas'); c.width=w; c.height=h; const cx=c.getContext('2d'); cx.drawImage(img,0,0,w,h);
+    const d=cx.getImageData(0,0,w,h).data; const g=new Uint8Array(n), hist=new Array(256).fill(0);
+    for(let i=0;i<n;i++){ const v=(d[i*4]*299+d[i*4+1]*587+d[i*4+2]*114)/1000|0; g[i]=v; hist[v]++; }
+    let всего=0; for(let t=0;t<256;t++)всего+=t*hist[t];
+    let сумма=0,вес=0,лучше=0,порог=128;
+    for(let t=0;t<256;t++){ вес+=hist[t]; if(!вес)continue; const ост=n-вес; if(!ост)break; сумма+=t*hist[t];
+      const м1=сумма/вес, м2=(всего-сумма)/ост, м=вес*ост*(м1-м2)*(м1-м2); if(м>лучше){лучше=м;порог=t;} }
+    const метка=new Int32Array(n).fill(-1), очередь=new Int32Array(n); let номер=0,лучшая=-1,размерЛ=0;
+    for(let s=0;s<n;s++){ if(g[s]<=порог||метка[s]!==-1)continue; let гол=0,хв=0; очередь[хв++]=s; метка[s]=номер; let р=0;
+      while(гол<хв){ const p=очередь[гол++]; р++; const x=p%w, y=(p/w)|0;
+        if(x>0&&метка[p-1]===-1&&g[p-1]>порог){метка[p-1]=номер;очередь[хв++]=p-1;}
+        if(x<w-1&&метка[p+1]===-1&&g[p+1]>порог){метка[p+1]=номер;очередь[хв++]=p+1;}
+        if(y>0&&метка[p-w]===-1&&g[p-w]>порог){метка[p-w]=номер;очередь[хв++]=p-w;}
+        if(y<h-1&&метка[p+w]===-1&&g[p+w]>порог){метка[p+w]=номер;очередь[хв++]=p+w;} }
+      if(р>размерЛ){размерЛ=р;лучшая=номер;} номер++; }
+    const доля=размерЛ/n; if(лучшая<0||доля<0.12||доля>0.97)return запас;
+    let tl=0,tr=0,br=0,bl=0,мин=1e9,макс=-1e9,минР=1e9,максР=-1e9;
+    for(let p=0;p<n;p++){ if(метка[p]!==лучшая)continue; const x=p%w,y=(p/w)|0,с=x+y,р=x-y;
+      if(с<мин){мин=с;tl=p;} if(с>макс){макс=с;br=p;} if(р>максР){максР=р;tr=p;} if(р<минР){минР=р;bl=p;} }
+    return [tl,tr,br,bl].flatMap(p=>[(p%w)/(w-1),((p/w)|0)/(h-1)]);
+  }catch(e){ return запас; }
+}
+/* выровнять лист: гомография «прямоугольник → четырёхугольник», выборка по ближайшей точке; затем обработка */
+function _zvВыровнятьJS(img,у,вид){
+  const k0=Math.min(1,2600/Math.max(img.width,img.height)); const W=Math.round(img.width*k0), H=Math.round(img.height*k0);
+  const sc=document.createElement('canvas'); sc.width=W; sc.height=H; sc.getContext('2d').drawImage(img,0,0,W,H);
+  const s=sc.getContext('2d').getImageData(0,0,W,H).data;
+  const P=[0,1,2,3].map(i=>[у[i*2]*W,у[i*2+1]*H]);
+  const д=(a,b)=>Math.hypot(P[a][0]-P[b][0],P[a][1]-P[b][1]);
+  let ш=Math.max(д(0,1),д(3,2)), в=Math.max(д(0,3),д(1,2)); const k=Math.min(1,1800/Math.max(ш,в)); ш=Math.max(16,Math.round(ш*k)); в=Math.max(16,Math.round(в*k));
+  /* решаем 8×8: (x,y) выхода → (u,v) снимка */
+  const пары=[[0,0],[ш,0],[ш,в],[0,в]]; const A=[],B=[];
+  for(let i=0;i<4;i++){ const [x,y]=пары[i],[u,v]=P[i]; A.push([x,y,1,0,0,0,-u*x,-u*y]); B.push(u); A.push([0,0,0,x,y,1,-v*x,-v*y]); B.push(v); }
+  for(let c=0;c<8;c++){ let m=c; for(let r=c+1;r<8;r++)if(Math.abs(A[r][c])>Math.abs(A[m][c]))m=r; [A[c],A[m]]=[A[m],A[c]]; [B[c],B[m]]=[B[m],B[c]];
+    for(let r=0;r<8;r++){ if(r===c)continue; const f=A[r][c]/A[c][c]; for(let j=c;j<8;j++)A[r][j]-=f*A[c][j]; B[r]-=f*B[c]; } }
+  const h=B.map((b,i)=>b/A[i][i]);
+  const oc=document.createElement('canvas'); oc.width=ш; oc.height=в; const ox=oc.getContext('2d'); const out=ox.createImageData(ш,в); const o=out.data;
+  for(let y=0;y<в;y++)for(let x=0;x<ш;x++){ const z=h[6]*x+h[7]*y+1; const u=Math.round((h[0]*x+h[1]*y+h[2])/z), v=Math.round((h[3]*x+h[4]*y+h[5])/z);
+    const j=(y*ш+x)*4; if(u<0||v<0||u>=W||v>=H){o[j]=o[j+1]=o[j+2]=255;o[j+3]=255;continue;} const i=(v*W+u)*4; o[j]=s[i];o[j+1]=s[i+1];o[j+2]=s[i+2];o[j+3]=255; }
+  const n=ш*в;
+  if(вид==='doc'||вид==='gray'){
+    const яр=new Uint8Array(n); for(let i=0;i<n;i++)яр[i]=(o[i*4]*299+o[i*4+1]*587+o[i*4+2]*114)/1000|0;
+    if(вид==='doc'){ const W1=ш+1, инт=new Float64Array(W1*(в+1));
+      for(let y=0;y<в;y++){ let стр=0; for(let x=0;x<ш;x++){ стр+=яр[y*ш+x]; инт[(y+1)*W1+x+1]=инт[y*W1+x+1]+стр; } }
+      const r=Math.max(8,ш/16|0);
+      for(let y=0;y<в;y++)for(let x=0;x<ш;x++){ const x1=Math.max(0,x-r),x2=Math.min(ш-1,x+r),y1=Math.max(0,y-r),y2=Math.min(в-1,y+r);
+        const сч=(x2-x1+1)*(y2-y1+1), сум=инт[(y2+1)*W1+x2+1]-инт[y1*W1+x2+1]-инт[(y2+1)*W1+x1]+инт[y1*W1+x1];
+        const v=(яр[y*ш+x]*сч*100<сум*85)?0:255; const j=(y*ш+x)*4; o[j]=o[j+1]=o[j+2]=v; } }
+    else { const гист=new Array(256).fill(0); for(const v of яр)гист[v]++; let низ=0,верх=255,нак=0;
+      for(let t=0;t<256;t++){ нак+=гист[t]; if(нак>n/100){низ=t;break;} } нак=0; for(let t=255;t>=0;t--){ нак+=гист[t]; if(нак>n/100){верх=t;break;} }
+      const дд=Math.max(1,верх-низ); for(let i=0;i<n;i++){ const v=Math.max(0,Math.min(255,(яр[i]-низ)*255/дд|0)); o[i*4]=o[i*4+1]=o[i*4+2]=v; } }
+  } else {
+    const низ=[0,0,0],верх=[255,255,255];
+    for(let к=0;к<3;к++){ const гр=new Array(256).fill(0); for(let i=0;i<n;i++)гр[o[i*4+к]]++; let нак=0;
+      for(let t=0;t<256;t++){ нак+=гр[t]; if(нак>n/200){низ[к]=t;break;} } нак=0; for(let t=255;t>=0;t--){ нак+=гр[t]; if(нак>n/200){верх[к]=t;break;} } }
+    for(let i=0;i<n;i++)for(let к=0;к<3;к++)o[i*4+к]=Math.max(0,Math.min(255,(o[i*4+к]-низ[к])*255/Math.max(1,верх[к]-низ[к])|0));
+  }
+  ox.putImageData(out,0,0); return oc;
+}
+/* PDF из JPEG-листов: A4 (595×842 пт), лист вписан по центру. Пишем сами — без чужих библиотек. */
+function _zvPdf(страницы){   // [{jpeg:Uint8Array,w,h}]
+  const enc=new TextEncoder(); const части=[]; let длина=0; const смещ=[];
+  const пиши=(x)=>{ const b=typeof x==='string'?enc.encode(x):x; части.push(b); длина+=b.length; };
+  const объект=(номер,тело)=>{ смещ[номер]=длина; пиши(номер+' 0 obj\n'); тело(); пиши('\nendobj\n'); };
+  пиши('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
+  const N=страницы.length, детей=страницы.map((_,i)=>(3+i*3)+' 0 R').join(' ');
+  объект(1,()=>пиши('<< /Type /Catalog /Pages 2 0 R >>'));
+  объект(2,()=>пиши('<< /Type /Pages /Kids ['+детей+'] /Count '+N+' >>'));
+  страницы.forEach((с,i)=>{ const стр=3+i*3, рис=4+i*3, сод=5+i*3;
+    const k=Math.min(595/с.w,842/с.h), dw=с.w*k, dh=с.h*k, dx=(595-dw)/2, dy=(842-dh)/2;
+    const поток='q '+dw.toFixed(2)+' 0 0 '+dh.toFixed(2)+' '+dx.toFixed(2)+' '+dy.toFixed(2)+' cm /Im'+i+' Do Q';
+    объект(стр,()=>пиши('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /Im'+i+' '+рис+' 0 R >> >> /Contents '+сод+' 0 R >>'));
+    объект(рис,()=>{ пиши('<< /Type /XObject /Subtype /Image /Width '+с.w+' /Height '+с.h+' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '+с.jpeg.length+' >>\nstream\n'); пиши(с.jpeg); пиши('\nendstream'); });
+    объект(сод,()=>пиши('<< /Length '+поток.length+' >>\nstream\n'+поток+'\nendstream'));
+  });
+  const всего=3+N*3; const xref=длина;
+  пиши('xref\n0 '+всего+'\n0000000000 65535 f \n'); for(let i=1;i<всего;i++)пиши(String(смещ[i]).padStart(10,'0')+' 00000 n \n');
+  пиши('trailer\n<< /Size '+всего+' /Root 1 0 R >>\nstartxref\n'+xref+'\n%%EOF');
+  return new Blob(части,{type:'application/pdf'});
+}
+function _zvВебСканер(taskId,after){
+  const back=el('<div class="zv-scan"><div class="zv-scan-head"><button class="zv-scan-x">✕</button><div class="zv-scan-t"><div>Сканер документов</div><div class="zv-scan-d"></div></div></div><div class="zv-scan-body"></div></div>');
+  back.querySelector('.zv-scan-d').textContent=_zvСканМесто(taskId);
+  document.body.appendChild(back);
+  const тело=back.querySelector('.zv-scan-body');
+  const листы=[]; let вид='doc', исх=null, углы=null, имя=(()=>{const д=new Date();return 'Скан '+String(д.getDate()).padStart(2,'0')+'.'+String(д.getMonth()+1).padStart(2,'0')+'.'+д.getFullYear();})(), текст=true;
+  back.querySelector('.zv-scan-x').onclick=()=>back.remove();
+  const снимок=(камера)=>{ const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; if(камера)inp.setAttribute('capture','environment');
+    inp.onchange=async()=>{ const f=inp.files&&inp.files[0]; if(!f)return;
+      try{ исх=window.createImageBitmap?await createImageBitmap(f,{imageOrientation:'from-image'}):await new Promise((ok,ош)=>{const im=new Image();im.onload=()=>ok(im);im.onerror=ош;im.src=URL.createObjectURL(f);}); }
+      catch(e){ toast('Не получилось открыть снимок'); return; }
+      углы=_zvУглыJS(исх); экранУглов(); };
+    inp.click(); };
+  const экранЛистов=()=>{
+    тело.innerHTML='';
+    const кн=el('<div class="zv-scan-row"><button class="btn zv-scan-cam">📷 Снять лист</button><button class="btn ghost zv-scan-file">🖼 Из файла</button></div>');
+    кн.querySelector('.zv-scan-cam').onclick=()=>снимок(true); кн.querySelector('.zv-scan-file').onclick=()=>снимок(false); тело.appendChild(кн);
+    if(!листы.length){ тело.appendChild(el('<div class="note">Снимите лист — края найдутся сами, их можно поправить. Листов может быть несколько: получится один PDF.</div>')); return; }
+    const сетка=el('<div class="zv-scan-grid"></div>');
+    листы.forEach((л,i)=>{ const т=el('<div class="zv-scan-th"><img><span></span><button>✕</button></div>'); т.querySelector('img').src=л.c.toDataURL('image/jpeg',0.6); т.querySelector('span').textContent=i+1;
+      т.querySelector('button').onclick=()=>{ листы.splice(i,1); экранЛистов(); }; сетка.appendChild(т); });
+    тело.appendChild(сетка);
+    const фм=el('<div><div class="sec-head" style="padding-left:0">Название</div><input class="input" maxlength="80"><label class="zv-scan-ocr"><input type="checkbox"> Распознать текст — чтобы искать по документу и копировать</label><button class="btn zv-scan-save" style="width:100%;margin-top:12px">Сохранить в проект</button><div class="zv-scan-st note"></div></div>');
+    const поле=фм.querySelector('input.input'); поле.value=имя; поле.oninput=()=>{имя=поле.value;};
+    const чек=фм.querySelector('input[type=checkbox]'); чек.checked=текст; чек.onchange=()=>{текст=чек.checked;};
+    const ст=фм.querySelector('.zv-scan-st'), сохр=фм.querySelector('.zv-scan-save');
+    сохр.onclick=async()=>{ сохр.disabled=true;
+      try{
+        ст.textContent='Собираю PDF…';
+        const стр=[]; for(const л of листы){ const b=await new Promise(ok=>л.c.toBlob(ok,'image/jpeg',0.88)); стр.push({jpeg:new Uint8Array(await b.arrayBuffer()),w:л.c.width,h:л.c.height,blob:b}); }
+        const pdf=_zvPdf(стр);
+        ст.textContent='Выгружаю документ…';
+        const dataUrl=await new Promise((ok,ош)=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.onerror=()=>ош(fr.error);fr.readAsDataURL(pdf);});
+        const url=await cloudUploadMedia(dataUrl); if(!url)throw new Error('upload');
+        let всё='';
+        if(текст){ for(let i=0;i<стр.length;i++){ ст.textContent='Распознаю текст: лист '+(i+1)+' из '+стр.length+'…';
+          try{ const r=await apiFetchAny(wapi('/ocr'),{method:'POST',headers:{'x-session-token':sessionToken||'','Content-Type':'image/jpeg'},body:стр[i].blob,timeout:90000});
+            if(r.ok){ const j=await r.json(); if(j&&j.text)всё+=(стр.length>1?'— Лист '+(i+1)+' —\n':'')+j.text+'\n\n'; } }catch(e){} } }
+        const чистое=(имя||'Документ').trim().replace(/[\\/:*?"<>|]/g,'_').slice(0,80)||'Документ';
+        await _zvСканСохранить({project_id:_prj.project.id,name:чистое+'.pdf',mime:'application/pdf',size:pdf.size,url,text:всё.trim()},taskId,after);
+        back.remove();
+      }catch(e){ ст.textContent=''; сохр.disabled=false; toast('Не получилось сохранить — проверьте связь'); }
+    };
+    тело.appendChild(фм);
+  };
+  const экранУглов=()=>{
+    тело.innerHTML='';
+    const поле=el('<div class="zv-scan-edit"><canvas></canvas><svg><polygon/></svg><i></i><i></i><i></i><i></i></div>'); тело.appendChild(поле);
+    const cv=поле.querySelector('canvas'); const макс=Math.min(тело.clientWidth||360,560), k=Math.min(макс/исх.width,(window.innerHeight*0.58)/исх.height);
+    cv.width=Math.round(исх.width*k); cv.height=Math.round(исх.height*k); cv.getContext('2d').drawImage(исх,0,0,cv.width,cv.height);
+    поле.style.width=cv.width+'px'; поле.style.height=cv.height+'px';
+    const svg=поле.querySelector('svg'), пол=поле.querySelector('polygon'), ручки=[...поле.querySelectorAll('i')];
+    svg.setAttribute('width',cv.width); svg.setAttribute('height',cv.height);
+    const нарисовать=()=>{ пол.setAttribute('points',[0,1,2,3].map(i=>(углы[i*2]*cv.width)+','+(углы[i*2+1]*cv.height)).join(' '));
+      ручки.forEach((р,i)=>{ р.style.left=(углы[i*2]*cv.width-16)+'px'; р.style.top=(углы[i*2+1]*cv.height-16)+'px'; }); };
+    ручки.forEach((р,i)=>{ р.onpointerdown=(e)=>{ e.preventDefault(); р.setPointerCapture(e.pointerId); const пр=поле.getBoundingClientRect();
+      р.onpointermove=(ev)=>{ углы[i*2]=Math.max(0,Math.min(1,(ev.clientX-пр.left)/cv.width)); углы[i*2+1]=Math.max(0,Math.min(1,(ev.clientY-пр.top)/cv.height)); нарисовать(); };
+      р.onpointerup=()=>{ р.onpointermove=null; }; }; });
+    нарисовать();
+    const виды=el('<div class="zv-scan-row"></div>');
+    [['doc','Документ'],['gray','Серый'],['color','Цвет']].forEach(([к,т])=>{ const b=el('<button class="btn'+(вид===к?'':' ghost')+'"></button>'); b.textContent=т; b.onclick=()=>{вид=к;[...виды.children].forEach(x=>x.classList.add('ghost'));b.classList.remove('ghost');}; виды.appendChild(b); });
+    тело.appendChild(виды);
+    const низ=el('<div class="zv-scan-row"><button class="btn ghost">Переснять</button><button class="btn">Сохранить лист</button></div>');
+    низ.children[0].onclick=()=>экранЛистов();
+    низ.children[1].onclick=()=>{ низ.children[1].disabled=true; низ.children[1].textContent='Выравниваю…';
+      setTimeout(()=>{ try{ листы.push({c:_zvВыровнятьJS(исх,углы,вид)}); toast('Лист '+листы.length+' готов'); }catch(e){ toast('Не получилось выровнять лист'); } экранЛистов(); },30); };
+    тело.appendChild(низ);
+  };
+  экранЛистов();
+}
 function workPrjFiles(){
   const box=$('#workBody'); if(!box||!_prj)return;
   box.innerHTML='';
   const head=el('<div class="sec-head"></div>'); head.textContent='📎 Файлы · '+_prj.project.name; box.appendChild(head);
   const add=el('<div class="cn-add"><div class="ad-ic">📎</div><div><div class="ad-t">Прикрепить файл</div><div class="ad-d">к проекту целиком; к задаче — на экране задачи</div></div></div>');
   add.onclick=()=>workPrjAttach(null,()=>workPrjFiles()); box.appendChild(add);
+  const скан=el('<div class="cn-add"><div class="ad-ic">📷</div><div><div class="ad-t">Сканировать документ</div><div class="ad-d">камерой: выровняет лист, соберёт PDF, распознает текст</div></div></div>');
+  скан.onclick=()=>workPrjScan(null,()=>workPrjFiles()); box.appendChild(скан);
   if(!_prj.files.length)box.appendChild(el('<div class="empty" style="padding:30px 26px">Файлов пока нет.<br>Договоры, сметы, фото — всё, что нужно команде под рукой.</div>'));
   _prj.files.forEach(x=>box.appendChild(workPrjFileRow(x,'all')));
   const back=el('<button class="btn ghost sub-btn" style="margin-top:12px">К проекту</button>');
@@ -9519,6 +9773,8 @@ function workPrjTaskView(t){
   файлы.forEach(x=>box.appendChild(workPrjFileRow(x,'task')));
   const add=el('<div class="cn-add"><div class="ad-ic">📎</div><div><div class="ad-t">Прикрепить файл</div><div class="ad-d">договор, смета, фото результата</div></div></div>');
   add.onclick=()=>workPrjAttach(t.id,()=>workPrjTaskView(t)); box.appendChild(add);
+  const скан=el('<div class="cn-add"><div class="ad-ic">📷</div><div><div class="ad-t">Сканировать документ</div><div class="ad-d">к задаче: лист за листом в один PDF</div></div></div>');
+  скан.onclick=()=>workPrjScan(t.id,()=>workPrjTaskView(t)); box.appendChild(скан);
 
   if(can.status){
     const b=el('<button class="btn '+(готова?'ghost ':'')+'sub-btn" style="margin-top:12px"></button>'); b.textContent=готова?'Вернуть в работу':'✅ Выполнено';
@@ -10226,7 +10482,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=210, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-210.apk';
+const APK_NEW_BUILD=211, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-211.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
@@ -10742,7 +10998,7 @@ function openTgChannels(){ go('scrTgChannels'); renderTgChannels(); }
 function renderTgChannels(){
   const cfg=loadSocialCfg();const box=$('#tgList');if(!box)return;box.innerHTML='';
   const add=el('<div class="snet" style="cursor:pointer"></div>');
-  add.innerHTML='<div class="sn-ic" style="background:radial-gradient(120% 120% at 32% 24%,#3FC7FF,#1E96D6 72%)"><svg viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z" fill="#fff"/></svg></div><div class="sn-main"><div class="sn-name">Добавить канал</div><div class="sn-sub">публичный Telegram, напр. @meduzalive</div></div>';
+  add.innerHTML='<div class="sn-ic" style="background:radial-gradient(120% 120% at 32% 24%,#3FC7FF,#1E96D6 72%)"><svg viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z" fill="#fff"/></svg></div><div class="sn-main"><div class="sn-name">Добавить канал</div><div class="sn-sub">публичный канал, напр. @meduzalive</div></div>';
   add.onclick=()=>addTgChannel();box.appendChild(add);
   (cfg.tgChannels||[]).forEach(ch=>{
     const row=el('<div class="snet"></div>');
@@ -10756,7 +11012,7 @@ function renderTgChannels(){
 }
 async function addTgChannel(){
   const cfg=loadSocialCfg();
-  let v=await appPrompt('Каналов можно несколько — добавляйте по одному.\nНапример: @meduzalive или t.me/rian_ru','@',{title:'Публичный Telegram-канал',okText:'Добавить'});
+  let v=await appPrompt('Каналов можно несколько — добавляйте по одному.\nНапример: @meduzalive или t.me/rian_ru','@',{title:'Публичный новостной канал',okText:'Добавить'});
   if(v===null)return;v=tgChannelNameClient(v);if(!v)return;
   if(!cfg.tgChannels.includes(v))cfg.tgChannels.push(v);
   saveSocialCfg();renderTgChannels();openTgChannel(v);
