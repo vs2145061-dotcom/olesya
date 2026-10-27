@@ -2151,7 +2151,7 @@ function applyTheme(pref,_skipNative){
     bt.title = p==='auto' ? ('Тема: авто · как в системе (сейчас '+(t==='dark'?'тёмная':'светлая')+')') : (p==='light' ? 'Тема: светлая' : 'Тема: тёмная');
   }
   // сообщаем оболочке тему страницы — но НЕ на самом раннем вызове (иначе мелькает белым до показа экрана)
-  if(!_skipNative)omSyncNativeTheme();
+  if(!_skipNative){ omSyncNativeTheme(); try{ if(typeof отдатьГлавную==='function')отдатьГлавную(); }catch(e){} }
   return t;
 }
 // «Авто»: перепроверяем системную тему при каждом возврате в приложение
@@ -2243,6 +2243,7 @@ function applyHomeBg(){
   if(ph){s.classList.add('homebg');s.style.backgroundImage='url('+ph+')';}
   else{s.classList.remove('homebg');s.style.backgroundImage='';}
   const rm=$('#btnHomeBgRemove');if(rm)rm.style.display=ph?'grid':'none';
+  try{ if(typeof отдатьГлавную==='function')отдатьГлавную(); }catch(e){}
 }
 function loadHomeBgPhoto(file){
   if(!file)return;
@@ -2365,7 +2366,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.46', BUILD_ID='2026-10-26-211';
+const APP_VERSION='5.2.47', BUILD_ID='2026-10-27-212';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -3344,7 +3345,118 @@ function go(id){ try{if(selMode)exitSel();}catch(e){} if(id==='scrPhone'){try{do
         try{ window.ReactNativeWebView.postMessage(JSON.stringify({type:'chats-hide'})); }catch(e){}
       },320);                                        // переход экрана — 0,28 с
     }
-  } }catch(e){} try{_deskSync(id);}catch(e){} try{omSyncNativeTheme();}catch(e){} }
+  } }catch(e){} try{главнаяВидна(id);}catch(e){} try{_deskSync(id);}catch(e){} try{omSyncNativeTheme();}catch(e){} }
+/* Нативная Главная (оболочка 212+, 27.10.2026): она лежит поверх этой и видна,
+   пока открыт экран Главной и поверх него нет окна. Данные — отдатьГлавную(). */
+function главнаяНативно(){ try{ return !!(window.__OLESYA_NATIVE__&&window.ReactNativeWebView&&window.__OLESYA_ГЛАВНАЯ__); }catch(e){ return false; } }
+function главнаяВидна(id){
+  if(!главнаяНативно())return;
+  try{
+    const экран=id||((typeof currentScreenId==='function')?currentScreenId():'');
+    const видно=экран==='scrHome'&&!_omTopOverlay();
+    window.ReactNativeWebView.postMessage(JSON.stringify({type:'главная-видна',видно:видно}));
+    if(видно)отдатьГлавную();
+    if(видно&&window.__zvРаздел)отдатьРаздел(window.__zvРаздел);   // вернулись из окна страницы — свежие данные разделу
+  }catch(e){}
+}
+let _главнаяФон=null;
+function отдатьГлавную(){
+  if(!главнаяНативно()||!me)return;
+  try{
+    let unread=0;const d=db();
+    Object.values(d.chats).forEach(c=>{if(c.members&&c.members.includes(me.id))unread+=(c.messages||[]).filter(m=>m.from!==me.id&&!(m.readBy||[]).includes(me.id)).length;});
+    const seen=callsSeenAt();const missed=getCalls().filter(c=>c.dir==='missed'&&(c.t||0)>seen).length;
+    const p=getThemePref();
+    const sh=window.__OLESYA_SHELL__;const b=sh&&Number(sh.b);
+    let later=0;try{later=Number(localStorage.getItem('om_upd_later'))||0;}catch(e){}
+    const приманка=(function(){ try{ const э=document.querySelector('#cardBiz .hc-lure'); return !!(э&&э.style.display!=='none'); }catch(e){ return false; } })();
+    const весть={type:'главная',я:{id:me.id,имя:me.name||'',цвет:me.color||'',значок:me.avatar||''},
+      непрочитано:unread,пропущено:missed,приманка:приманка,
+      тема:p==='auto'?'🌗':(p==='light'?'☀️':'🌙'),
+      обновление:{нужно:!(b>=APK_NEW_BUILD)&&(Date.now()-later>86400000),url:APK_NEW_URL,сборка:APK_NEW_BUILD}};
+    /* фото фона — только когда поменялось: оно большое */
+    const фон=homeBgData(); const метка=фон?(фон.length+':'+фон.slice(-48)):'';
+    if(метка!==_главнаяФон){ весть.фон=фон; _главнаяФон=метка; }
+    window.ReactNativeWebView.postMessage(JSON.stringify(весть));
+  }catch(e){}
+}
+/* Нажатие на нативной Главной — нажимаем ту же кнопку этой страницы. */
+window.olesyaГлавная=function(что){
+  try{
+    const ид={чаты:'cardChats',звонки:'cardCalls',книга:'cardContacts',избранное:'cardFav',новости:'cardNews',соцсети:'cardSocial',каналы:'cardChannels',бизнес:'cardBiz',
+      настройки:'btnSettingsHome',я:'homeAvatar',тема:'btnTheme',фон:'btnHomeBg','фон-убрать':'btnHomeBgRemove'}[что];
+    if(currentScreenId()!=='scrHome'&&что!=='обн-позже')go('scrHome');
+    if(ид){ const э=document.getElementById(ид); if(э)э.click(); return; }
+    if(что==='обн-ссылка'){ const э=document.querySelector('#updBanner .upd-copy'); if(э)э.click(); return; }
+    if(что==='обн-позже'){ const э=document.querySelector('#updBanner .upd-later'); if(э)э.click(); else{ try{localStorage.setItem('om_upd_later',String(Date.now()));}catch(x){} } отдатьГлавную(); return; }
+  }catch(e){}
+};
+/* Разделы с Главной нативно (оболочка 212+, 27.10.2026): «Звонки», «Телефонная
+   книга», «Настройки». Страница отдаёт данные и выполняет просьбы; экраны свои
+   (scrCalls, scrContacts, settingsSheet) в Android не открываются. */
+function разделыНативно(){ try{ return !!(главнаяНативно()&&window.__OLESYA_РАЗДЕЛЫ__); }catch(e){ return false; } }
+window.__zvРаздел='';
+function открытьРазделНативно(что){
+  if(!разделыНативно())return false;
+  try{ if(currentScreenId()!=='scrHome')go('scrHome'); window.ReactNativeWebView.postMessage(JSON.stringify({type:'раздел',что:что})); return true; }catch(e){ return false; }
+}
+/* Оболочка открыла (или закрыла — пустое) раздел: ему и отдаём обновления. */
+window.olesyaРаздел=function(что){
+  window.__zvРаздел=что||'';
+  if(что==='звонки'){ try{markCallsSeen();}catch(e){} }
+  if(что)отдатьРаздел(что);
+};
+let _разделТ=null;
+function отдатьРазделПозже(что){ if(window.__zvРаздел!==что)return; clearTimeout(_разделТ); _разделТ=setTimeout(function(){ отдатьРаздел(что); },150); }
+function снятьНастройки(){
+  const лист=document.getElementById('settingsSheet'); const строки=[];
+  const видно=function(э){ try{ return getComputedStyle(э).display!=='none'; }catch(e){ return true; } };
+  if(лист)лист.querySelectorAll('.sec-head,.setting').forEach(function(э){
+    if(!видно(э))return;
+    if(э.classList.contains('sec-head')){ строки.push({вид:'раздел',т:э.textContent.trim()}); return; }
+    const sw=э.querySelector('.switch'),t=э.querySelector('.lbl .t'),d=э.querySelector('.lbl .d'),ic=э.querySelector('.ic');
+    строки.push({вид:'строка',id:э.id||'',знак:ic?ic.textContent.trim():'',т:t?t.textContent.trim():'',д:d?d.textContent.trim():'',
+      красная:!!(t&&t.style.color),
+      пер:sw?{id:sw.id||'',вкл:sw.classList.contains('on'),замок:sw.style.pointerEvents==='none'}:null,
+      стрелка:[].some.call(э.children,function(c){ return c.textContent.trim()==='›'; })});
+  });
+  const pb=document.querySelector('#settingsSheet .pro-badge');
+  return {строки:строки,я:{имя:me.name||'',телефон:me.phone||'',значок:me.avatar||'',цвет:me.color||''},
+    pro:!!(pb&&getComputedStyle(pb).display!=='none'),версия:((document.getElementById('appVerLine')||{}).textContent||'')};
+}
+function отдатьРаздел(что){
+  if(!разделыНативно()||!me)return;
+  try{
+    let д=null;
+    if(что==='звонки'){
+      д={список:getCalls().map(function(c){ const u=userById(c.peer);
+        return {peer:c.peer,имя:c.name||(u&&contactDisplayName(u))||'Контакт',значок:u?(u.avatar||''):'',цвет:u?(u.color||''):'#6C7BFF',
+          dir:c.dir||'out',kind:c.kind||'audio',dur:c.dur||0,t:c.t||0,когда:relTime(c.t)+(c.dur?(' · '+fmtDur(c.dur)):''),есть:!!u}; })};
+    } else if(что==='контакты'){
+      const pb=getPhonebook();
+      const список=knownContacts().map(function(u){ return {id:u.id,имя:contactDisplayName(u),телефон:u.phone||'',значок:u.avatar||'',цвет:u.color||'',онлайн:!!u.online,ник:u.username||''}; })
+        .sort(function(a,b){ return a.имя.localeCompare(b.имя,'ru'); });
+      const пр=pb.filter(function(e){ return e&&!e.uid&&!e.self; }).map(function(e){ return {имя:e.name||e.phone,телефон:e.phone}; })
+        .sort(function(a,b){ return a.имя.localeCompare(b.имя,'ru'); }).slice(0,400);
+      д={контакты:список,приглашения:пр,книга:pb.length,вZ:pb.filter(function(e){ return e&&e.uid; }).length,ищем:!!_matchBusy,облако:!!cloudOn};
+    } else if(что==='настройки'){ paintMe(); refreshSettings(); д=снятьНастройки(); }
+    if(д)window.ReactNativeWebView.postMessage(JSON.stringify(Object.assign({type:'раздел-данные',что:что},д)));
+  }catch(e){}
+}
+/* Строка или переключатель нативных «Настроек» — нажимаем тот же элемент. */
+window.olesyaНастройка=function(id){
+  try{ const э=document.getElementById(id); if(!э)return; э.click();
+    setTimeout(function(){ отдатьРаздел('настройки'); },350); setTimeout(function(){ отдатьРаздел('настройки'); },1500); }catch(e){}
+};
+/* Просьбы нативной «Телефонной книги». */
+window.olesyaКонтакт=function(что,а,б){
+  try{
+    if(что==='имя'){ const u=userById(а); if(!u)return; bookSet(а,{name:(String(б||'').trim()||u.name)}); renderContacts(); return; }
+    if(что==='добавить'){ if(!а||!а.id)return; cacheUser(а); bookSet(а.id,{phone:а.phone||''}); renderContacts(); return; }
+    if(что==='обновить'){ matchPhonebook(true); return; }
+    if(что==='импорт'){ importDeviceContacts(); return; }
+  }catch(e){}
+};
 /* Двухпанельный десктоп (≥900px): при переписке/списке чатов держим список слева, чат справа. */
 function _isDesk(){ try{return window.matchMedia&&window.matchMedia('(min-width:900px)').matches;}catch(e){return false;} }
 function _ensureDeskEmpty(){ if(document.getElementById('deskEmpty'))return; const d=document.createElement('div'); d.id='deskEmpty';
@@ -10482,7 +10594,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=211, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-211.apk';
+const APK_NEW_BUILD=212, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-212.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
@@ -10783,6 +10895,7 @@ function renderContacts(){
     });
   }
 
+  отдатьРазделПозже('контакты');
   if(!list.length && !invites.length){
     if(hint)hint.textContent='';
     wrap.appendChild(el('<div class="empty" style="padding:40px 26px">Пока нет контактов.<br>Нажмите «Импорт из телефона», чтобы загрузить книгу, или добавьте по номеру — <b>+7 900 123 45 67</b>.</div>'));
@@ -10798,9 +10911,10 @@ function logCall(peerId,kind,dir,dur){
   list.unshift({peer:peerId,name:u?contactDisplayName(u):String(peerId),kind:kind||'audio',dir:dir||'out',dur:Math.round(dur||0),t:Date.now()});
   try{localStorage.setItem(callsKey(),JSON.stringify(list.slice(0,100)));}catch(e){}
   try{if(typeof renderHome==='function')renderHome();}catch(e){}   // обновить счётчик пропущенных на «Звонки»
+  try{отдатьРазделПозже('звонки');}catch(e){}
 }
 function renderCalls(){
-  if(!me)return;const wrap=$('#callsList');if(!wrap)return;wrap.innerHTML='';
+  if(!me)return;отдатьРазделПозже('звонки');const wrap=$('#callsList');if(!wrap)return;wrap.innerHTML='';
   const list=getCalls();
   if(!list.length){
     wrap.appendChild(el('<div class="empty" style="padding:46px 26px">Пока нет звонков.<br>Откройте телефонную книгу и позвоните контакту.</div>'));
@@ -10841,8 +10955,8 @@ function callContact(id,kind){
 
 /* ---- Навигация хаба и экранов ---- */
 $('#cardChats').onclick=()=>{current=null;renderChats();go('scrChats');};
-$('#cardCalls').onclick=()=>{renderCalls();go('scrCalls');markCallsSeen();};
-$('#cardContacts').onclick=()=>{renderContacts();go('scrContacts');};
+$('#cardCalls').onclick=()=>{if(открытьРазделНативно('звонки')){markCallsSeen();return;}renderCalls();go('scrCalls');markCallsSeen();};
+$('#cardContacts').onclick=()=>{if(открытьРазделНативно('контакты'))return;renderContacts();go('scrContacts');};
 $('#cardFav').onclick=()=>{if(me)openConv(me.id);};
 
 /* ================== НОВОСТИ (интернет-лента через сервер) ================== */
@@ -11081,8 +11195,8 @@ function openWebview(url,title,backTo,preferExternal){
 $('#webBack').onclick=()=>{try{$('#webFrame').src='about:blank';}catch(e){}go(_webBackTo);};
 $('#webOpen').onclick=()=>{if(_webUrl)window.open(_webUrl,'_blank','noopener');};
 $('#webFallbackOpen').onclick=()=>{if(_webUrl)window.open(_webUrl,'_blank','noopener');};
-$('#btnSettingsHome').onclick=()=>{paintMe();refreshSettings();$('#settingsSheet').classList.add('show');};
-$('#homeAvatar').onclick=()=>{paintMe();refreshSettings();$('#settingsSheet').classList.add('show');};
+$('#btnSettingsHome').onclick=()=>{if(открытьРазделНативно('настройки'))return;paintMe();refreshSettings();$('#settingsSheet').classList.add('show');};
+$('#homeAvatar').onclick=()=>{if(открытьРазделНативно('настройки'))return;paintMe();refreshSettings();$('#settingsSheet').classList.add('show');};
 $('#btnImportContacts').onclick=importDeviceContacts;
 $('#btnCallPick').onclick=()=>{renderContacts();go('scrContacts');};
 {const cs=$('#contactsSearch');if(cs)cs.addEventListener('input',renderContacts);}
@@ -11096,10 +11210,10 @@ function rememberEnabled(){try{return localStorage.getItem('om_remember')!=='0';
 function setRemember(on){try{localStorage.setItem('om_remember',on?'1':'0');}catch(e){}}
 
 /* ================== SETTINGS / PROFILE ================== */
-$('#btnSettings').onclick=()=>{paintMe();refreshSettings();$('#settingsSheet').classList.add('show');};
+$('#btnSettings').onclick=()=>{if(открытьРазделНативно('настройки'))return;paintMe();refreshSettings();$('#settingsSheet').classList.add('show');};
 /* 19.10.2026 (владелец): своя аватарка → «Моя страница», а не настройки — как в Android */
 $('#myAvatarTop').onclick=()=>openMyPage();
-function _открытьНастройки(строка){ paintMe();refreshSettings();$('#settingsSheet').classList.add('show'); if(строка)setTimeout(()=>{const r=$('#'+строка);if(r)r.click();},120); }
+function _открытьНастройки(строка){ if(открытьРазделНативно('настройки')){ if(строка)setTimeout(()=>{const r=$('#'+строка);if(r)r.click();},420); return; } paintMe();refreshSettings();$('#settingsSheet').classList.add('show'); if(строка)setTimeout(()=>{const r=$('#'+строка);if(r)r.click();},120); }
 function openMyPage(){
   if(!me)return; const старый=$('#myPage'); if(старый)старый.remove();
   const w=document.createElement('div'); w.id='myPage';
@@ -12413,6 +12527,7 @@ function синхроСписка(){
     _меткаСписка++;                                  // отменяем отложенное «спрячь» из go()
     window.ReactNativeWebView.postMessage(JSON.stringify({type:надо?'chats-show':'chats-hide'}));
   }catch(e){}
+  try{ главнаяВидна(); }catch(e){}
 }
 function _omWatchOverlay(id){
   const e=document.getElementById(id); if(!e)return;
