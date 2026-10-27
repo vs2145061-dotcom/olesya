@@ -2366,7 +2366,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.47', BUILD_ID='2026-10-27-212';
+const APP_VERSION='5.2.48', BUILD_ID='2026-10-27-212';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -3395,6 +3395,8 @@ window.olesyaГлавная=function(что){
    книга», «Настройки». Страница отдаёт данные и выполняет просьбы; экраны свои
    (scrCalls, scrContacts, settingsSheet) в Android не открываются. */
 function разделыНативно(){ try{ return !!(главнаяНативно()&&window.__OLESYA_РАЗДЕЛЫ__); }catch(e){ return false; } }
+/* подразделы и тосты рисует оболочка с 213 */
+function подразделыНативно(){ try{ return разделыНативно()&&Number((window.__OLESYA_SHELL__||{}).b)>=213; }catch(e){ return false; } }
 window.__zvРаздел='';
 function открытьРазделНативно(что){
   if(!разделыНативно())return false;
@@ -3447,6 +3449,100 @@ function отдатьРаздел(что){
 window.olesyaНастройка=function(id){
   try{ const э=document.getElementById(id); if(!э)return; э.click();
     setTimeout(function(){ отдатьРаздел('настройки'); },350); setTimeout(function(){ отдатьРаздел('настройки'); },1500); }catch(e){}
+};
+/* ── Подразделы настроек нативно (этап 3б, 27.10.2026) ──
+   Содержимое #subBody описывается простыми блоками: заметка, раздел, вариант,
+   строка с переключателем, поле, кнопка, запись журнала, ряд выбора (цвета и
+   значки аватара), картинка (QR), аватар. Нажатие — по номеру (data-zvi) на тот
+   же элемент. Картинки-образцы (фон чатов) оболочка пока не рисует — тогда
+   подраздел показывается страницей, как раньше. */
+function _zvКуски(узел){
+  const к=[];
+  const идти=function(n,ж,код,тускл){
+    if(n.nodeType===3){ const т=n.nodeValue.replace(/\s+/g,' '); if(т)к.push({т:т,ж:ж?1:0,м:код?1:0,б:тускл?1:0}); return; }
+    if(n.nodeType!==1)return;
+    const тег=n.tagName;
+    if(тег==='BR'){ к.push({т:'\n'}); return; }
+    if(тег==='BUTTON'||тег==='INPUT'||тег==='SVG'||тег==='svg')return;
+    const ст=(n.getAttribute&&n.getAttribute('style'))||'';
+    const ж2=ж||тег==='B'||тег==='STRONG', к2=код||тег==='CODE', т2=тускл||/--faint|--muted/.test(ст);
+    n.childNodes.forEach(function(c){ идти(c,ж2,к2,т2); });
+  };
+  идти(узел,false,false,false);
+  return к;
+}
+function снятьПодраздел(){
+  const тело=$('#subBody'); if(!тело)return null;
+  if(тело.querySelector('canvas,img,video,iframe,.bg-grid'))return null;
+  const эл=[]; let n=0;
+  const метка=function(э){ э.setAttribute('data-zvi',String(n)); return n++; };
+  const видно=function(э){ try{ return getComputedStyle(э).display!=='none'; }catch(e){ return true; } };
+  const обойти=function(узел){
+    [].forEach.call(узел.children,function(э){
+      if(!видно(э))return;
+      const к=э.classList, тег=э.tagName.toUpperCase();
+      if(к.contains('note')){ эл.push({вид:'заметка',ч:_zvКуски(э)}); return; }
+      if(к.contains('sec-head')){ эл.push({вид:'раздел',т:э.textContent.trim()}); return; }
+      if(к.contains('opt')){ эл.push({вид:'вариант',и:метка(э),вкл:к.contains('sel'),ч:_zvКуски(э.lastElementChild||э)}); return; }
+      if(к.contains('setting')){
+        const sw=э.querySelector('.switch'),t=э.querySelector('.lbl .t'),d=э.querySelector('.lbl .d'),ic=э.querySelector('.ic');
+        эл.push({вид:'строка',знак:ic?ic.textContent.trim():'',т:t?t.textContent.trim():'',д:d?d.textContent.trim():'',
+          пер:sw?{и:метка(sw),вкл:sw.classList.contains('on')}:null,и:sw?null:метка(э),
+          стрелка:[].some.call(э.children,function(c){ return c.textContent.trim()==='›'; })});
+        return;
+      }
+      if(тег==='INPUT'){ эл.push({вид:'поле',и:метка(э),значение:э.value||'',подсказка:э.placeholder||'',пароль:э.type==='password'}); return; }
+      if(тег==='TEXTAREA'){ эл.push({вид:'поле',и:метка(э),значение:э.value||'',подсказка:э.placeholder||'',много:1}); return; }
+      if(тег==='BUTTON'){ эл.push({вид:'кнопка',и:метка(э),т:э.textContent.trim(),стиль:к.contains('kill')?'красная':(к.contains('btn')?'главная':'простая'),выкл:!!э.disabled}); return; }
+      if(к.contains('log-row')){
+        const кн=э.querySelector('button'); const lt=[].map.call(э.querySelectorAll('.lt'),function(x){ return x.textContent.trim(); }).join(' ');
+        const копия=э.cloneNode(true); копия.querySelectorAll('.lt,button').forEach(function(x){ x.remove(); });
+        эл.push({вид:'запись',ч:_zvКуски(копия),низ:lt,кнопка:кн?{и:метка(кн),т:кн.textContent.trim()}:null});
+        return;
+      }
+      if(к.contains('pick-row')){
+        эл.push({вид:'выбор',кнопки:[].map.call(э.children,function(b){ const sv=b.querySelector('svg');
+          return {и:метка(b),вкл:b.classList.contains('sel'),фон:b.style.background||b.style.backgroundImage||'',svg:sv?sv.outerHTML:'',т:sv?'':b.textContent.trim()}; })});
+        return;
+      }
+      if(к.contains('avatar')){ эл.push({вид:'аватар'}); return; }
+      if(тег==='SVG'){ эл.push({вид:'картинка',svg:э.outerHTML}); return; }
+      if(э.children.length){ обойти(э); return; }
+      if(э.textContent.trim())эл.push({вид:'заметка',ч:_zvКуски(э)});
+    });
+  };
+  обойти(тело);
+  return эл;
+}
+/* Отдать оболочке. первый — при открытии: если описать нельзя, false (покажет страница). */
+let _подразделТ=null;
+function отдатьПодраздел(первый){
+  try{
+    const эл=снятьПодраздел();
+    if(!эл)return false;
+    window.ReactNativeWebView.postMessage(JSON.stringify({type:'подраздел',заголовок:($('#subTitle')||{}).textContent||'',элементы:эл,
+      я:me?{имя:me.name||'',цвет:me.color||'',значок:me.avatar||''}:null,первый:!!первый}));
+    return true;
+  }catch(e){ return false; }
+}
+/* Подраздел перестроился (buildSubRefresh, ответ сервера) — оболочке свежий вид. */
+try{ new MutationObserver(function(){
+  const сш=$('#subSheet'); if(!сш||!сш.classList.contains('zv-натив')||!сш.classList.contains('show'))return;
+  clearTimeout(_подразделТ); _подразделТ=setTimeout(function(){ if(!отдатьПодраздел(false)){ сш.classList.remove('zv-натив'); try{ window.ReactNativeWebView.postMessage(JSON.stringify({type:'подраздел',закрыт:true})); }catch(e){} } },90);
+}).observe(document.getElementById('subBody'),{childList:true,subtree:true,attributes:true,attributeFilter:['class','disabled','value','style']}); }catch(e){}
+/* Подраздел закрылся кодом страницы (кнопка «Сохранить», «Заблокировать сейчас») — оболочке. */
+try{ new MutationObserver(function(){
+  const сш=$('#subSheet');
+  if(сш.classList.contains('zv-натив')&&!сш.classList.contains('show')){ сш.classList.remove('zv-натив'); try{ window.ReactNativeWebView.postMessage(JSON.stringify({type:'подраздел',закрыт:true})); }catch(e){} }
+}).observe(document.getElementById('subSheet'),{attributes:true,attributeFilter:['class']}); }catch(e){}
+window.olesyaПодраздел=function(что,и,значение){
+  try{
+    const сш=$('#subSheet');
+    if(что==='закрыть'){ _subBuilder=null; сш.classList.remove('zv-натив'); сш.classList.remove('show'); return; }
+    const э=document.querySelector('#subBody [data-zvi="'+и+'"]'); if(!э)return;
+    if(что==='нажать'){ э.click(); return; }
+    if(что==='ввод'){ э.value=String(значение==null?'':значение); э.dispatchEvent(new Event('input',{bubbles:true})); э.dispatchEvent(new Event('change',{bubbles:true})); return; }
+  }catch(e){}
 };
 /* Просьбы нативной «Телефонной книги». */
 window.olesyaКонтакт=function(что,а,б){
@@ -11297,7 +11393,13 @@ $('#notifToggle').onclick=async function(){
 
 /* ================== SETTINGS SUB-SHEETS (v2) ================== */
 let _subBuilder=null;
-function openSub(title,builder){_subBuilder=builder;$('#subTitle').textContent=title;const b=$('#subBody');b.innerHTML='';builder(b);$('#subSheet').classList.add('show');}
+function openSub(title,builder){_subBuilder=builder;$('#subTitle').textContent=title;const b=$('#subBody');b.innerHTML='';builder(b);
+  /* 27.10.2026: в оболочке 212+ подраздел рисует сама оболочка — здесь он
+     строится как обычно, но невидим (zv-натив); описание уходит ей. */
+  const сш=$('#subSheet');
+  if(подразделыНативно()&&отдатьПодраздел(true)){ сш.classList.add('zv-натив'); }
+  else сш.classList.remove('zv-натив');
+  сш.classList.add('show');}
 function buildSubRefresh(){if(_subBuilder){const b=$('#subBody');b.innerHTML='';_subBuilder(b);}}
 $('#subBack').onclick=()=>$('#subSheet').classList.remove('show');
 function el(html){const t=document.createElement('div');t.innerHTML=String(html).trim();return t.firstChild;}
@@ -12511,7 +12613,7 @@ function _omCloseOverlay(id){
 function _omTopOverlay(){
   const dlg=[...document.querySelectorAll('.confirm-back')].pop();   // диалоги appConfirm/appPrompt — самые верхние
   if(dlg&&dlg.isConnected)return {dlg:dlg};
-  for(let i=OM_OVERLAYS.length-1;i>=0;i--){ const e=document.getElementById(OM_OVERLAYS[i]); if(e&&e.classList.contains('show'))return {id:OM_OVERLAYS[i]}; }
+  for(let i=OM_OVERLAYS.length-1;i>=0;i--){ const e=document.getElementById(OM_OVERLAYS[i]); if(e&&e.classList.contains('show')&&!e.classList.contains('zv-натив'))return {id:OM_OVERLAYS[i]}; }
   return null;
 }
 /* Слежение за открытием/закрытием: держим историю в синхроне. Открылась шторка → запись в
@@ -12745,7 +12847,7 @@ function волныЗвонка(включить,кто){
     }
   }catch(e){}
 }
-let toastTO=null;function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');clearTimeout(toastTO);toastTO=setTimeout(()=>el.classList.remove('show'),2600);}
+let toastTO=null;function toast(t){try{ if(typeof подразделыНативно==='function'&&подразделыНативно()&&window.__zvРаздел){ window.ReactNativeWebView.postMessage(JSON.stringify({type:'тост',т:String(t||'')})); return; } }catch(e){} const el=$('#toast');el.textContent=t;el.classList.add('show');clearTimeout(toastTO);toastTO=setTimeout(()=>el.classList.remove('show'),2600);}
 /* ── Отклик при нажатии: звук и вибрация настраиваются РАЗДЕЛЬНО (миграция со старого om_tapfx) ── */
 function tapSoundOn(){try{const v=localStorage.getItem('om_tapsnd');if(v!=null)return v!=='0';return localStorage.getItem('om_tapfx')!=='0';}catch(e){return true;}}   // по умолчанию включено
 function setTapSound(on){try{localStorage.setItem('om_tapsnd',on?'1':'0');}catch(e){} zvTapToShell();}
