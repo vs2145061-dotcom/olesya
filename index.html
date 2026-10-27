@@ -2366,7 +2366,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.48', BUILD_ID='2026-10-27-212';
+const APP_VERSION='5.2.49', BUILD_ID='2026-10-27-212';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -3397,6 +3397,8 @@ window.olesyaГлавная=function(что){
 function разделыНативно(){ try{ return !!(главнаяНативно()&&window.__OLESYA_РАЗДЕЛЫ__); }catch(e){ return false; } }
 /* подразделы и тосты рисует оболочка с 213 */
 function подразделыНативно(){ try{ return разделыНативно()&&Number((window.__OLESYA_SHELL__||{}).b)>=213; }catch(e){ return false; } }
+/* оболочка 215+: рисует сетку фонов чатов и строку состояния Firebase */
+function фоныНативно(){ try{ return подразделыНативно()&&Number((window.__OLESYA_SHELL__||{}).b)>=215; }catch(e){ return false; } }
 window.__zvРаздел='';
 function открытьРазделНативно(что){
   if(!разделыНативно())return false;
@@ -3413,8 +3415,9 @@ function отдатьРазделПозже(что){ if(window.__zvРаздел!
 function снятьНастройки(){
   const лист=document.getElementById('settingsSheet'); const строки=[];
   const видно=function(э){ try{ return getComputedStyle(э).display!=='none'; }catch(e){ return true; } };
-  if(лист)лист.querySelectorAll('.sec-head,.setting').forEach(function(э){
+  if(лист)лист.querySelectorAll('.sec-head,.setting,#firebaseStatusBadge').forEach(function(э){
     if(!видно(э))return;
+    if(э.id==='firebaseStatusBadge'){ if(фоныНативно())строки.push({вид:'заметка',т:э.textContent.trim()}); return; }
     if(э.classList.contains('sec-head')){ строки.push({вид:'раздел',т:э.textContent.trim()}); return; }
     const sw=э.querySelector('.switch'),t=э.querySelector('.lbl .t'),d=э.querySelector('.lbl .d'),ic=э.querySelector('.ic');
     строки.push({вид:'строка',id:э.id||'',знак:ic?ic.textContent.trim():'',т:t?t.textContent.trim():'',д:d?d.textContent.trim():'',
@@ -3473,7 +3476,8 @@ function _zvКуски(узел){
 }
 function снятьПодраздел(){
   const тело=$('#subBody'); if(!тело)return null;
-  if(тело.querySelector('canvas,img,video,iframe,.bg-grid'))return null;
+  if(тело.querySelector('canvas,img,video,iframe'))return null;
+  if(тело.querySelector('.bg-grid')&&!фоныНативно())return null;
   const эл=[]; let n=0;
   const метка=function(э){ э.setAttribute('data-zvi',String(n)); return n++; };
   const видно=function(э){ try{ return getComputedStyle(э).display!=='none'; }catch(e){ return true; } };
@@ -3506,6 +3510,15 @@ function снятьПодраздел(){
         return;
       }
       if(к.contains('avatar')){ эл.push({вид:'аватар'}); return; }
+      if(к.contains('bg-grid')){
+        эл.push({вид:'фоны',ячейки:[].map.call(э.children,function(c){
+          const sw=c.querySelector('.bgsw'), cap=c.querySelector('.bg-cap'), фон=(sw&&sw.style.backgroundImage)||'';
+          const ф=фон.match(/url\(["']?(.*?)["']?\)/);
+          return {и:метка(c),вкл:c.classList.contains('sel'),
+            тип:sw?(sw.classList.contains('default')?'стандарт':(sw.classList.contains('cbg')?'готовый':'своё')):'своё',
+            id:sw?(sw.getAttribute('data-bg')||''):'',т:cap?cap.textContent.trim():'',фото:ф?ф[1]:''}; })});
+        return;
+      }
       if(тег==='SVG'){ эл.push({вид:'картинка',svg:э.outerHTML}); return; }
       if(э.children.length){ обойти(э); return; }
       if(э.textContent.trim())эл.push({вид:'заметка',ч:_zvКуски(э)});
@@ -3535,6 +3548,9 @@ try{ new MutationObserver(function(){
   const сш=$('#subSheet');
   if(сш.classList.contains('zv-натив')&&!сш.classList.contains('show')){ сш.classList.remove('zv-натив'); try{ window.ReactNativeWebView.postMessage(JSON.stringify({type:'подраздел',закрыт:true})); }catch(e){} }
 }).observe(document.getElementById('subSheet'),{attributes:true,attributeFilter:['class']}); }catch(e){}
+window.olesyaФонФото=function(адрес){
+  try{ fetch(String(адрес||'')).then(function(r){ return r.blob(); }).then(function(b){ loadChatBgPhoto(b); }).catch(function(){ toast('Не удалось загрузить изображение'); }); }catch(e){}
+};
 window.olesyaПодраздел=function(что,и,значение){
   try{
     const сш=$('#subSheet');
