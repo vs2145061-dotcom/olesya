@@ -2366,7 +2366,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.52', BUILD_ID='2026-10-28-225';
+const APP_VERSION='5.2.53', BUILD_ID='2026-10-28-226';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -10719,7 +10719,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=225, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-225.apk';
+const APK_NEW_BUILD=226, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-226.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
@@ -11038,6 +11038,16 @@ function logCall(peerId,kind,dir,dur){
   try{if(typeof renderHome==='function')renderHome();}catch(e){}   // обновить счётчик пропущенных на «Звонки»
   try{отдатьРазделПозже('звонки');}catch(e){}
 }
+/* 28.10.2026, этап 5: звонок, принятый оболочкой без страницы, пишется в историю отсюда.
+   Если страница сама успела записать его как пропущенный (видела то же приглашение) — заменяем. */
+window.olesyaЖурналЗвонка=function(peer,kind,dir,dur){
+  try{
+    if(!me||!peer)return;
+    const list=getCalls();
+    if(list[0]&&list[0].peer===peer&&list[0].dir==='missed'&&Date.now()-list[0].t<180000){ list.shift(); try{localStorage.setItem(callsKey(),JSON.stringify(list));}catch(e){} }
+    logCall(peer,kind==='video'?'video':'audio',dir==='in'?'in':'missed',Number(dur)||0);
+  }catch(e){}
+};
 function renderCalls(){
   if(!me)return;отдатьРазделПозже('звонки');const wrap=$('#callsList');if(!wrap)return;wrap.innerHTML='';
   const list=getCalls();
