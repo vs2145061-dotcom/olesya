@@ -2366,7 +2366,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.50', BUILD_ID='2026-10-28-217';
+const APP_VERSION='5.2.51', BUILD_ID='2026-10-28-220';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -5752,7 +5752,7 @@ function autoSize(){const t=$('#msgInput');t.style.height='auto';
   // сверху/снизу (box-sizing:border-box) — иначе одна строка давала бы «лишние» 3px прокрутки.
   // Потолок высоты задаёт CSS (max-height:40vh); за ним прокрутка идёт БЕЗ видимой полосы.
   t.style.height=(t.scrollHeight+3)+'px';}
-function toggleSendBtn(){const has=$('#msgInput').value.trim().length>0;$('#btnSend').style.display=has?'grid':'none';$('#btnMic').style.display=has?'none':'grid';const _cl=document.getElementById('btnClip');if(_cl)_cl.style.display=has?'none':'';}
+function toggleSendBtn(){const has=$('#msgInput').value.trim().length>0;$('#btnSend').style.display=has?'grid':'none';$('#btnMic').style.display=has?'none':'grid';/* 28.10.2026: скрепка видна всегда, и пока пишешь */}
 
 /* typing */
 let typingTO=null,typingSent=false;
@@ -10706,7 +10706,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=217, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-217.apk';
+const APK_NEW_BUILD=220, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-220.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
