@@ -2366,7 +2366,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.51', BUILD_ID='2026-10-28-220';
+const APP_VERSION='5.2.52', BUILD_ID='2026-10-28-225';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -5363,16 +5363,29 @@ function voiceEl(m,mine){
   // расшифровка голосового (Cloudflare Workers AI · Whisper)
   const tr=document.createElement('div');tr.className='voice-tr';
   if(m.transcript){tr.textContent='📝 '+m.transcript;wrap.appendChild(tr);}
-  else{const tb=document.createElement('button');tb.className='voice-trbtn';tb.textContent='📝 Расшифровать';tb.onclick=e=>{e.stopPropagation();transcribeVoice(m,tr,tb);};wrap.appendChild(tb);wrap.appendChild(tr);}
+  else{const tb=document.createElement('button');tb.className='voice-trbtn';tb.textContent='📝 Расшифровать';tb.onclick=e=>{e.stopPropagation();transcribeVoice(m,tr,tb);};wrap.appendChild(tb);wrap.appendChild(tr);
+    if(!mine)warmTranscribe(m);}
   return wrap;
+}
+/* 28.10.2026: быстрее. Файл из нашего хранилища сервер берёт сам ({media}) — без скачивания
+   и обратной отправки; чужое голосовое на экране расшифровывается заранее (прогрев):
+   сервер запоминает итог, и по нажатию текст приходит сразу. */
+const VOICE_STORE_RE=/^https:\/\/[^/]+\.storage\.yandexcloud\.net\/|\/m\/[^?#]+\.[a-z0-9]+(\?|$)/i;
+const _warmed=new Set();
+function trByMedia(src,signal){return fetch(getApiUrl()+'/ai/transcribe?lang=ru',{method:'POST',headers:{'content-type':'application/json','x-session-token':sessionToken||''},body:JSON.stringify({media:src}),signal});}
+function warmTranscribe(m){
+  try{const src=m.audio||m.src;if(!src||_warmed.has(m.id)||!VOICE_STORE_RE.test(src))return;
+    if(!(cloudOn&&isCloudReady()&&CFG.provider==='worker'))return;
+    _warmed.add(m.id);setTimeout(()=>{trByMedia(src,timeoutSignal(60000)).catch(()=>{});},400);}catch(e){}
 }
 async function transcribeVoice(m,host,btn){
   if(!(cloudOn&&isCloudReady()&&CFG.provider==='worker')){toast('Расшифровка работает при подключённом сервере (Cloudflare Workers AI)');return;}
   const src=m.audio||m.src;if(!src){toast('Нет аудио для расшифровки');return;}
   if(btn)btn.remove();host.textContent='🎧 Расшифровываю…';
   try{
-    const blob=await (await fetch(src)).blob();
-    const r=await fetch(getApiUrl()+'/ai/transcribe',{method:'POST',headers:{'content-type':blob.type||'audio/webm','x-session-token':sessionToken||''},body:blob,signal:timeoutSignal(60000)});
+    let r=VOICE_STORE_RE.test(src)?await trByMedia(src,timeoutSignal(60000)).catch(()=>null):null;
+    if(!r||!r.ok){const blob=await (await fetch(src)).blob();
+      r=await fetch(getApiUrl()+'/ai/transcribe',{method:'POST',headers:{'content-type':blob.type||'audio/webm','x-session-token':sessionToken||''},body:blob,signal:timeoutSignal(60000)});}
     if(r.ok){const d=await r.json();const t=(d&&d.text)||'';host.textContent=t?('📝 '+t):'Не удалось распознать речь';
       if(t){try{const dd=db();const c=getChat();const mm=c&&c.messages.find(x=>x.id===m.id);if(mm){mm.transcript=t;save(dd);}}catch(e){}}}
     else host.textContent='Не удалось расшифровать (сервис занят)';
@@ -10706,7 +10719,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=220, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-220.apk';
+const APK_NEW_BUILD=225, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-225.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
