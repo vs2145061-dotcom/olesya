@@ -2367,7 +2367,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.54', BUILD_ID='2026-10-29-239';
+const APP_VERSION='5.2.55', BUILD_ID='2026-10-29-245';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -3244,7 +3244,11 @@ function emit(type,payload){
      нельзя забыть в новом сигнале. */
   if(type&&type.indexOf('call:')===0&&callCid&&payload&&!payload.cid){ try{ payload.cid=callCid; }catch(e){} }
   const msg={type,payload,from:me?me.id:null,tab:TAB,eid:TAB+'-'+(++emitSeq),t:сейчасПоСерверу()};
-  cloudBusSend(msg);
+  if(type&&type.indexOf('call:')===0&&type!=='call:invite'){
+    /* 29.10.2026: «ответил»/«отбой» — до трёх повторов, eid тот же: получатель отсеет дубль */
+    (async()=>{ for(let i=0;i<3;i++){ if(await cloudBusSend(msg))return; await new Promise(r=>setTimeout(r,700)); }
+      try{ крошка('страница: сигнал '+type+' не ушёл после трёх попыток: '+_busОшибка,'звонок'); }catch(e){} })();
+  } else cloudBusSend(msg);
   bc&&bc.postMessage(msg);
   // localStorage ping for browsers without BroadcastChannel
   localStorage.setItem('om_ping',JSON.stringify(msg));
@@ -3287,7 +3291,9 @@ function handleBus(m){
     case 'presence': refreshIfPresence(); break;
     case 'call:invite': if(me&&m.payload.to===me.id)showIncomingCall(m.payload); break;
     case 'call:accept':
-      if(me&&callPeerId===m.payload.from){
+      if(me&&callPeerId===m.payload.from&&callAnswered){
+        try{ крошка('страница: повторный «снял трубку» — уже знаем, пропускаю','звонок'); }catch(e){}
+      } else if(me&&callPeerId===m.payload.from){
         try{ крошка('страница: собеседник снял трубку','звонок'); }catch(e){}
         onCallAccepted();
       } else {
@@ -8023,7 +8029,9 @@ function showIncomingCall(p){
 function onCallAccepted(){
   _ringStop();
   try{ if(window.__OLESYA_NATIVE__&&window.ReactNativeWebView)
-        window.ReactNativeWebView.postMessage(JSON.stringify({type:'call-answered'})); }catch(e){}
+        window.ReactNativeWebView.postMessage(JSON.stringify({type:'call-answered',
+          /* 29.10.2026: «ответил» после долгого сна не дошёл — оболочка дублирует его своей шиной */
+          я:callIncoming?'отвечаю':'звоню',peer:callPeerId||'',cid:callCid||''})); }catch(e){}
   clearTimeout(callRingTO);stopCallInvite();
   callAnswered=true;
   callIncoming=false;$('#callAvatar').classList.remove('incoming-ring');$('#callSpamBadge').style.display='none';
@@ -8691,7 +8699,7 @@ async function renderWork(){
     else if(_workTab==='clients')await workClients(box);
     else if(_workTab==='projects')await workProjects(box);
     else await workCard(box);
-    _zvПлиткаСканера(box);   // 26.10.2026 (владелец: «сканер нужно сделать на виду в бизнес-режиме»)
+    if(_workTab==='card')_zvПлиткаСканера(box);   // 26.10.2026 «на виду»; 29.10.2026 владелец: «сканер оставь только в карточке»
     return;
   }catch(e){
     /* 402 — подписка кончилась прямо во время работы. Не оставляем человека
@@ -10720,7 +10728,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=239, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-239.apk';
+const APK_NEW_BUILD=245, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-245.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
