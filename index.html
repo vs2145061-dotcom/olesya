@@ -1156,9 +1156,10 @@ body.call-open #toast{bottom:190px}
   box-shadow:0 6px 18px -6px rgba(255,45,149,.8)}
 /* блик: узкая светлая полоса раз в несколько секунд пробегает по плитке */
 .hc-biz::after{content:'';position:absolute;top:-60%;left:-70%;width:45%;height:220%;
-  background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.42),rgba(255,255,255,0));
-  transform:rotate(18deg);animation:bizShine 4.5s ease-in-out infinite}
-@keyframes bizShine{0%{left:-70%}55%{left:130%}100%{left:130%}}
+  /* 28.10.2026 (владелец): розово-золотой блик с тонкой белой нитью, пролёт 1 с, пауза 2,5 с — как в Android 235 */
+  background:linear-gradient(90deg,rgba(255,236,200,0),rgba(255,214,150,.45) 18%,rgba(255,196,170,.62) 38%,rgba(255,252,240,.95) 50%,rgba(255,176,196,.55) 62%,rgba(255,214,150,.42) 82%,rgba(255,236,200,0));
+  transform:rotate(20deg);animation:bizShine 3.5s cubic-bezier(.45,0,.2,1) infinite}
+@keyframes bizShine{0%,71%{left:-70%}100%{left:130%}}
 @media (prefers-reduced-motion:reduce){.hc-biz::after{animation:none;opacity:0}}
 /* приманка: пробный период — правда, он действительно 7 дней. Владельцу не показываем. */
 .hc-biz .hc-lure{position:absolute;top:10px;right:10px;padding:3px 9px;border-radius:11px;
@@ -2366,7 +2367,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.53', BUILD_ID='2026-10-28-226';
+const APP_VERSION='5.2.54', BUILD_ID='2026-10-29-239';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -10719,7 +10720,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=226, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-226.apk';
+const APK_NEW_BUILD=239, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-239.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
