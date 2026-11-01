@@ -2367,7 +2367,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='5.2.61', BUILD_ID='2026-11-01-253';
+const APP_VERSION='5.2.62', BUILD_ID='2026-11-01-254';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -4277,6 +4277,13 @@ function enterApp(){
      этого вызова владелец до открытия настроек видел бы у себя приманку
      «7 дней бесплатно», а технические пункты оставались бы спрятанными. */
   try{ ownerRestore(); }catch(e){}
+  /* 01.11.2026: книга телефона — один раз перечитать (раньше местные номера без кода страны отбрасывались),
+     и раз в сутки перепроверить «не в ZORVELD» — без вопросов, если книга уже была загружена */
+  try{ setTimeout(function(){ try{
+    const pb=getPhonebook(); if(!pb.length)return;
+    if(nativeBridge()&&!localStorage.getItem('om_pb_reimport_1101')){ localStorage.setItem('om_pb_reimport_1101','1'); window.ReactNativeWebView.postMessage(JSON.stringify({type:'pick-contacts'})); return; }
+    matchPhonebook();
+  }catch(e){} },9000); }catch(e){}
   try{ if(!localStorage.getItem('om_reg_at')){ localStorage.setItem('om_reg_at',String(Date.now())); } evSend('register'); }catch(e){}
   try{sessionStorage.setItem(SS,me.id);}catch(e){}
   {const d=db();if(!d.users[me.id]){d.users[me.id]=me;save(d);}}
@@ -8439,10 +8446,24 @@ function normalizePhoneInput(raw){
   raw=(raw||'').trim();
   const numOnly=raw.replace(/[^\d]/g,'');
   if(raw.startsWith('+'))return raw.replace(/[^+\d]/g,'');
+  if(/^00\d{8,15}$/.test(numOnly))return '+'+numOnly.slice(2);
   if(/^8\d{10}$/.test(numOnly))return '+7'+numOnly.slice(1);
   if(/^7\d{10}$/.test(numOnly))return '+'+numOnly;
+  /* 01.11.2026 (Виталий: «телефонная книга не определяет контакта по номеру»): номера в местном виде
+     (без + и кода страны: «0151…», «90 123 45 67», «998…») раньше отбрасывались — человек не находился.
+     Код страны — по своему номеру. */
+  const cc=_zvМойКод();
+  if(/^998\d{9}$/.test(numOnly))return '+'+numOnly;
+  if(cc==='998'&&/^\d{9}$/.test(numOnly))return '+998'+numOnly;
+  if(cc==='7'&&/^9\d{9}$/.test(numOnly))return '+7'+numOnly;
+  if(cc&&/^0\d{6,13}$/.test(numOnly)&&cc!=='7')return '+'+cc+numOnly.slice(1);
+  if(cc&&numOnly.length>=6&&numOnly.length<=12&&!/^0/.test(numOnly)&&cc!=='7'&&numOnly.indexOf(cc)!==0)return '+'+cc+numOnly;
+  if(cc&&numOnly.indexOf(cc)===0&&numOnly.length>=cc.length+7)return '+'+numOnly;
   return raw;
 }
+function _zvМойКод(){ try{ const t=String((me&&me.phone)||'').replace(/[^\d]/g,''); if(!t)return '';
+  if(typeof COUNTRIES!=='undefined'){ let best=''; COUNTRIES.forEach(function(c){ if(t.indexOf(c[1])===0&&c[1].length>best.length)best=c[1]; }); return best; }
+  return t.indexOf('998')===0?'998':(t[0]==='7'?'7':''); }catch(e){ return ''; } }
 function openNewChat(){
   const d=db();const wrap=$('#contactList');wrap.innerHTML='';
   const rawTerm=($('#contactSearch').value||'').trim();
@@ -10730,7 +10751,7 @@ function knownContacts(){return Object.values(db().users).filter(u=>u&&u.id!==me
    «Скопировать ссылку» — запасной путь через обычный браузер. «Позже» — на сутки.
    Текст один для всех (владелец, 08.10.2026): сборок старше 143 ни у кого
    нет, все обновления встают поверх. */
-const APK_NEW_BUILD=253, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-253.apk';
+const APK_NEW_BUILD=254, APK_NEW_URL='https://api.zorveld.pro/apk/zorveld-254.apk';
 function renderUpdateBanner(){
   try{
     const grid=document.querySelector('#scrHome .home-grid'); if(!grid)return;
@@ -10839,7 +10860,9 @@ async function processImportedContacts(list,more){
 let _matchBusy=false;
 async function matchPhonebook(force){
   const entries=getPhonebook();
-  const pending=entries.filter(e=>e&&!e.uid&&(force||(!e.checked&&!e.notreg)));
+  /* 01.11.2026: «не в ZORVELD» перепроверяем раз в сутки — человек мог зарегистрироваться позже (сестра Виталия) */
+  const сутки=86400000, сейчас=Date.now();
+  const pending=entries.filter(e=>e&&!e.uid&&(force||(!e.checked&&!e.notreg)||(e.notreg&&сейчас-(e.at||0)>сутки)));
   if(!cloudOn){ if(pending.length)toast('Контакты загружены. Поиск друзей в ZORVELD включится с сервером (Настройки → Облачный сервер).'); renderContacts(); return; }
   if(!pending.length){renderContacts();return;}
   if(_matchBusy)return;
@@ -10851,7 +10874,8 @@ async function matchPhonebook(force){
       const res=await Promise.all(slice.map(async e=>{try{return {e,u:await cloudLookup(e.phone)};}catch(_){return {e,u:undefined};}}));
       res.forEach(({e,u})=>{
         if(u===undefined)return;          // ошибка сети — попробуем позже
-        e.checked=true;
+        e.checked=true; e.at=Date.now();
+        if(u&&u.id&&u.id!==me.id){ e.notreg=false; }
         if(u&&u.id&&u.id!==me.id){cacheUser(u);bookSet(u.id,{name:(e.name&&e.name!==e.phone)?e.name:u.name,phone:u.phone||e.phone});e.uid=u.id;matched++;}
         else if(u&&u.id===me.id){e.self=true;}
         else{e.notreg=true;}
