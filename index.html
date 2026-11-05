@@ -2381,7 +2381,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='6.0.1', BUILD_ID='2026-11-03-261';
+const APP_VERSION='6.0.2', BUILD_ID='2026-11-03-261';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -12325,7 +12325,7 @@ function setLockCfg(c){localStorage.setItem('om_lock_'+me.id,JSON.stringify(c));
 function замокОболочке(){try{if(!(window.__ZV_NATIVE_LOCK__&&window.ReactNativeWebView&&me))return;const c=lockCfg();window.ReactNativeWebView.postMessage(JSON.stringify({type:'замок-настройки',pin:c.pin||null,autolock:(c.autolock==null?60000:c.autolock),bio:c.bio!==false}));}catch(e){}}
 (function отдать(){try{if(me){замокОболочке();return;}}catch(e){}setTimeout(отдать,700);})();
 window.olesyaНативныйЗамок=function(что){try{if(что==='открыт'){_былаРазблокировка=true;}}catch(e){}};
-const LOCK_WHEN=[['Сразу',0],['Через 1 минуту',60000],['Через 5 минут',300000],['Только при закрытии приложения',-1]];
+const LOCK_WHEN=[['Сразу',0],['Через 1 минуту',60000],['Через 2 минуты',120000],['Через 5 минут',300000],['Через 10 минут',600000],['Только при закрытии приложения',-1]];
 function lockWhenLabel(){let c={};try{c=lockCfg();}catch(e){}const v=(c.autolock==null?60000:c.autolock);const f=LOCK_WHEN.find(x=>x[1]===v);return f?f[0].toLowerCase():'через 1 минуту';}
 function buildLockOptions(body){
   const c=lockCfg();
@@ -12436,7 +12436,7 @@ document.addEventListener('visibilitychange',()=>{
   if(window.__ZV_NATIVE_LOCK__)return;   // шторку и замок ведёт оболочка
   let c={};try{c=lockCfg();}catch(e){}
   if(document.hidden){
-    hidAt=Date.now();
+    if(!hidAt) hidAt=Date.now();   // 05.11.2026: отсчёт от первого ухода — повторные события его не сдвигают
     if(c&&c.pin&&!_omInCall()) showPrivacyCover();   // только шторка, экран не трогаем
     return;
   }
@@ -12456,6 +12456,7 @@ document.addEventListener('visibilitychange',()=>{
   }
   const thr=(c&&c.autolock!=null)?c.autolock:60000;
   _замокВстанет=!!(c&&c.pin&&!_omInCall() && hidAt && thr>=0 && Date.now()-hidAt>=thr);
+  hidAt=0;
   if(_замокВстанет){
     maybeLock();   // прошёл порог → настоящий экран блокировки + PIN/отпечаток; после — возврат на свой экран
   }
