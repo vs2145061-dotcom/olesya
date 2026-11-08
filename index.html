@@ -414,6 +414,15 @@ html.нативный-список #scrChats>*{visibility:hidden}
 :root{--zv-k:1}
 .bubble{font-size:calc(14.7px * var(--zv-k))}
 .bubble .zv-em{font-size:1.25em;line-height:1}
+/* 08.11.2026: эмодзи картинками (Fluent 3D, MIT / свой набор ZORVELD) */
+.zv-emi{width:1.4em;height:1.4em;vertical-align:-.32em;display:inline-block;object-fit:contain}
+.bubble.emoji-b .zv-emi{width:1.45em;height:1.45em;vertical-align:middle}
+.zv-emo-tabs{display:flex;justify-content:space-around;position:sticky;top:-11px;background:var(--surface);z-index:2;padding:4px 0;border-bottom:1px solid var(--line-soft)}
+.zv-emo-tabs button{background:none;border:0;width:34px;height:34px;cursor:pointer;padding:0}
+.zv-emo-tabs img{width:24px;height:24px}
+.zv-emo-grid{display:grid;grid-template-columns:repeat(8,1fr)}
+.zv-emo-grid button{background:none;border:0;height:44px;cursor:pointer;padding:0;font-size:26px}
+.zv-emo-grid img{width:32px;height:32px}
 .bubble a.zv-a{color:inherit;text-decoration:underline;word-break:break-word}
 .row.them .bubble a.zv-a{color:var(--primary)}
 .bubble.emoji-b{background:none!important;box-shadow:none!important;border:0!important;padding:0 2px!important}
@@ -2381,7 +2390,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='6.0.3', BUILD_ID='2026-11-03-261';
+const APP_VERSION='6.0.4', BUILD_ID='2026-11-03-261';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -5197,7 +5206,19 @@ function _zvParse(т){ const с=String(т||''); const к=[]; let п=0;
   с.replace(_ZV_ССЫЛКА,(н,_1,где)=>{ const ч=_zvTrim(н); if(!ч)return н; if(/^\+|^8/.test(ч)&&ч.replace(/\D/g,'').length<10)return н; if(где>п)к.push({т:с.slice(п,где)}); к.push(Object.assign({т:ч},_zvKind(ч))); п=где+ч.length; return н; });
   if(п<с.length)к.push({т:с.slice(п)}); return к; }
 function _zvFirstUrl(т){ const х=_zvParse(т).find(x=>x.вид==='сайт'); return х?х.адрес:null; }
-function _zvEmInto(фр,т){ String(т).split(_ZV_ЭМГ).forEach((ч,и)=>{ if(!ч)return; if(и%2){const sp=document.createElement('span');sp.className='zv-em';sp.textContent=ч;фр.appendChild(sp);} else фр.appendChild(document.createTextNode(ч)); }); }
+/* 08.11.2026 (владелец: «эмодзи визуально как в Telegram», повтор Android): картинки со своего сервера,
+   api.zorveld.pro/emoji/v1/<коды без FE0F>.webp; нет картинки — символ, как было */
+const _ZV_EMO='https://api.zorveld.pro/emoji/v1/';
+let _zvEmSet=null; try{ const с=localStorage.getItem('zv-emoji-index'); if(с)_zvEmSet=new Set(JSON.parse(с)); }catch(e){}
+fetch(_ZV_EMO+'index.json').then(r=>r.ok?r.json():null).then(a=>{ if(Array.isArray(a)&&a.length){ _zvEmSet=new Set(a); try{localStorage.setItem('zv-emoji-index',JSON.stringify(a));}catch(e){} } }).catch(()=>{});
+function _zvEmName(е){ const к=[]; for(const с of String(е||'')){ const н=с.codePointAt(0); if(н!==0xFE0F)к.push(н.toString(16)); } return к.join('-'); }
+function _zvEmHas(е){ return !!(_zvEmSet&&_zvEmSet.has(_zvEmName(е))); }
+function _zvEmImg(е){ const i=document.createElement('img'); i.className='zv-emi'; i.alt=е; i.draggable=false; i.decoding='async';
+  i.onerror=()=>{ const t=document.createElement('span'); t.className='zv-em'; t.textContent=е; i.replaceWith(t); }; i.src=_ZV_EMO+_zvEmName(е)+'.webp'; return i; }
+function _zvEmInto(фр,т){ String(т).split(_ZV_ЭМГ).forEach((ч,и)=>{ if(!ч)return; if(и%2){
+    const эм=ч.match(new RegExp(_ZV_ЭМ,'g'))||[];
+    if(эм.length&&эм.every(_zvEmHas)){ эм.forEach(е=>фр.appendChild(_zvEmImg(е))); return; }
+    const sp=document.createElement('span');sp.className='zv-em';sp.textContent=ч;фр.appendChild(sp);} else фр.appendChild(document.createTextNode(ч)); }); }
 /* Ссылки и эмодзи в уже собранном тексте (упоминания в группах не трогаем) */
 function _zvRich(tx){
   const w=document.createTreeWalker(tx,NodeFilter.SHOW_TEXT); const узлы=[]; while(w.nextNode())узлы.push(w.currentNode);
@@ -7000,8 +7021,21 @@ const eb=$('#emojiBar');
   STICKER_ORDER.forEach(k=>{const b=document.createElement('button');b.className='stk-item';b.title='Отправить стикер';b.innerHTML=stickerSVG(k);b.onclick=()=>sendSticker(k);grid.appendChild(b);});
   const l2=document.createElement('div');l2.className='stk-sec';l2.textContent='Эмодзи';
   const row=document.createElement('div');row.className='emoji-row';
-  EMOJIS.forEach(em=>{const b=document.createElement('button');b.className='emoji-btn';b.textContent=em;b.onclick=()=>{const t=$('#msgInput');t.value+=em;t.focus();toggleSendBtn();autoSize();};row.appendChild(b);});
+  const вставить=em=>{const t=$('#msgInput');t.value+=em;t.focus();toggleSendBtn();autoSize();};
+  EMOJIS.forEach(em=>{const b=document.createElement('button');b.className='emoji-btn';b.textContent=em;b.onclick=()=>вставить(em);row.appendChild(b);});
   eb.appendChild(l1);eb.appendChild(grid);eb.appendChild(l2);eb.appendChild(row);
+  /* 08.11.2026: весь набор разделами, как в Telegram (каталог с сервера; нет связи — прежний короткий ряд) */
+  const собрать=(кат)=>{ if(!Array.isArray(кат)||!кат.length)return; row.remove(); l2.remove();
+    const полоса=document.createElement('div'); полоса.className='zv-emo-tabs'; eb.insertBefore(полоса,l1);
+    const места={};
+    кат.forEach(р=>{ const з=document.createElement('div'); з.className='stk-sec'; з.textContent=р.название; места[р.ключ]=з; eb.appendChild(з);
+      const с=document.createElement('div'); с.className='zv-emo-grid';
+      (р.эмодзи||[]).forEach(([е])=>{ const b=document.createElement('button'); b.title=е; b.appendChild(_zvEmHas(е)?_zvEmImg(е):document.createTextNode(е)); b.onclick=()=>вставить(е); с.appendChild(b); });
+      eb.appendChild(с);
+      const т=document.createElement('button'); т.title=р.название; т.appendChild(_zvEmHas(р.значок)?_zvEmImg(р.значок):document.createTextNode(р.значок));
+      т.onclick=()=>{ eb.scrollTop=места[р.ключ].offsetTop-44; }; полоса.appendChild(т); }); };
+  try{ const с=localStorage.getItem('zv-emoji-catalog'); if(с)собрать(JSON.parse(с)); }catch(e){}
+  fetch(_ZV_EMO+'catalog.json').then(r=>r.ok?r.json():null).then(к=>{ if(Array.isArray(к)&&к.length){ try{ if(!localStorage.getItem('zv-emoji-catalog')){ localStorage.setItem('zv-emoji-catalog',JSON.stringify(к)); собрать(к);} else localStorage.setItem('zv-emoji-catalog',JSON.stringify(к)); }catch(e){ собрать(к); } } }).catch(()=>{});
 })();
 function sendSticker(key){ if(!current||!STICKERS[key])return; pushMessage({type:'sticker',sticker:key,text:key}); eb.classList.remove('show'); }
 $('#btnEmoji').onclick=()=>{$('#gifPanel').classList.remove('show');eb.classList.toggle('show');};
