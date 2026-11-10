@@ -2390,7 +2390,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='6.0.4', BUILD_ID='2026-11-03-261';
+const APP_VERSION='6.0.5', BUILD_ID='2026-11-03-261';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -5208,7 +5208,7 @@ function _zvParse(т){ const с=String(т||''); const к=[]; let п=0;
 function _zvFirstUrl(т){ const х=_zvParse(т).find(x=>x.вид==='сайт'); return х?х.адрес:null; }
 /* 08.11.2026 (владелец: «эмодзи визуально как в Telegram», повтор Android): картинки со своего сервера,
    api.zorveld.pro/emoji/v1/<коды без FE0F>.webp; нет картинки — символ, как было */
-const _ZV_EMO='https://api.zorveld.pro/emoji/v1/';
+const _ZV_EMO='https://api.zorveld.pro/emoji/v2/';
 let _zvEmSet=null; try{ const с=localStorage.getItem('zv-emoji-index'); if(с)_zvEmSet=new Set(JSON.parse(с)); }catch(e){}
 fetch(_ZV_EMO+'index.json').then(r=>r.ok?r.json():null).then(a=>{ if(Array.isArray(a)&&a.length){ _zvEmSet=new Set(a); try{localStorage.setItem('zv-emoji-index',JSON.stringify(a));}catch(e){} } }).catch(()=>{});
 function _zvEmName(е){ const к=[]; for(const с of String(е||'')){ const н=с.codePointAt(0); if(н!==0xFE0F)к.push(н.toString(16)); } return к.join('-'); }
