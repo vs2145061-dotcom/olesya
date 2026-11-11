@@ -423,6 +423,9 @@ html.нативный-список #scrChats>*{visibility:hidden}
 .zv-emo-grid{display:grid;grid-template-columns:repeat(8,1fr)}
 .zv-emo-grid button{background:none;border:0;height:44px;cursor:pointer;padding:0;font-size:26px}
 .zv-emo-grid img{width:32px;height:32px}
+.zv-emo-pick{position:fixed;z-index:9999;display:flex;gap:4px;padding:6px 8px;background:var(--surface);border:1px solid var(--line-soft);border-radius:16px;box-shadow:0 6px 24px rgba(0,0,0,.35)}
+.zv-emo-pick button{background:none;border:0;width:40px;height:40px;padding:0;cursor:pointer}
+.zv-emo-pick img{width:36px;height:36px}
 .bubble a.zv-a{color:inherit;text-decoration:underline;word-break:break-word}
 .row.them .bubble a.zv-a{color:var(--primary)}
 .bubble.emoji-b{background:none!important;box-shadow:none!important;border:0!important;padding:0 2px!important}
@@ -2390,7 +2393,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='6.0.5', BUILD_ID='2026-11-03-261';
+const APP_VERSION='6.0.6', BUILD_ID='2026-11-03-261';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -5208,7 +5211,17 @@ function _zvParse(т){ const с=String(т||''); const к=[]; let п=0;
 function _zvFirstUrl(т){ const х=_zvParse(т).find(x=>x.вид==='сайт'); return х?х.адрес:null; }
 /* 08.11.2026 (владелец: «эмодзи визуально как в Telegram», повтор Android): картинки со своего сервера,
    api.zorveld.pro/emoji/v1/<коды без FE0F>.webp; нет картинки — символ, как было */
-const _ZV_EMO='https://api.zorveld.pro/emoji/v2/';
+const _ZV_EMO='https://api.zorveld.pro/emoji/v3/';
+/* 11.11.2026: руки цветом эмоции; долгое нажатие (или правая кнопка) — выбор из 5 цветов кожи, запоминается для жеста */
+const _ZV_ТОНЫ=[0x1F3FB,0x1F3FC,0x1F3FD,0x1F3FE,0x1F3FF]; let _zvТоны={}; try{ _zvТоны=JSON.parse(localStorage.getItem('zv-emoji-tone')||'{}')||{}; }catch(e){}
+function _zvEmToned(е,и){ return и==null?е:String(е).replace(/\uFE0F/g,'')+String.fromCodePoint(_ZV_ТОНЫ[и]); }
+function _zvEmTone(е){ const и=_zvТоны[е]; return и==null?е:_zvEmToned(е,и); }
+function _zvEmPick(е,якорь,после){ document.querySelectorAll('.zv-emo-pick').forEach(x=>x.remove()); const п=document.createElement('div'); п.className='zv-emo-pick';
+  const зак=(ев)=>{ if(ев&&п.contains(ев.target))return; п.remove(); document.removeEventListener('pointerdown',зак,true); };
+  [null,0,1,2,3,4].forEach(и=>{ const с=_zvEmToned(е,и), b=document.createElement('button'); b.appendChild(_zvEmHas(с)?_zvEmImg(с):document.createTextNode(с));
+    b.onclick=()=>{ if(и==null)delete _zvТоны[е]; else _zvТоны[е]=и; try{localStorage.setItem('zv-emoji-tone',JSON.stringify(_zvТоны));}catch(x){} зак(); после(с); }; п.appendChild(b); });
+  document.body.appendChild(п); const r=якорь.getBoundingClientRect(), w=п.offsetWidth; п.style.left=Math.max(6,Math.min(innerWidth-w-6,r.left+r.width/2-w/2))+'px'; п.style.top=Math.max(6,r.top-п.offsetHeight-6)+'px';
+  setTimeout(()=>document.addEventListener('pointerdown',зак,true),0); }
 let _zvEmSet=null; try{ const с=localStorage.getItem('zv-emoji-index'); if(с)_zvEmSet=new Set(JSON.parse(с)); }catch(e){}
 fetch(_ZV_EMO+'index.json').then(r=>r.ok?r.json():null).then(a=>{ if(Array.isArray(a)&&a.length){ _zvEmSet=new Set(a); try{localStorage.setItem('zv-emoji-index',JSON.stringify(a));}catch(e){} } }).catch(()=>{});
 function _zvEmName(е){ const к=[]; for(const с of String(е||'')){ const н=с.codePointAt(0); if(н!==0xFE0F)к.push(н.toString(16)); } return к.join('-'); }
@@ -7030,12 +7043,15 @@ const eb=$('#emojiBar');
     const места={};
     кат.forEach(р=>{ const з=document.createElement('div'); з.className='stk-sec'; з.textContent=р.название; места[р.ключ]=з; eb.appendChild(з);
       const с=document.createElement('div'); с.className='zv-emo-grid';
-      (р.эмодзи||[]).forEach(([е])=>{ const b=document.createElement('button'); b.title=е; b.appendChild(_zvEmHas(е)?_zvEmImg(е):document.createTextNode(е)); b.onclick=()=>вставить(е); с.appendChild(b); });
+      (р.эмодзи||[]).forEach(([е,тон])=>{ const b=document.createElement('button'); const рисуй=()=>{ const в=тон?_zvEmTone(е):е; b.title=в; b.replaceChildren(_zvEmHas(в)?_zvEmImg(в):document.createTextNode(в)); }; рисуй();
+        let дол=false,тм=0; b.onclick=()=>{ if(дол){дол=false;return;} вставить(тон?_zvEmTone(е):е); };
+        if(тон){ const откр=()=>{ дол=true; _zvEmPick(е,b,(х)=>{ дол=false; рисуй(); вставить(х); }); }; b.addEventListener('pointerdown',()=>{ дол=false; тм=setTimeout(откр,320); }); ['pointerup','pointerleave','pointercancel'].forEach(н=>b.addEventListener(н,()=>clearTimeout(тм))); b.addEventListener('contextmenu',ев=>{ ев.preventDefault(); clearTimeout(тм); откр(); }); }
+        с.appendChild(b); });
       eb.appendChild(с);
       const т=document.createElement('button'); т.title=р.название; т.appendChild(_zvEmHas(р.значок)?_zvEmImg(р.значок):document.createTextNode(р.значок));
       т.onclick=()=>{ eb.scrollTop=места[р.ключ].offsetTop-44; }; полоса.appendChild(т); }); };
-  try{ const с=localStorage.getItem('zv-emoji-catalog'); if(с)собрать(JSON.parse(с)); }catch(e){}
-  fetch(_ZV_EMO+'catalog.json').then(r=>r.ok?r.json():null).then(к=>{ if(Array.isArray(к)&&к.length){ try{ if(!localStorage.getItem('zv-emoji-catalog')){ localStorage.setItem('zv-emoji-catalog',JSON.stringify(к)); собрать(к);} else localStorage.setItem('zv-emoji-catalog',JSON.stringify(к)); }catch(e){ собрать(к); } } }).catch(()=>{});
+  try{ const с=localStorage.getItem('zv-emoji-catalog3'); if(с)собрать(JSON.parse(с)); }catch(e){}
+  fetch(_ZV_EMO+'catalog.json').then(r=>r.ok?r.json():null).then(к=>{ if(Array.isArray(к)&&к.length){ try{ if(!localStorage.getItem('zv-emoji-catalog3')){ localStorage.setItem('zv-emoji-catalog3',JSON.stringify(к)); собрать(к);} else localStorage.setItem('zv-emoji-catalog3',JSON.stringify(к)); }catch(e){ собрать(к); } } }).catch(()=>{});
 })();
 function sendSticker(key){ if(!current||!STICKERS[key])return; pushMessage({type:'sticker',sticker:key,text:key}); eb.classList.remove('show'); }
 $('#btnEmoji').onclick=()=>{$('#gifPanel').classList.remove('show');eb.classList.toggle('show');};
