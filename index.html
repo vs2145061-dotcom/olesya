@@ -1970,7 +1970,7 @@ body.call-open #toast{bottom:190px}
       <div class="setting"><div class="ic">🔔</div><div class="lbl"><div class="t">Уведомления</div><div class="d">Оповещения о сообщениях и звонках, когда приложение свёрнуто</div></div><div class="switch" id="notifToggle"></div></div>
       <div class="setting"><div class="ic">🔉</div><div class="lbl"><div class="t">Звук при нажатии</div><div class="d">Короткий звук при нажатиях на кнопки</div></div><div class="switch on" id="tapSndToggle"></div></div>
       <div class="setting" id="rowTapSound" style="cursor:pointer"><div class="ic">🎵</div><div class="lbl"><div class="t">Какой звук</div><div class="d" id="stTapSound">Капля</div></div><div style="color:var(--faint)">›</div></div>
-      <div class="setting"><div class="ic">📳</div><div class="lbl"><div class="t">Виброотклик</div><div class="d">Лёгкая вибрация при нажатиях</div></div><div class="switch on" id="tapVibToggle"></div></div>
+      <div class="setting"><div class="ic">📳</div><div class="lbl"><div class="t">Виброотклик</div><div class="d">Сильная вибрация при нажатиях и выборе</div></div><div class="switch on" id="tapVibToggle"></div></div>
       <div class="sec-head">Оформление</div>
       <div class="setting pro-row" id="rowPro" style="cursor:pointer"><div class="ic">✨</div><div class="lbl"><div class="t">ZORVELD Pro</div><div class="d" id="stPro">оформить подписку</div></div><div style="color:var(--faint)">›</div></div>
       <div class="setting" id="rowTheme" style="cursor:pointer"><div class="ic">🎨</div><div class="lbl"><div class="t">Тема оформления</div><div class="d" id="stTheme">Авто</div></div><div style="color:var(--faint)">›</div></div>
@@ -2393,7 +2393,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='6.0.7', BUILD_ID='2026-11-03-261';
+const APP_VERSION='6.0.8', BUILD_ID='2026-11-03-261';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
