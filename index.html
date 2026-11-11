@@ -2393,7 +2393,7 @@ function stickerSVG(key){
 }
 
 /* ===================== v2 CORE ===================== */
-const APP_VERSION='6.0.6', BUILD_ID='2026-11-03-261';
+const APP_VERSION='6.0.7', BUILD_ID='2026-11-03-261';
 /* Подвал настроек раньше показывал зашитую «v4.8.0» — по ней нельзя было понять,
    какая версия реально загружена. Теперь берётся из APP_VERSION. */
 /* Показываем и версию оболочки: у всех сборок APK одинаковое имя версии,
@@ -5219,7 +5219,7 @@ function _zvEmTone(е){ const и=_zvТоны[е]; return и==null?е:_zvEmToned(
 function _zvEmPick(е,якорь,после){ document.querySelectorAll('.zv-emo-pick').forEach(x=>x.remove()); const п=document.createElement('div'); п.className='zv-emo-pick';
   const зак=(ев)=>{ if(ев&&п.contains(ев.target))return; п.remove(); document.removeEventListener('pointerdown',зак,true); };
   [null,0,1,2,3,4].forEach(и=>{ const с=_zvEmToned(е,и), b=document.createElement('button'); b.appendChild(_zvEmHas(с)?_zvEmImg(с):document.createTextNode(с));
-    b.onclick=()=>{ if(и==null)delete _zvТоны[е]; else _zvТоны[е]=и; try{localStorage.setItem('zv-emoji-tone',JSON.stringify(_zvТоны));}catch(x){} зак(); после(с); }; п.appendChild(b); });
+    b.onclick=()=>{ _selVibe(60); if(и==null)delete _zvТоны[е]; else _zvТоны[е]=и; try{localStorage.setItem('zv-emoji-tone',JSON.stringify(_zvТоны));}catch(x){} зак(); после(с); }; п.appendChild(b); });
   document.body.appendChild(п); const r=якорь.getBoundingClientRect(), w=п.offsetWidth; п.style.left=Math.max(6,Math.min(innerWidth-w-6,r.left+r.width/2-w/2))+'px'; п.style.top=Math.max(6,r.top-п.offsetHeight-6)+'px';
   setTimeout(()=>document.addEventListener('pointerdown',зак,true),0); }
 let _zvEmSet=null; try{ const с=localStorage.getItem('zv-emoji-index'); if(с)_zvEmSet=new Set(JSON.parse(с)); }catch(e){}
@@ -5550,7 +5550,7 @@ let selMode=null, selSet=new Set();
 try{ document.addEventListener('touchstart',()=>{window._lastTouch=Date.now();},{passive:true,capture:true}); }catch(e){}
 function _touchRecent(){ return (Date.now()-(window._lastTouch||0))<1200; }
 // виброотклик выбора через нативный мост doVibe (navigator.vibrate в Android WebView отключён)
-function _selVibe(ms){ try{ if(typeof doVibe==='function')doVibe(ms||10); else if(navigator.vibrate)navigator.vibrate(ms||10); }catch(e){} }
+function _selVibe(ms){ try{ if(typeof doVibe==='function')doVibe(ms||60); else if(navigator.vibrate)navigator.vibrate(ms||60); }catch(e){} }
 function selBoxFor(mode){ return document.getElementById(mode==='msg'?'msgs':'chatList'); }
 function markSelNode(mode,id,on){ const box=selBoxFor(mode); if(!box)return; const k=(mode==='msg'?'msg:':'chat:')+id;
   Array.prototype.forEach.call(box.children,ch=>{ if(ch.dataset&&ch.dataset.k===k)ch.classList.toggle('selrow',on); }); }
@@ -7045,7 +7045,7 @@ const eb=$('#emojiBar');
       const с=document.createElement('div'); с.className='zv-emo-grid';
       (р.эмодзи||[]).forEach(([е,тон])=>{ const b=document.createElement('button'); const рисуй=()=>{ const в=тон?_zvEmTone(е):е; b.title=в; b.replaceChildren(_zvEmHas(в)?_zvEmImg(в):document.createTextNode(в)); }; рисуй();
         let дол=false,тм=0; b.onclick=()=>{ if(дол){дол=false;return;} вставить(тон?_zvEmTone(е):е); };
-        if(тон){ const откр=()=>{ дол=true; _zvEmPick(е,b,(х)=>{ дол=false; рисуй(); вставить(х); }); }; b.addEventListener('pointerdown',()=>{ дол=false; тм=setTimeout(откр,320); }); ['pointerup','pointerleave','pointercancel'].forEach(н=>b.addEventListener(н,()=>clearTimeout(тм))); b.addEventListener('contextmenu',ев=>{ ев.preventDefault(); clearTimeout(тм); откр(); }); }
+        if(тон){ const откр=()=>{ дол=true; _selVibe(60); _zvEmPick(е,b,(х)=>{ дол=false; рисуй(); вставить(х); }); }; b.addEventListener('pointerdown',()=>{ дол=false; тм=setTimeout(откр,320); }); ['pointerup','pointerleave','pointercancel'].forEach(н=>b.addEventListener(н,()=>clearTimeout(тм))); b.addEventListener('contextmenu',ев=>{ ев.preventDefault(); clearTimeout(тм); откр(); }); }
         с.appendChild(b); });
       eb.appendChild(с);
       const т=document.createElement('button'); т.title=р.название; т.appendChild(_zvEmHas(р.значок)?_zvEmImg(р.значок):document.createTextNode(р.значок));
@@ -12996,7 +12996,7 @@ function setTapVibe(on){try{localStorage.setItem('om_tapvib',on?'1':'0');}catch(
 function doVibe(ms){
   try{
     if(window.__OLESYA_NATIVE__&&window.ReactNativeWebView){window.ReactNativeWebView.postMessage(JSON.stringify({type:'haptic',ms:ms||10}));return;}
-    if(navigator.vibrate)navigator.vibrate(ms||10);
+    if(navigator.vibrate)navigator.vibrate(ms||60);
   }catch(e){}
 }
 let _tapCtx=null,_tapPrimed=false;
